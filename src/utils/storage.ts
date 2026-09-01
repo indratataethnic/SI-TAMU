@@ -140,7 +140,15 @@ export const saveCompensations = (records: CompensationRecord[]): void => {
 export const getStoredSettings = (): SchoolSettings => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    return raw ? JSON.parse(raw) : initialSettings;
+    const parsed = raw ? JSON.parse(raw) : initialSettings;
+    const defaultWebhook = 'https://script.google.com/macros/s/AKfycbyGbfZdmd1fop8QjjBAlFAe3ZRbfCpa0Ql1wxBrDoKMtzkWig4-FQOw9pN56HVKujc/exec';
+    if (!parsed.googleSheetsWebhook) {
+      parsed.googleSheetsWebhook = defaultWebhook;
+    }
+    if (!parsed.googleSheetsWebhookUrl) {
+      parsed.googleSheetsWebhookUrl = defaultWebhook;
+    }
+    return parsed;
   } catch (e) {
     return initialSettings;
   }

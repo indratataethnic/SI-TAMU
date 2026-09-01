@@ -18,16 +18,21 @@ if (!fs.existsSync(CONFIG_DIR)) {
 
 // GET API: Retrieve globally stored spreadsheet and webhook URL
 app.get("/api/global-config", (req, res) => {
+  const defaultWebhook = "https://script.google.com/macros/s/AKfycbyGbfZdmd1fop8QjjBAlFAe3ZRbfCpa0Ql1wxBrDoKMtzkWig4-FQOw9pN56HVKujc/exec";
   try {
     if (fs.existsSync(CONFIG_FILE)) {
       const data = fs.readFileSync(CONFIG_FILE, "utf-8");
-      return res.json(JSON.parse(data));
+      const parsed = JSON.parse(data);
+      if (!parsed.googleSheetsWebhook) {
+        parsed.googleSheetsWebhook = defaultWebhook;
+      }
+      return res.json(parsed);
     }
   } catch (err) {
     console.error("Error reading global config:", err);
   }
   return res.json({
-    googleSheetsWebhook: "https://script.google.com/macros/s/AKfycbyGbfZdmd1fop8QjjBAlFAe3ZRbfCpa0Ql1wxBrDoKMtzkWig4-FQOw9pN56HVKujc/exec",
+    googleSheetsWebhook: defaultWebhook,
     googleSheetsUrl: ""
   });
 });
