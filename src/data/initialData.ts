@@ -312,6 +312,7 @@ export const initialStudents: Student[] = [
   {
     id: 'STU-001',
     nisn: '0089123401',
+    nik: '3515011204120001',
     name: 'Ahmad Faiz Al-Farizi',
     class: 'Kelas 6',
     gender: 'L',
@@ -324,6 +325,7 @@ export const initialStudents: Student[] = [
   {
     id: 'STU-002',
     nisn: '0089123402',
+    nik: '3515015508120002',
     name: 'Annisa Putri Rahmawati',
     class: 'Kelas 6',
     gender: 'P',
@@ -336,6 +338,7 @@ export const initialStudents: Student[] = [
   {
     id: 'STU-003',
     nisn: '0089123403',
+    nik: '3515011909130003',
     name: 'Bagas Aditya Pratama',
     class: 'Kelas 5',
     gender: 'L',
@@ -348,6 +351,7 @@ export const initialStudents: Student[] = [
   {
     id: 'STU-004',
     nisn: '0089123404',
+    nik: '3515012211140004',
     name: 'Daffa Rizky Ramadhan',
     class: 'Kelas 4',
     gender: 'L',
@@ -360,6 +364,7 @@ export const initialStudents: Student[] = [
   {
     id: 'STU-005',
     nisn: '0089123405',
+    nik: '3515016003150005',
     name: 'Nayla Salsabila Azzahra',
     class: 'Kelas 3',
     gender: 'P',
@@ -372,6 +377,7 @@ export const initialStudents: Student[] = [
   {
     id: 'STU-006',
     nisn: '0089123406',
+    nik: '3515011407160006',
     name: 'Rezky Arya Maulana',
     class: 'Kelas 2',
     gender: 'L',
@@ -384,6 +390,7 @@ export const initialStudents: Student[] = [
   {
     id: 'STU-007',
     nisn: '0089123407',
+    nik: '3515015002170007',
     name: 'Zahra Amelia Dewi',
     class: 'Kelas 1',
     gender: 'P',

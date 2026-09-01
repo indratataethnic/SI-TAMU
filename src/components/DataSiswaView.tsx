@@ -61,6 +61,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
   // Form state
   const [formData, setFormData] = useState({
     nisn: '',
+    nik: '',
     name: '',
     class: 'Kelas 1',
     gender: 'L' as 'L' | 'P',
@@ -88,6 +89,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
         !q ||
         s.name.toLowerCase().includes(q) ||
         s.nisn.toLowerCase().includes(q) ||
+        (s.nik && s.nik.toLowerCase().includes(q)) ||
         s.class.toLowerCase().includes(q) ||
         s.parentName.toLowerCase().includes(q);
       return matchesClass && matchesSearch;
@@ -99,6 +101,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
     setCustomClassMode(false);
     setFormData({
       nisn: '',
+      nik: '',
       name: '',
       class: 'Kelas 1',
       gender: 'L',
@@ -116,6 +119,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
     setCustomClassMode(!isStandardClass);
     setFormData({
       nisn: student.nisn,
+      nik: student.nik || '',
       name: student.name,
       class: student.class || 'Kelas 1',
       gender: student.gender,
@@ -360,7 +364,10 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                   return (
                     <tr key={student.id} className="hover:bg-slate-50/80 transition">
                       <td className="py-3 px-4 text-slate-500 font-mono">{idx + 1}</td>
-                      <td className="py-3 px-4 font-mono font-medium text-slate-700">{student.nisn}</td>
+                      <td className="py-3 px-4 font-mono font-medium text-slate-700">
+                        <div>{student.nisn}</div>
+                        {student.nik && <div className="text-[10px] text-slate-400 font-mono">NIK: {student.nik}</div>}
+                      </td>
                       <td className="py-3 px-4">
                         <span className="font-bold text-slate-900 block">{student.name}</span>
                         <span className="text-[10px] text-slate-400 font-mono">Kode Akses: {student.accessCode || '-'}</span>
@@ -472,6 +479,16 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
             <form onSubmit={handleFormSubmit} className="p-6 space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
+                  <label className="block font-semibold text-slate-700 mb-1">NIK (16 Digit)</label>
+                  <input
+                    type="text"
+                    value={formData.nik}
+                    onChange={(e) => setFormData({ ...formData, nik: e.target.value })}
+                    placeholder="Contoh: 351501..."
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-mono"
+                  />
+                </div>
+                <div>
                   <label className="block font-semibold text-slate-700 mb-1">NISN (Nomor Induk)</label>
                   <input
                     type="text"
@@ -482,52 +499,53 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-mono"
                   />
                 </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block font-semibold text-slate-700">Pilihan Kelas</label>
-                    <button
-                      type="button"
-                      onClick={() => setCustomClassMode(!customClassMode)}
-                      className="text-[10px] text-emerald-700 hover:underline font-semibold"
-                    >
-                      {customClassMode ? '← Pilih Kelas 1-6' : 'Ketik Manual'}
-                    </button>
-                  </div>
-                  {customClassMode ? (
-                    <input
-                      type="text"
-                      required
-                      value={formData.class}
-                      onChange={(e) => setFormData({ ...formData, class: e.target.value })}
-                      placeholder="Contoh: Kelas 1-A atau 6B"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold"
-                    />
-                  ) : (
-                    <select
-                      value={formData.class}
-                      onChange={(e) => {
-                        if (e.target.value === 'CUSTOM') {
-                          setCustomClassMode(true);
-                        } else {
-                          setFormData({ ...formData, class: e.target.value });
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold text-slate-900"
-                    >
-                      <optgroup label="Kelas Utama (SD)">
-                        {PRIMARY_SCHOOL_CLASSES.map(cls => (
-                          <option key={cls} value={cls}>{cls}</option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Kelas Paralel">
-                        {PRIMARY_SCHOOL_PARALLEL_CLASSES.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c)).map(cls => (
-                          <option key={cls} value={cls}>{cls}</option>
-                        ))}
-                      </optgroup>
-                      <option value="CUSTOM">+ Tulis Format Kelas Lain...</option>
-                    </select>
-                  )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold text-slate-700">Pilihan Kelas</label>
+                  <button
+                    type="button"
+                    onClick={() => setCustomClassMode(!customClassMode)}
+                    className="text-[10px] text-emerald-700 hover:underline font-semibold"
+                  >
+                    {customClassMode ? '← Pilih Kelas 1-6' : 'Ketik Manual'}
+                  </button>
                 </div>
+                {customClassMode ? (
+                  <input
+                    type="text"
+                    required
+                    value={formData.class}
+                    onChange={(e) => setFormData({ ...formData, class: e.target.value })}
+                    placeholder="Contoh: Kelas 1-A atau 6B"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold"
+                  />
+                ) : (
+                  <select
+                    value={formData.class}
+                    onChange={(e) => {
+                      if (e.target.value === 'CUSTOM') {
+                        setCustomClassMode(true);
+                      } else {
+                        setFormData({ ...formData, class: e.target.value });
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold text-slate-900"
+                  >
+                    <optgroup label="Kelas Utama (SD)">
+                      {PRIMARY_SCHOOL_CLASSES.map(cls => (
+                        <option key={cls} value={cls}>{cls}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Kelas Paralel">
+                      {PRIMARY_SCHOOL_PARALLEL_CLASSES.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c)).map(cls => (
+                        <option key={cls} value={cls}>{cls}</option>
+                      ))}
+                    </optgroup>
+                    <option value="CUSTOM">+ Tulis Format Kelas Lain...</option>
+                  </select>
+                )}
               </div>
 
               {/* Quick Class Selector Buttons for Add/Edit */}
@@ -696,6 +714,14 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
               {/* Bio Details */}
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
                 <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">NIK Siswa:</span>
+                    <span className="font-mono font-semibold text-slate-800">{detailStudent.nik || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">NISN:</span>
+                    <span className="font-mono font-semibold text-slate-800">{detailStudent.nisn}</span>
+                  </div>
                   <div>
                     <span className="text-slate-400 block text-[10px]">Orang Tua / Wali:</span>
                     <span className="font-semibold text-slate-800">{detailStudent.parentName}</span>

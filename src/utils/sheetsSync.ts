@@ -148,20 +148,21 @@ function formatHeaderRow(sheet, headers, bgHex) {
 
 function writeStudentsSheet(ss, students) {
   var sheet = ss.getSheetByName("Data_Siswa") || ss.insertSheet("Data_Siswa");
-  var headers = ["NISN", "Nama Siswa", "Kelas", "Jenis Kelamin", "Nama Orang Tua / Wali", "No HP / WhatsApp Wali", "Alamat Rumah", "Kode Akses Siswa", "Catatan Khusus", "ID Sistem"];
+  var headers = ["NIK", "NISN", "Nama Siswa", "Kelas", "Jenis Kelamin", "Nama Orang Tua / Wali", "No HP / WhatsApp Wali", "Alamat Rumah", "Kode Akses Siswa", "Catatan Khusus", "ID Sistem"];
   formatHeaderRow(sheet, headers, "#064E3B");
 
   if (!students || students.length === 0) return;
 
   var rows = students.map(function(s) {
     return [
+      "'" + (s.nik || "-"),
       "'" + (s.nisn || ""),
       s.name || "",
       s.class || "",
       s.gender === "L" ? "Laki-laki" : (s.gender === "P" ? "Perempuan" : s.gender || ""),
       s.parentName || "",
       "'" + (s.parentPhone || ""),
-      s.address || "",
+      s.parentAddress || s.address || "",
       "'" + (s.accessCode || ""),
       s.notes || "",
       s.id || ""

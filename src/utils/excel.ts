@@ -4,6 +4,7 @@ import { Student, ViolationRecord, RewardRecord, StudentScoreSummary } from '../
 export const downloadStudentTemplate = () => {
   const templateData = [
     {
+      'NIK (16 Digit)': '3515011204120001',
       'NISN': '0089123410',
       'Nama Siswa': 'Contoh Siswa Baru',
       'Kelas': 'Kelas 1',
@@ -13,6 +14,7 @@ export const downloadStudentTemplate = () => {
       'Alamat': 'Jl. Contoh Alamat No. 1'
     },
     {
+      'NIK (16 Digit)': '3515015508120002',
       'NISN': '0089123411',
       'Nama Siswa': 'Contoh Siswi Baru',
       'Kelas': 'Kelas 2',
@@ -36,6 +38,7 @@ export const exportStudentsToExcel = (students: Student[], summaries: StudentSco
     const sum = summaryMap.get(s.id);
     return {
       'No': index + 1,
+      'NIK': s.nik || '-',
       'NISN': s.nisn,
       'Nama Siswa': s.name,
       'Kelas': s.class,
@@ -141,6 +144,7 @@ export const importStudentsFromExcel = async (file: File): Promise<Student[]> =>
 
         const parsedStudents: Student[] = rawJson.map((row, index) => {
           // Normalize column names
+          const nik = String(row['NIK (16 Digit)'] || row['NIK'] || row['nik'] || '').trim();
           const nisn = String(row['NISN'] || row['nisn'] || row['No Induk'] || `NISN-${Date.now()}-${index}`);
           const name = String(row['Nama Siswa'] || row['Nama'] || row['nama'] || `Siswa ${index + 1}`).trim();
           const studentClass = String(row['Kelas'] || row['kelas'] || 'VII-A').trim();
@@ -157,6 +161,7 @@ export const importStudentsFromExcel = async (file: File): Promise<Student[]> =>
           return {
             id: `STU-IMP-${Date.now()}-${index}`,
             nisn,
+            nik: nik || undefined,
             name,
             class: studentClass,
             gender,

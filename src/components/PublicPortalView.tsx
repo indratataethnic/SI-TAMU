@@ -59,17 +59,18 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
     const cleanCode = inputAccessCode.trim().toUpperCase();
 
     if (!cleanNisn) {
-      setErrorMessage('Silakan masukkan NISN atau nama siswa.');
+      setErrorMessage('Silakan masukkan NIK, NISN, atau nama siswa.');
       return;
     }
 
     const found = students.find(s =>
+      (s.nik && s.nik.trim() === cleanNisn) ||
       s.nisn.trim() === cleanNisn ||
       s.name.toLowerCase().includes(cleanNisn.toLowerCase())
     );
 
     if (!found) {
-      setErrorMessage('Data siswa dengan NISN / nama tersebut tidak ditemukan.');
+      setErrorMessage('Data siswa dengan NIK / NISN / nama tersebut tidak ditemukan.');
       return;
     }
 
@@ -84,7 +85,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
 
   const handleSelectDirect = (student: Student) => {
     setSelectedStudent(student);
-    setInputNisn(student.nisn);
+    setInputNisn(student.nik || student.nisn);
     setInputAccessCode(student.accessCode || '');
   };
 
@@ -107,7 +108,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
   const handleContactBK = () => {
     if (!selectedStudent) return;
     const bkPhone = settings.bkCoordinatorPhone || '081234567890';
-    const text = `Halo Bapak/Ibu Guru BK ${settings.schoolName}, saya orang tua dari ananda *${selectedStudent.name}* (Kelas ${selectedStudent.class}, NISN: ${selectedStudent.nisn}). Saya ingin berkonsultasi mengenai perkembangan tata tertib dan poin kedisiplinan ananda. Terima kasih.`;
+    const text = `Halo Bapak/Ibu Guru BK ${settings.schoolName}, saya orang tua dari ananda *${selectedStudent.name}* (Kelas ${selectedStudent.class}). Saya ingin berkonsultasi mengenai perkembangan tata tertib dan poin kedisiplinan ananda. Terima kasih.`;
     openWhatsApp(bkPhone, text);
   };
 
@@ -145,14 +146,14 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  NISN atau Nama Lengkap Siswa
+                  NIK, NISN, atau Nama Lengkap Siswa
                 </label>
                 <input
                   type="text"
                   required
                   value={inputNisn}
                   onChange={(e) => setInputNisn(e.target.value)}
-                  placeholder="Contoh: 0089123401 atau Nama Siswa"
+                  placeholder="Contoh: 351501... (NIK) / 0089123401 (NISN)"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium"
                 />
               </div>
@@ -259,7 +260,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    NISN: <span className="font-mono font-bold text-slate-700">{selectedStudent.nisn}</span> • Wali Murid: <span className="font-semibold text-slate-700">{selectedStudent.parentName}</span>
+                    Wali Murid: <span className="font-semibold text-slate-700">{selectedStudent.parentName}</span>
                   </p>
                 </div>
               </div>

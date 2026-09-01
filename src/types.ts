@@ -5,6 +5,7 @@ export type ViolationCategoryType = 'berat' | 'sedang' | 'ringan' | 'khusus';
 export interface Student {
   id: string;
   nisn: string;
+  nik?: string;
   name: string;
   class: string;
   gender: 'L' | 'P';
