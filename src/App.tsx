@@ -169,13 +169,6 @@ export default function App() {
     const webhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '').trim();
     if (!webhook) return;
 
-    const hasAutoFetched = sessionStorage.getItem('si_tamu_auto_fetched');
-    if (hasAutoFetched) {
-      isInitialLoadingRef.current = false;
-      return;
-    }
-    sessionStorage.setItem('si_tamu_auto_fetched', 'true');
-
     fetchFullStateFromSheets(webhook)
       .then(res => {
         if (res.success && res.data) {
