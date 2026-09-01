@@ -136,21 +136,21 @@ export default function App() {
     fetch('/api/global-config')
       .then(res => res.json())
       .then(data => {
-        if (data && (data.googleSheetsWebhook || data.googleSheetsUrl)) {
+        if (data) {
           setSettings(prev => {
-            const webhook = data.googleSheetsWebhook || '';
-            const sheetUrl = data.googleSheetsUrl || '';
-            if (prev.googleSheetsWebhook !== webhook || prev.googleSheetsUrl !== sheetUrl) {
-              const updated = {
-                ...prev,
-                googleSheetsWebhook: webhook,
-                googleSheetsWebhookUrl: webhook,
-                googleSheetsUrl: sheetUrl
-              };
-              saveSettings(updated);
-              return updated;
-            }
-            return prev;
+            const webhook = data.googleSheetsWebhook || prev.googleSheetsWebhook || '';
+            const sheetUrl = data.googleSheetsUrl || prev.googleSheetsUrl || '';
+            const serverSettings = data.settings || {};
+            
+            const updated = {
+              ...prev,
+              ...serverSettings,
+              googleSheetsWebhook: webhook,
+              googleSheetsWebhookUrl: webhook,
+              googleSheetsUrl: sheetUrl
+            };
+            saveSettings(updated);
+            return updated;
           });
         }
       })
@@ -178,19 +178,18 @@ export default function App() {
 
   useEffect(() => { 
     saveSettings(settings); 
-    // Persist configuration to the Express backend container server
+    // Persist configuration & school settings to the Express backend container server
     const webhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '').trim();
     const sheetUrl = (settings.googleSheetsUrl || '').trim();
-    if (webhook || sheetUrl) {
-      fetch('/api/global-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          googleSheetsWebhook: webhook,
-          googleSheetsUrl: sheetUrl
-        })
-      }).catch(err => console.log('Error writing global config to server:', err));
-    }
+    fetch('/api/global-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        googleSheetsWebhook: webhook,
+        googleSheetsUrl: sheetUrl,
+        settings: settings
+      })
+    }).catch(err => console.log('Error writing global config to server:', err));
   }, [settings]);
   useEffect(() => { saveUserRole(role); }, [role]);
 

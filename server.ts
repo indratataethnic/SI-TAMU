@@ -33,17 +33,19 @@ app.get("/api/global-config", (req, res) => {
   }
   return res.json({
     googleSheetsWebhook: defaultWebhook,
-    googleSheetsUrl: ""
+    googleSheetsUrl: "",
+    settings: null
   });
 });
 
-// POST API: Store spreadsheet and webhook URL globally
+// POST API: Store spreadsheet, webhook URL and settings globally
 app.post("/api/global-config", (req, res) => {
   try {
-    const { googleSheetsWebhook, googleSheetsUrl } = req.body;
+    const { googleSheetsWebhook, googleSheetsUrl, settings } = req.body;
     const config = {
       googleSheetsWebhook: googleSheetsWebhook || "",
-      googleSheetsUrl: googleSheetsUrl || ""
+      googleSheetsUrl: googleSheetsUrl || "",
+      settings: settings || null
     };
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), "utf-8");
     return res.json({ success: true, config });
