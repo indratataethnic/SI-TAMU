@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Student, Teacher, StudentScoreSummary, CompensationRecord, SchoolSettings, ViolationRecord } from '../types';
+import React, { useState, useMemo } from 'react';
+import { Student, StudentScoreSummary, CompensationRecord, SchoolSettings, ViolationRecord } from '../types';
 import {
   Calculator,
   Search,
@@ -17,14 +17,17 @@ import {
   Trash2,
   X,
   AlertCircle,
-  GraduationCap
+  Crown,
+  Star,
+  Award,
+  ShieldCheck
 } from 'lucide-react';
 import { exportPenghitunganToExcel } from '../utils/excel';
 import { openWhatsApp, generateThresholdWAMessage } from '../utils/whatsapp';
+import { SertifikatTeladanModal } from './SertifikatTeladanModal';
 
 interface PenghitunganViewProps {
   summaries: StudentScoreSummary[];
-  teachers?: Teacher[];
   compensations: CompensationRecord[];
   violations: ViolationRecord[];
   settings: SchoolSettings;
@@ -35,7 +38,6 @@ interface PenghitunganViewProps {
 
 export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
   summaries,
-  teachers = [],
   compensations,
   violations,
   settings,
@@ -49,14 +51,37 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
   const [compensationModalOpen, setCompensationModalOpen] = useState(false);
   const [selectedStudentForComp, setSelectedStudentForComp] = useState<Student | null>(null);
 
+  // Teladan Modal State
+  const [teladanSelectorOpen, setTeladanSelectorOpen] = useState(false);
+  const [activeTeladanCertSummary, setActiveTeladanCertSummary] = useState<StudentScoreSummary | null>(null);
+  const [teladanSelectedClassTab, setTeladanSelectedClassTab] = useState<string>('ALL');
+
   // Form for compensation
   const [compTask, setCompTask] = useState('');
   const [compPoints, setCompPoints] = useState<number>(10);
   const [compSupervisor, setCompSupervisor] = useState(settings.bkCoordinatorName || 'Ibu Ratna, M.Pd.');
-  const [compSupervisorNip, setCompSupervisorNip] = useState(settings.bkCoordinatorNip || '');
   const [compNotes, setCompNotes] = useState('');
 
   const classesList = ['ALL', ...Array.from(new Set(summaries.map(s => s.student.class))).sort()];
+  const realClasses = useMemo(() => {
+    return Array.from(new Set(summaries.map(s => s.student.class))).sort();
+  }, [summaries]);
+
+  // Teladan Candidates: STRICT REQUIREMENT: Total Violations === 0 and Active Points === 0
+  const teladanCandidates = useMemo(() => {
+    return summaries
+      .filter(s => s.totalViolationPoints === 0 && s.violationsCount === 0)
+      .sort((a, b) => b.totalRewardPoints - a.totalRewardPoints || a.student.name.localeCompare(b.student.name));
+  }, [summaries]);
+
+  // Group Teladan Candidates by Class
+  const teladanByClass = useMemo(() => {
+    const map: Record<string, StudentScoreSummary[]> = {};
+    realClasses.forEach(cls => {
+      map[cls] = teladanCandidates.filter(s => s.student.class === cls);
+    });
+    return map;
+  }, [realClasses, teladanCandidates]);
 
   const filteredSummaries = summaries.filter(s => {
     const matchesCls = selectedClass === 'ALL' || s.student.class === selectedClass;
@@ -95,7 +120,6 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
       deductedPoints: Number(compPoints) || 0,
       date: new Date().toISOString().slice(0, 10),
       supervisorName: compSupervisor,
-      supervisorNip: compSupervisorNip || undefined,
       status: 'Disetujui',
       notes: compNotes,
       createdAt: new Date().toISOString()
@@ -120,17 +144,27 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
             Penghitungan & Manajemen Akumulasi Poin Siswa
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Kalkulasi otomatis poin aktif <span className="font-semibold text-emerald-950">(Pelanggaran - Kompensasi)</span> serta penanganan berjenjang (Ambang 100, 300, 500 Poin).
+            Kalkulasi otomatis poin aktif <span className="font-semibold text-emerald-950">(Pelanggaran - Kompensasi)</span>, penanganan berjenjang, serta penetapan Murid Teladan per kelas.
           </p>
         </div>
 
-        <button
-          onClick={() => exportPenghitunganToExcel(summaries)}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-900 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold transition shadow cursor-pointer"
-        >
-          <FileSpreadsheet className="w-3.5 h-3.5" />
-          Export Rekap Poin Excel
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setTeladanSelectorOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-emerald-950 font-bold rounded-xl text-xs transition shadow cursor-pointer"
+          >
+            <Crown className="w-4 h-4 text-emerald-950" />
+            Tentukan Murid Teladan Tiap Kelas
+          </button>
+
+          <button
+            onClick={() => exportPenghitunganToExcel(summaries)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-900 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold transition shadow cursor-pointer"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            Export Rekap Poin Excel
+          </button>
+        </div>
       </div>
 
       {/* Threshold Guide Cards */}
@@ -342,6 +376,15 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
                               <Printer className="w-3 h-3" />
                               <span>Surat Panggilan</span>
                             </button>
+                          ) : item.totalViolationPoints === 0 && item.violationsCount === 0 ? (
+                            <button
+                              onClick={() => setActiveTeladanCertSummary(item)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-emerald-950 font-bold rounded-lg text-[11px] transition shadow-xs cursor-pointer"
+                              title="Cetak Sertifikat Siswa Teladan (0 Pelanggaran)"
+                            >
+                              <Crown className="w-3 h-3" />
+                              <span>Sertifikat Teladan</span>
+                            </button>
                           ) : (
                             <span className="text-[11px] text-slate-400 font-medium">Dalam Batas Aman</span>
                           )}
@@ -481,32 +524,13 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
                   <label className="block font-semibold text-slate-700 mb-1">
                     Guru Pembina / Saksi
                   </label>
-                  {teachers.length > 0 ? (
-                    <select
-                      value={compSupervisor}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setCompSupervisor(val);
-                        const t = teachers.find(item => item.name === val);
-                        if (t) setCompSupervisorNip(t.nip);
-                      }}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none text-xs sm:text-sm font-medium text-slate-900"
-                    >
-                      {teachers.map(t => (
-                        <option key={t.id} value={t.name}>
-                          {t.name} ({t.role})
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      required
-                      value={compSupervisor}
-                      onChange={(e) => setCompSupervisor(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none"
-                    />
-                  )}
+                  <input
+                    type="text"
+                    required
+                    value={compSupervisor}
+                    onChange={(e) => setCompSupervisor(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                  />
                 </div>
               </div>
 
@@ -541,6 +565,203 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* MODAL PENETAPAN MURID TELADAN TIAP KELAS */}
+      {teladanSelectorOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75 backdrop-blur-sm flex justify-center items-start p-3 sm:p-6 text-xs">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden my-4 border border-amber-300">
+            {/* Header */}
+            <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between border-b border-emerald-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/20 text-amber-400 rounded-xl border border-amber-500/30">
+                  <Crown className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg text-amber-300">Penetapan & Cetak Piagam Murid Teladan</h3>
+                  <p className="text-xs text-emerald-300">
+                    Syarat Mutlak: <strong className="text-amber-300">0 (Nol) Poin Pelanggaran</strong> & Disiplin Berprestasi
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setTeladanSelectorOpen(false)}
+                className="p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-emerald-900 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Criteria Banner */}
+            <div className="p-4 bg-amber-50/80 border-b border-amber-200 flex items-start gap-3">
+              <ShieldCheck className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
+              <div className="text-slate-700 leading-relaxed">
+                <span className="font-bold text-amber-950 block">Standar Kriteria Penentuan Siswa Teladan:</span>
+                <p className="text-[11px] text-slate-600 mt-0.5">
+                  Siswa wajib memiliki <strong>0 (NOL) catatan poin pelanggaran</strong> dan rekam jejak tata tertib prima. Siswa dengan perolehan <strong>Poin Reward prestasi tertinggi</strong> otomatis diprioritaskan sebagai bintang teladan di kelasnya.
+                </p>
+              </div>
+            </div>
+
+            {/* Class Filter Tabs */}
+            <div className="px-6 pt-4 pb-2 border-b border-slate-200 flex flex-wrap items-center gap-2 bg-slate-50">
+              <span className="font-bold text-slate-600 text-xs mr-2">Pilih Kelas:</span>
+              <button
+                onClick={() => setTeladanSelectedClassTab('ALL')}
+                className={`px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
+                  teladanSelectedClassTab === 'ALL'
+                    ? 'bg-emerald-950 text-white shadow'
+                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                Semua Kelas ({teladanCandidates.length} Siswa)
+              </button>
+              {realClasses.map(cls => {
+                const count = (teladanByClass[cls] || []).length;
+                return (
+                  <button
+                    key={cls}
+                    onClick={() => setTeladanSelectedClassTab(cls)}
+                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
+                      teladanSelectedClassTab === cls
+                        ? 'bg-emerald-950 text-white shadow'
+                        : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    Kelas {cls} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Candidate List per Class */}
+            <div className="p-6 max-h-[65vh] overflow-y-auto space-y-6">
+              {(teladanSelectedClassTab === 'ALL' ? realClasses : [teladanSelectedClassTab]).map(cls => {
+                const classCandidates = teladanByClass[cls] || [];
+                const topCandidate = classCandidates[0];
+
+                return (
+                  <div key={cls} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+                    {/* Class Section Header */}
+                    <div className="bg-slate-100 px-4 py-2.5 flex items-center justify-between border-b border-slate-200">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-sm">Kelas {cls}</span>
+                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-semibold text-[10px]">
+                          {classCandidates.length} Siswa 0 Pelanggaran
+                        </span>
+                      </div>
+                      {topCandidate && (
+                        <div className="flex items-center gap-1.5 text-amber-700 font-bold text-xs">
+                          <Crown className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Peringkat 1: {topCandidate.student.name} (+{topCandidate.totalRewardPoints} Pts)</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {classCandidates.length === 0 ? (
+                      <div className="p-6 text-center text-slate-400">
+                        Belum ada siswa di kelas {cls} yang memenuhi syarat (0 pelanggaran).
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-100">
+                        {classCandidates.map((cand, idx) => {
+                          const isTop = idx === 0;
+                          return (
+                            <div
+                              key={cand.student.id}
+                              className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-amber-50/40 transition ${
+                                isTop ? 'bg-amber-50/20' : ''
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div
+                                  className={`w-8 h-8 rounded-full flex items-center justify-center font-bold shrink-0 ${
+                                    isTop
+                                      ? 'bg-amber-500 text-slate-950 shadow-md ring-2 ring-amber-300'
+                                      : 'bg-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  {isTop ? <Crown className="w-4 h-4" /> : `#${idx + 1}`}
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-slate-900 text-sm">{cand.student.name}</span>
+                                    {isTop && (
+                                      <span className="px-2 py-0.5 bg-gradient-to-r from-amber-500 to-amber-600 text-emerald-950 font-black text-[10px] rounded-full uppercase tracking-wider shadow-xs">
+                                        ★ Murid Teladan Kelas
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-slate-500">
+                                    <span>NISN: {cand.student.nisn}</span>
+                                    <span>•</span>
+                                    <span className="text-emerald-700 font-bold">✓ 0 Poin Pelanggaran</span>
+                                    <span>•</span>
+                                    <span className="text-amber-800 font-semibold bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded">
+                                      +{cand.totalRewardPoints} Poin Reward ({cand.rewardsCount}x prestasi)
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                                <button
+                                  onClick={() => {
+                                    const text = `*PIAGAM PENGHARGAAN SISWA TELADAN ${settings.schoolName.toUpperCase()}*\n\n` +
+                                      `Yth. Bapak/Ibu Orang Tua/Wali dari ananda *${cand.student.name}* (Kelas ${cand.student.class}),\n\n` +
+                                      `Kami dengan bangga menginformasikan bahwa ananda ditetapkan sebagai *SISWA TELADAN KELAS ${cand.student.class}* atas kedisiplinan prima (0 Pelanggaran) dan perolehan +${cand.totalRewardPoints} Poin Reward Prestasi.\n\n` +
+                                      `Selamat dan terima kasih atas bimbingan luar biasa Bapak/Ibu di rumah!`;
+                                    openWhatsApp(cand.student.parentPhone, text);
+                                  }}
+                                  className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg font-semibold transition flex items-center gap-1 cursor-pointer"
+                                  title="Kirim Ucapan Selamat ke WhatsApp Orang Tua"
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                  <span>Kirim WA</span>
+                                </button>
+
+                                <button
+                                  onClick={() => setActiveTeladanCertSummary(cand)}
+                                  className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer ${
+                                    isTop
+                                      ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-emerald-950 shadow'
+                                      : 'bg-emerald-950 hover:bg-emerald-900 text-white'
+                                  }`}
+                                >
+                                  <Printer className="w-3.5 h-3.5" />
+                                  <span>Cetak Piagam Teladan</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-3 bg-slate-100 border-t border-slate-200 flex justify-end">
+              <button
+                onClick={() => setTeladanSelectorOpen(false)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-bold transition cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SERTIFIKAT TELADAN RESMI */}
+      {activeTeladanCertSummary && (
+        <SertifikatTeladanModal
+          summary={activeTeladanCertSummary}
+          settings={settings}
+          onClose={() => setActiveTeladanCertSummary(null)}
+        />
       )}
     </div>
   );

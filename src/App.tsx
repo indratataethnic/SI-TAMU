@@ -513,7 +513,7 @@ export default function App() {
           rewards={rewards}
           compensations={compensations}
           summaries={summaries}
-          onSaveWebhookUrl={(url) => setSettings(prev => ({ ...prev, googleSheetsWebhookUrl: url }))}
+          onSaveSettings={(newSettings) => setSettings(newSettings)}
         />
       )}
 

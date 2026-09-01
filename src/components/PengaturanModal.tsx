@@ -5,8 +5,9 @@ import { resetAllToDefault } from '../utils/storage';
 
 interface PengaturanModalProps {
   settings: SchoolSettings;
-  onSaveSettings: (settings: SchoolSettings) => void;
+  onSaveSettings?: (settings: SchoolSettings) => void;
   onClose: () => void;
+  isOpen?: boolean;
 }
 
 export const PengaturanModal: React.FC<PengaturanModalProps> = ({
@@ -19,7 +20,9 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveSettings(form);
+    if (typeof onSaveSettings === 'function') {
+      onSaveSettings(form);
+    }
     setSavedSuccess(true);
     setTimeout(() => {
       setSavedSuccess(false);

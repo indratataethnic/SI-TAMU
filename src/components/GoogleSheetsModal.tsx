@@ -1,30 +1,31 @@
 import React, { useState } from 'react';
-import { SchoolSettings, Student, Teacher, ViolationRecord, RewardRecord, CompensationRecord } from '../types';
+import { SchoolSettings, Student, ViolationRecord, RewardRecord, CompensationRecord } from '../types';
 import { Table, Copy, Check, ExternalLink, RefreshCw, AlertCircle, Sparkles, CheckCircle2, X } from 'lucide-react';
 import { getGoogleAppsScriptTemplate, syncAllToGoogleSheets, testGoogleSheetsWebhook } from '../utils/sheetsSync';
 
 interface GoogleSheetsModalProps {
   settings: SchoolSettings;
   students: Student[];
-  teachers?: Teacher[];
   violations: ViolationRecord[];
   rewards: RewardRecord[];
   compensations: CompensationRecord[];
-  onSaveSettings: (newSettings: SchoolSettings) => void;
+  onSaveSettings?: (newSettings: SchoolSettings) => void;
+  onSaveWebhookUrl?: (url: string) => void;
   onClose: () => void;
+  isOpen?: boolean;
+  summaries?: any[];
 }
 
 export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
   settings,
   students,
-  teachers = [],
   violations,
   rewards,
   compensations,
   onSaveSettings,
   onClose
 }) => {
-  const [webhookUrl, setWebhookUrl] = useState(settings.googleSheetsWebhook || '');
+  const [webhookUrl, setWebhookUrl] = useState(settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '');
   const [sheetUrl, setSheetUrl] = useState(settings.googleSheetsUrl || '');
   const [copied, setCopied] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -39,11 +40,15 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
   };
 
   const handleSave = () => {
-    onSaveSettings({
+    const updatedSettings: SchoolSettings = {
       ...settings,
       googleSheetsWebhook: webhookUrl.trim(),
+      googleSheetsWebhookUrl: webhookUrl.trim(),
       googleSheetsUrl: sheetUrl.trim()
-    });
+    };
+    if (typeof onSaveSettings === 'function') {
+      onSaveSettings(updatedSettings);
+    }
   };
 
   const handleSyncNow = async () => {
@@ -63,7 +68,6 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
 
     const res = await syncAllToGoogleSheets(webhookUrl, {
       students,
-      teachers,
       violations,
       rewards,
       compensations
