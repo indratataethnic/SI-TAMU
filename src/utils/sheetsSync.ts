@@ -367,13 +367,20 @@ function writeSettingsSheet(ss, settings) {
 
   var keys = [
     { key: "schoolName", value: settings.schoolName || "", desc: "Nama Satuan Pendidikan" },
+    { key: "schoolSubtitle", value: settings.schoolSubtitle || "", desc: "Motto / Subtitle Sekolah" },
     { key: "schoolAddress", value: settings.schoolAddress || "", desc: "Alamat Sekolah" },
-    { key: "headmasterName", value: settings.headmasterName || "", desc: "Nama Kepala Sekolah" },
-    { key: "headmasterNip", value: settings.headmasterNip || "", desc: "NIP Kepala Sekolah" },
+    { key: "schoolPhone", value: settings.schoolPhone || "", desc: "Nomor Telepon Sekolah" },
+    { key: "schoolEmail", value: settings.schoolEmail || "", desc: "Email Sekolah" },
+    { key: "schoolWebsite", value: settings.schoolWebsite || "", desc: "Website Sekolah" },
+    { key: "principalName", value: settings.principalName || settings.headmasterName || "", desc: "Nama Kepala Sekolah" },
+    { key: "principalNip", value: settings.principalNip || settings.headmasterNip || "", desc: "NIP Kepala Sekolah" },
+    { key: "bkCoordinatorName", value: settings.bkCoordinatorName || "", desc: "Nama Koordinator BK" },
+    { key: "bkCoordinatorNip", value: settings.bkCoordinatorNip || "", desc: "NIP Koordinator BK" },
+    { key: "staffPin", value: settings.staffPin || "", desc: "Kode Akses Petugas / PIN" },
+    { key: "waGatewayApiKey", value: settings.waGatewayApiKey || "", desc: "API Key WA Gateway" },
+    { key: "waGatewayDevice", value: settings.waGatewayDevice || "", desc: "Device WA Gateway" },
     { key: "letterNumberPrefix", value: settings.letterNumberPrefix || "", desc: "Prefix Nomor Surat" },
-    { key: "waGatewayApiKey", value: settings.waGatewayApiKey || "", desc: "API Key Fonnte/WA Gateway" },
-    { key: "waGatewayDevice", value: settings.waGatewayDevice || "", desc: "Device Fonnte / WA Gateway" },
-    { key: "academicYear", value: settings.academicYear || "2026/2027", desc: "Tahun Pelajaran Aktif" }
+    { key: "academicYear", value: settings.academicYear || "", desc: "Tahun Pelajaran Aktif" }
   ];
 
   var rows = keys.map(function(item) {
@@ -402,7 +409,10 @@ function fetchAllData(ss) {
       var key = values[i][0];
       var val = values[i][1];
       if (key) {
-        data.settings[key] = String(val);
+        var strVal = String(val);
+        data.settings[key] = strVal;
+        if (key === "headmasterName") data.settings["principalName"] = strVal;
+        if (key === "headmasterNip") data.settings["principalNip"] = strVal;
       }
     }
   }

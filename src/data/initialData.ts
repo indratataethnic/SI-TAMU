@@ -550,23 +550,23 @@ export const initialCompensations: CompensationRecord[] = [
 ];
 
 export const initialSettings: SchoolSettings = {
-  schoolName: 'UPTD SD NEGERI 1 TELADAN',
-  schoolSubtitle: 'Disiplin, Berprestasi, Berkarakter & Berakhlak Mulia',
-  schoolAddress: 'Jl. Pendidikan No. 45, Kecamatan Kota, Kode Pos 40123',
-  schoolPhone: '(021) 7890-1234 / 0812-3456-7890',
-  schoolEmail: 'info@sdn1teladan.sch.id',
-  schoolWebsite: 'https://sdn1teladan.sch.id',
-  principalName: 'Drs. H. Mulyadi, M.Pd.',
-  principalNip: '19750412 200003 1 002',
-  bkCoordinatorName: 'Ratna Dewi Kusuma, S.Psi., M.Pd.',
-  bkCoordinatorNip: '19820715 200801 2 007',
-  staffPin: '1234',
+  schoolName: '',
+  schoolSubtitle: '',
+  schoolAddress: '',
+  schoolPhone: '',
+  schoolEmail: '',
+  schoolWebsite: '',
+  principalName: '',
+  principalNip: '',
+  bkCoordinatorName: '',
+  bkCoordinatorNip: '',
+  staffPin: '',
   googleSheetsUrl: '',
-  googleSheetsWebhook: 'https://script.google.com/macros/s/AKfycbyGbfZdmd1fop8QjjBAlFAe3ZRbfCpa0Ql1wxBrDoKMtzkWig4-FQOw9pN56HVKujc/exec',
+  googleSheetsWebhook: '',
   waGatewayApiKey: '',
   waGatewayDevice: '',
-  letterNumberPrefix: '421.2/SD/SI-TAMU',
-  academicYear: '2026/2027'
+  letterNumberPrefix: '',
+  academicYear: ''
 };
 
 export const educationalArticles = [
