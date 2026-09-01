@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { SchoolSettings, Student, Teacher, PiketSchedule, ViolationRecord, RewardRecord, CompensationRecord } from '../types';
-import { Table, Copy, Check, ExternalLink, RefreshCw, AlertCircle, Sparkles, CheckCircle2, X, HelpCircle, ShieldAlert, ArrowRight } from 'lucide-react';
-import { getGoogleAppsScriptTemplate, syncAllToGoogleSheets, testGoogleSheetsWebhook, validateWebhookUrl } from '../utils/sheetsSync';
+import { Table, Copy, Check, ExternalLink, RefreshCw, AlertCircle, Sparkles, CheckCircle2, X, HelpCircle, ShieldAlert, ArrowRight, Download } from 'lucide-react';
+import { getGoogleAppsScriptTemplate, syncAllToGoogleSheets, testGoogleSheetsWebhook, validateWebhookUrl, fetchFullStateFromSheets } from '../utils/sheetsSync';
 
 interface GoogleSheetsModalProps {
   settings: SchoolSettings;
@@ -16,6 +16,14 @@ interface GoogleSheetsModalProps {
   onClose: () => void;
   isOpen?: boolean;
   summaries?: any[];
+  onImportFullData?: (imported: {
+    settings?: SchoolSettings;
+    students?: Student[];
+    teachers?: Teacher[];
+    violations?: ViolationRecord[];
+    rewards?: RewardRecord[];
+    compensations?: CompensationRecord[];
+  }) => void;
 }
 
 export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
@@ -28,13 +36,15 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
   compensations,
   summaries,
   onSaveSettings,
-  onClose
+  onClose,
+  onImportFullData
 }) => {
   const [webhookUrl, setWebhookUrl] = useState(settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '');
   const [sheetUrl, setSheetUrl] = useState(settings.googleSheetsUrl || '');
   const [copied, setCopied] = useState(false);
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{ success?: boolean; message?: string } | null>(null);
   const [showTroubleshoot, setShowTroubleshoot] = useState(false);
 
@@ -110,6 +120,65 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
     setSyncStatus(res);
   };
 
+  const handleImportData = async () => {
+    const clean = webhookUrl.trim();
+    if (!clean) {
+      setSyncStatus({
+        success: false,
+        message: 'Masukkan URL Webhook Google Apps Script terlebih dahulu.'
+      });
+      return;
+    }
+
+    setImporting(true);
+    setSyncStatus(null);
+
+    // Save webhook address first
+    handleSave();
+
+    const res = await fetchFullStateFromSheets(clean);
+    setImporting(false);
+
+    if (res.success && res.data) {
+      setSyncStatus({
+        success: true,
+        message: 'Pengaturan identitas sekolah, API keys, dan seluruh data siswa/catatan berhasil diunduh dari Google Spreadsheet ke perangkat ini!'
+      });
+
+      if (typeof onImportFullData === 'function') {
+        const fetchedSettings = res.data.settings || {};
+        const mergedSettings: SchoolSettings = {
+          ...settings,
+          schoolName: fetchedSettings.schoolName || settings.schoolName,
+          schoolAddress: fetchedSettings.schoolAddress || settings.schoolAddress,
+          headmasterName: fetchedSettings.headmasterName || settings.headmasterName,
+          headmasterNip: fetchedSettings.headmasterNip || settings.headmasterNip,
+          letterNumberPrefix: fetchedSettings.letterNumberPrefix || settings.letterNumberPrefix,
+          waGatewayApiKey: fetchedSettings.waGatewayApiKey || settings.waGatewayApiKey,
+          waGatewayDevice: fetchedSettings.waGatewayDevice || settings.waGatewayDevice,
+          academicYear: fetchedSettings.academicYear || settings.academicYear || '2026/2027',
+          googleSheetsWebhook: clean,
+          googleSheetsWebhookUrl: clean,
+          googleSheetsUrl: sheetUrl.trim() || settings.googleSheetsUrl
+        };
+
+        onImportFullData({
+          settings: mergedSettings,
+          students: res.data.students,
+          teachers: res.data.teachers,
+          violations: res.data.violations,
+          rewards: res.data.rewards,
+          compensations: res.data.compensations
+        });
+      }
+    } else {
+      setSyncStatus({
+        success: false,
+        message: res.message
+      });
+    }
+  };
+
   const urlValidation = validateWebhookUrl(webhookUrl);
 
   return (
@@ -137,13 +206,25 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
         {/* Content */}
         <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto text-sm text-slate-700">
           {/* Status Alert Box */}
-          <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-3">
-            <Sparkles className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
-            <div>
-              <h4 className="font-semibold text-emerald-950">Penyimpanan Terpusat & Real-Time di Google Drive Anda</h4>
-              <p className="text-xs text-emerald-800 mt-0.5 leading-relaxed">
-                Aplikasi SI TAMU akan mengirimkan setiap penambahan data siswa, input pelanggaran, dan pencatatan prestasi secara langsung ke Google Spreadsheet yang Anda miliki.
-              </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-3">
+              <Sparkles className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-emerald-950">Sinkronisasi Real-Time & Terpusat</h4>
+                <p className="text-xs text-emerald-800 mt-0.5 leading-relaxed">
+                  Aplikasi SI TAMU akan mengirimkan setiap penambahan data siswa, pelanggaran, prestasi, dan pengaturan identitas sekolah secara langsung ke Google Spreadsheet Anda.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-200 flex items-start gap-3">
+              <Download className="w-5 h-5 text-indigo-700 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-indigo-950">Akses dari Laptop/HP Lain</h4>
+                <p className="text-xs text-indigo-800 mt-0.5 leading-relaxed">
+                  Cukup tempelkan URL Webhook yang sama di perangkat baru, lalu klik <strong>"Muat Pengaturan & Data"</strong> untuk mengunduh seluruh database dan pengaturan sekolah secara instan.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -209,7 +290,17 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                   className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-800 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition shadow cursor-pointer disabled:opacity-40"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-                  {syncing ? 'Menyinkronkan...' : `Sinkronkan Seluruh Data (${students.length} Siswa, ${teachers.length} Guru, ${violations.length} Pelanggaran)`}
+                  {syncing ? 'Menyinkronkan...' : `Sinkronkan Seluruh Data (${students.length} Siswa, ${teachers.length} Guru)`}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleImportData}
+                  disabled={importing || testing || syncing || !webhookUrl}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-800 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs transition shadow cursor-pointer disabled:opacity-40"
+                >
+                  <Download className={`w-3.5 h-3.5 ${importing ? 'animate-spin' : ''}`} />
+                  {importing ? 'Mengunduh...' : 'Muat Pengaturan & Data'}
                 </button>
 
                 {sheetUrl && (

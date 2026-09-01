@@ -60,9 +60,22 @@ function doPost(e) {
 
     var action = postData.action || "SYNC_ALL";
 
+    if (action === "FETCH_ALL") {
+      var allData = fetchAllData(ss);
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "Data berhasil dimuat dari Google Spreadsheet!",
+        data: allData,
+        timestamp: new Date().toISOString()
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     if (action === "SYNC_ALL" || action === "INIT_SHEETS") {
       setupAllSheets(ss);
 
+      if (postData.settings) {
+        writeSettingsSheet(ss, postData.settings);
+      }
       if (postData.students && postData.students.length >= 0) {
         writeStudentsSheet(ss, postData.students);
       }
@@ -117,6 +130,7 @@ function doGet(e) {
 
 function setupAllSheets(ss) {
   var sheets = [
+    { name: "Pengaturan_Aplikasi", color: "#0F766E" },
     { name: "Data_Siswa", color: "#064E3B" },
     { name: "Data_Guru", color: "#134E4A" },
     { name: "Jadwal_Piket", color: "#4338CA" },
@@ -344,6 +358,186 @@ function writeSummariesSheet(ss, summaries) {
   sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
   sheet.autoResizeColumns(1, headers.length);
 }
+
+function writeSettingsSheet(ss, settings) {
+  var sheet = ss.getSheetByName("Pengaturan_Aplikasi") || ss.insertSheet("Pengaturan_Aplikasi");
+  formatHeaderRow(sheet, ["Kunci", "Nilai", "Deskripsi"], "#0F766E");
+
+  if (!settings) return;
+
+  var keys = [
+    { key: "schoolName", value: settings.schoolName || "", desc: "Nama Satuan Pendidikan" },
+    { key: "schoolAddress", value: settings.schoolAddress || "", desc: "Alamat Sekolah" },
+    { key: "headmasterName", value: settings.headmasterName || "", desc: "Nama Kepala Sekolah" },
+    { key: "headmasterNip", value: settings.headmasterNip || "", desc: "NIP Kepala Sekolah" },
+    { key: "letterNumberPrefix", value: settings.letterNumberPrefix || "", desc: "Prefix Nomor Surat" },
+    { key: "waGatewayApiKey", value: settings.waGatewayApiKey || "", desc: "API Key Fonnte/WA Gateway" },
+    { key: "waGatewayDevice", value: settings.waGatewayDevice || "", desc: "Device Fonnte / WA Gateway" },
+    { key: "academicYear", value: settings.academicYear || "2026/2027", desc: "Tahun Pelajaran Aktif" }
+  ];
+
+  var rows = keys.map(function(item) {
+    return [item.key, String(item.value), item.desc];
+  });
+
+  sheet.getRange(2, 1, rows.length, 3).setValues(rows);
+  sheet.autoResizeColumns(1, 3);
+}
+
+function fetchAllData(ss) {
+  var data = {
+    settings: {},
+    students: [],
+    teachers: [],
+    violations: [],
+    rewards: [],
+    compensations: []
+  };
+
+  // 1. Settings
+  var settingsSheet = ss.getSheetByName("Pengaturan_Aplikasi");
+  if (settingsSheet) {
+    var values = settingsSheet.getDataRange().getValues();
+    for (var i = 1; i < values.length; i++) {
+      var key = values[i][0];
+      var val = values[i][1];
+      if (key) {
+        data.settings[key] = String(val);
+      }
+    }
+  }
+
+  // 2. Students
+  var studentSheet = ss.getSheetByName("Data_Siswa");
+  if (studentSheet) {
+    var values = studentSheet.getDataRange().getValues();
+    for (var i = 1; i < values.length; i++) {
+      var row = values[i];
+      if (row[0]) {
+        data.students.push({
+          id: row[6] ? String(row[6]) : ("student_" + i),
+          nisn: String(row[0]),
+          name: String(row[1] || ""),
+          class: String(row[2] || ""),
+          parentName: String(row[3] || ""),
+          parentPhone: String(row[4] || ""),
+          parentAddress: String(row[5] || ""),
+          academicYear: row[7] ? String(row[7]) : "2026/2027",
+          createdAt: row[8] ? String(row[8]) : new Date().toISOString()
+        });
+      }
+    }
+  }
+
+  // 3. Teachers
+  var teacherSheet = ss.getSheetByName("Data_Guru");
+  if (teacherSheet) {
+    var values = teacherSheet.getDataRange().getValues();
+    for (var i = 1; i < values.length; i++) {
+      var row = values[i];
+      if (row[1]) {
+        data.teachers.push({
+          nip: String(row[0] || ""),
+          name: String(row[1] || ""),
+          role: row[2] === "Kepala Sekolah" ? "kepala_sekolah" :
+                row[2] === "Wali Kelas" ? "wali_kelas" :
+                row[2] === "Guru Bimbingan Konseling (BK)" ? "guru_bk" :
+                row[2] === "Guru Tim Piket" ? "guru_piket" :
+                row[2] === "Pembina OSIS / Kesiswaan" ? "pembina_osis" : "guru_mapel",
+          subject: String(row[3] || ""),
+          classAssigned: String(row[4] || ""),
+          phone: String(row[5] || ""),
+          id: row[6] ? String(row[6]) : ("teacher_" + i)
+        });
+      }
+    }
+  }
+
+  // 4. Violations
+  var violationSheet = ss.getSheetByName("Data_Pelanggaran");
+  if (violationSheet) {
+    var values = violationSheet.getDataRange().getValues();
+    for (var i = 1; i < values.length; i++) {
+      var row = values[i];
+      if (row[12] || row[1]) {
+        data.violations.push({
+          id: row[12] ? String(row[12]) : ("violation_" + i),
+          studentId: "",
+          studentNisn: String(row[1]),
+          studentName: String(row[2]),
+          studentClass: String(row[3]),
+          ruleName: String(row[4]),
+          category: String(row[5]),
+          points: Number(row[6]) || 0,
+          reporterName: String(row[7]),
+          parentName: String(row[8]),
+          parentPhone: String(row[9]),
+          description: String(row[10] || ""),
+          whatsappSent: row[11] === "Sudah Terkirim",
+          academicYear: row[13] ? String(row[13]) : "2026/2027",
+          date: String(row[0]),
+          createdAt: row[14] ? String(row[14]) : new Date().toISOString()
+        });
+      }
+    }
+  }
+
+  // 5. Rewards
+  var rewardSheet = ss.getSheetByName("Data_Reward");
+  if (rewardSheet) {
+    var values = rewardSheet.getDataRange().getValues();
+    for (var i = 1; i < values.length; i++) {
+      var row = values[i];
+      if (row[11] || row[1]) {
+        data.rewards.push({
+          id: row[11] ? String(row[11]) : ("reward_" + i),
+          studentId: "",
+          studentNisn: String(row[1]),
+          studentName: String(row[2]),
+          studentClass: String(row[3]),
+          competitionName: String(row[4]),
+          level: String(row[5]),
+          rank: String(row[6]),
+          points: Number(row[7]) || 0,
+          organizer: String(row[8]),
+          reporterName: String(row[9]),
+          notes: String(row[10] || ""),
+          academicYear: row[12] ? String(row[12]) : "2026/2027",
+          date: String(row[0]),
+          createdAt: row[13] ? String(row[13]) : new Date().toISOString()
+        });
+      }
+    }
+  }
+
+  // 6. Compensations
+  var compensationSheet = ss.getSheetByName("Data_Kompensasi");
+  if (compensationSheet) {
+    var values = compensationSheet.getDataRange().getValues();
+    for (var i = 1; i < values.length; i++) {
+      var row = values[i];
+      if (row[9] || row[1]) {
+        data.compensations.push({
+          id: row[9] ? String(row[9]) : ("compensation_" + i),
+          studentId: "",
+          studentNisn: String(row[1]),
+          studentName: String(row[2]),
+          studentClass: String(row[3]),
+          taskName: String(row[4]),
+          deductedPoints: Number(row[5]) || 0,
+          status: String(row[6] || "Disetujui"),
+          supervisorName: String(row[7]),
+          notes: String(row[8] || ""),
+          academicYear: row[10] ? String(row[10]) : "2026/2027",
+          date: String(row[0]),
+          createdAt: row[11] ? String(row[11]) : new Date().toISOString()
+        });
+      }
+    }
+  }
+
+  return data;
+}
 `;
 };
 
@@ -422,6 +616,7 @@ export const syncAllToGoogleSheets = async (
     compensations: any[];
     summaries?: any[];
     sheetUrl?: string;
+    settings?: any;
   }
 ): Promise<{ success: boolean; message: string }> => {
   const validation = validateWebhookUrl(webhookUrl);
@@ -472,6 +667,7 @@ export const syncAllToGoogleSheets = async (
     const bodyString = JSON.stringify({
       action: 'SYNC_ALL',
       sheetUrl: payload.sheetUrl,
+      settings: payload.settings || null,
       students: payload.students || [],
       teachers: payload.teachers || [],
       piketSchedules: payload.piketSchedules || [],
@@ -516,7 +712,8 @@ export const syncFullStateToSheets = async (
   summaries?: any[],
   sheetUrl?: string,
   teachers?: any[],
-  piketSchedules?: any[]
+  piketSchedules?: any[],
+  settings?: any
 ): Promise<{ success: boolean; message: string }> => {
   return syncAllToGoogleSheets(webhookUrl, {
     students,
@@ -526,7 +723,64 @@ export const syncFullStateToSheets = async (
     rewards,
     compensations,
     summaries,
-    sheetUrl
+    sheetUrl,
+    settings
   });
+};
+
+/**
+ * Loads entire database and school settings from Google Sheets Webhook
+ */
+export const fetchFullStateFromSheets = async (
+  webhookUrl: string
+): Promise<{
+  success: boolean;
+  message: string;
+  data?: {
+    settings?: any;
+    students?: any[];
+    teachers?: any[];
+    violations?: any[];
+    rewards?: any[];
+    compensations?: any[];
+  }
+}> => {
+  const validation = validateWebhookUrl(webhookUrl);
+  if (!validation.valid) {
+    return { success: false, message: validation.message };
+  }
+
+  try {
+    const response = await fetch(webhookUrl.trim(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify({
+        action: 'FETCH_ALL',
+        sentAt: new Date().toISOString()
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP Error: ${response.status}`);
+    }
+
+    const json = await response.json();
+    if (json.status === 'success' && json.data) {
+      return {
+        success: true,
+        message: 'Data dan pengaturan berhasil dimuat dari Google Spreadsheet!',
+        data: json.data
+      };
+    } else {
+      throw new Error(json.message || 'Format data dari Google Sheets tidak dikenali.');
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      message: `Gagal memuat data: ${err.message || 'Periksa koneksi internet atau izin Web App (harus "Siapa saja / Anyone")'}`
+    };
+  }
 };
 

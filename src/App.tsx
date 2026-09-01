@@ -162,8 +162,53 @@ export default function App() {
       summaries,
       settings.googleSheetsUrl,
       teachersToSync,
-      piketSchedulesToSync
+      piketSchedulesToSync,
+      settings
     ).catch(err => console.log('Background sheets sync error:', err));
+  };
+
+  const handleImportFullData = (imported: {
+    settings?: SchoolSettings;
+    students?: Student[];
+    teachers?: Teacher[];
+    violations?: ViolationRecord[];
+    rewards?: RewardRecord[];
+    compensations?: CompensationRecord[];
+  }) => {
+    if (imported.settings) {
+      setSettings(imported.settings);
+    }
+
+    const mergedStudents = imported.students || students;
+    const sMap = new Map(mergedStudents.map(s => [s.nisn, s.id]));
+
+    if (imported.students) {
+      setStudents(imported.students);
+    }
+    if (imported.teachers) {
+      setTeachers(imported.teachers);
+    }
+    if (imported.violations) {
+      const mappedViolations = imported.violations.map(v => ({
+        ...v,
+        studentId: v.studentId || sMap.get((v as any).studentNisn || '') || ''
+      }));
+      setViolations(mappedViolations);
+    }
+    if (imported.rewards) {
+      const mappedRewards = imported.rewards.map(r => ({
+        ...r,
+        studentId: r.studentId || sMap.get((r as any).studentNisn || '') || ''
+      }));
+      setRewards(mappedRewards);
+    }
+    if (imported.compensations) {
+      const mappedCompensations = imported.compensations.map(c => ({
+        ...c,
+        studentId: c.studentId || sMap.get((c as any).studentNisn || '') || ''
+      }));
+      setCompensations(mappedCompensations);
+    }
   };
 
   // Debounced Auto-Sync to Google Sheets whenever any dataset changes
@@ -181,12 +226,13 @@ export default function App() {
         summaries,
         settings.googleSheetsUrl,
         teachers,
-        piketSchedules
+        piketSchedules,
+        settings
       ).catch(err => console.log('Debounced sheets sync:', err));
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [students, teachers, piketSchedules, violations, rewards, compensations, settings.googleSheetsWebhook, settings.googleSheetsWebhookUrl, settings.googleSheetsUrl, summaries]);
+  }, [students, teachers, piketSchedules, violations, rewards, compensations, settings.googleSheetsWebhook, settings.googleSheetsWebhookUrl, settings.googleSheetsUrl, summaries, settings]);
 
   // Handlers for Students
   const handleAddStudent = (student: Student) => {
@@ -594,6 +640,7 @@ export default function App() {
           compensations={compensations}
           summaries={summaries}
           onSaveSettings={(newSettings) => setSettings(newSettings)}
+          onImportFullData={handleImportFullData}
         />
       )}
 
