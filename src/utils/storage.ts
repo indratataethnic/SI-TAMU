@@ -14,7 +14,7 @@ const STORAGE_KEYS = {
   USER_ROLE: 'sitamu_user_role'
 };
 
-// Clear legacy initial data once if present
+// Clear legacy initial data once if present & ensure default role is public
 try {
   if (!localStorage.getItem('sitamu_data_emptied_v3')) {
     localStorage.removeItem(STORAGE_KEYS.STUDENTS);
@@ -23,6 +23,7 @@ try {
     localStorage.removeItem(STORAGE_KEYS.VIOLATIONS);
     localStorage.removeItem(STORAGE_KEYS.REWARDS);
     localStorage.removeItem(STORAGE_KEYS.COMPENSATIONS);
+    localStorage.setItem(STORAGE_KEYS.USER_ROLE, 'public');
     localStorage.setItem('sitamu_data_emptied_v3', 'true');
   }
 } catch (e) {}
@@ -176,9 +177,9 @@ export const saveSettings = (settings: SchoolSettings): void => {
 export const loadUserRole = (): 'staff' | 'public' => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.USER_ROLE);
-    return raw === 'staff' || raw === 'public' ? raw : 'staff';
+    return raw === 'staff' || raw === 'public' ? raw : 'public';
   } catch (e) {
-    return 'staff';
+    return 'public';
   }
 };
 
@@ -196,6 +197,7 @@ export const resetAllToDefault = (): void => {
   localStorage.setItem(STORAGE_KEYS.REWARDS, JSON.stringify([]));
   localStorage.setItem(STORAGE_KEYS.COMPENSATIONS, JSON.stringify([]));
   localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(initialSettings));
+  localStorage.setItem(STORAGE_KEYS.USER_ROLE, 'public');
 };
 
 export const calculateStudentSummaries = (

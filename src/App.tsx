@@ -75,7 +75,10 @@ export default function App() {
   const [role, setRole] = useState<UserRole>(() => loadUserRole());
 
   // Navigation State
-  const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
+  const [currentTab, setCurrentTab] = useState<NavTab>(() => {
+    const initialRole = loadUserRole();
+    return initialRole === 'public' ? 'portal_publik' : 'dashboard';
+  });
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Quick inputs preselection
@@ -513,8 +516,8 @@ export default function App() {
   const handleToggleRole = () => {
     if (role === 'staff') {
       setRole('public');
-      if (['data_siswa', 'data_pelanggaran', 'data_reward', 'penghitungan', 'kelola_poin', 'input_pelanggaran', 'input_reward'].includes(currentTab)) {
-        setCurrentTab('dashboard');
+      if (['data_siswa', 'data_guru', 'data_pelanggaran', 'data_reward', 'penghitungan', 'kelola_poin', 'input_pelanggaran', 'input_reward'].includes(currentTab)) {
+        setCurrentTab('portal_publik');
       }
     } else {
       setPendingActionAfterPin(() => () => {
