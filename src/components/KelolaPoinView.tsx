@@ -57,7 +57,7 @@ export const KelolaPoinView: React.FC<KelolaPoinViewProps> = ({
   const handleOpenAddViolation = () => {
     setEditingViolation(null);
     setViolationForm({
-      code: `V-${Date.now().toString().slice(-4)}`,
+      code: `V-${Date.now().toString().slice(-4)}-${Math.random().toString(36).substring(2, 5)}`,
       category: 'berat',
       name: '',
       points: 20,
@@ -89,7 +89,7 @@ export const KelolaPoinView: React.FC<KelolaPoinViewProps> = ({
       onSaveViolationRules(updated);
     } else {
       const newRule: ViolationRule = {
-        id: `V-${Date.now()}`,
+        id: `V-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         ...violationForm
       };
       onSaveViolationRules([...violationRules, newRule]);
@@ -108,7 +108,7 @@ export const KelolaPoinView: React.FC<KelolaPoinViewProps> = ({
   const handleOpenAddReward = () => {
     setEditingReward(null);
     setRewardForm({
-      code: `REW-${Date.now().toString().slice(-4)}`,
+      code: `REW-${Date.now().toString().slice(-4)}-${Math.random().toString(36).substring(2, 5)}`,
       name: '',
       level: 'Nasional',
       rank: 'Juara I',
@@ -142,7 +142,7 @@ export const KelolaPoinView: React.FC<KelolaPoinViewProps> = ({
       onSaveRewardRules(updated);
     } else {
       const newRule: RewardRule = {
-        id: `REW-${Date.now()}`,
+        id: `REW-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         ...rewardForm
       };
       onSaveRewardRules([...rewardRules, newRule]);

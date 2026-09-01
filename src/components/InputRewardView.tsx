@@ -106,7 +106,7 @@ export const InputRewardView: React.FC<InputRewardViewProps> = ({
     }
 
     const newReward: RewardRecord = {
-      id: `REW-${Date.now()}`,
+      id: `REW-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       studentId: selectedStudent.id,
       studentName: selectedStudent.name,
       studentClass: selectedStudent.class,

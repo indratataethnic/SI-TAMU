@@ -307,8 +307,8 @@ export const JurnalPiketModal: React.FC<JurnalPiketModalProps> = ({
               <div className="h-20 flex items-center justify-center">
                 {/* Tanda tangan placeholder */}
               </div>
-              <p className="font-bold text-slate-900 uppercase underline">{settings.principalName || 'Drs. H. Mulyadi, M.Pd.'}</p>
-              <p className="text-[11px] text-slate-500 font-mono">NIP: {settings.principalNip || '197504122000031002'}</p>
+              <p className="font-bold text-slate-900 uppercase underline">{settings.principalName || '( .......................................... )'}</p>
+              <p className="text-[11px] text-slate-500 font-mono">NIP: {settings.principalNip || '..........................................'}</p>
             </div>
 
             <div>

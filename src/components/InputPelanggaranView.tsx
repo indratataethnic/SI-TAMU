@@ -89,7 +89,7 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
     }
 
     const newViolation: ViolationRecord = {
-      id: `VIOL-${Date.now()}`,
+      id: `VIOL-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       studentId: selectedStudent.id,
       studentName: selectedStudent.name,
       studentClass: selectedStudent.class,

@@ -107,8 +107,12 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
 
   const handleContactBK = () => {
     if (!selectedStudent) return;
-    const bkPhone = settings.bkCoordinatorPhone || '081234567890';
-    const text = `Halo Bapak/Ibu Guru BK ${settings.schoolName}, saya orang tua dari ananda *${selectedStudent.name}* (Kelas ${selectedStudent.class}). Saya ingin berkonsultasi mengenai perkembangan tata tertib dan poin kedisiplinan ananda. Terima kasih.`;
+    const bkPhone = settings.bkCoordinatorPhone || settings.schoolPhone || '';
+    if (!bkPhone) {
+      alert('Nomor kontak Guru BK atau nomor telepon sekolah belum diisi di Pengaturan.');
+      return;
+    }
+    const text = `Halo Bapak/Ibu Guru BK ${settings.schoolName || 'Sekolah'}, saya orang tua dari ananda *${selectedStudent.name}* (Kelas ${selectedStudent.class}). Saya ingin berkonsultasi mengenai perkembangan tata tertib dan poin kedisiplinan ananda. Terima kasih.`;
     openWhatsApp(bkPhone, text);
   };
 

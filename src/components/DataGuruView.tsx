@@ -167,7 +167,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
       });
     } else {
       const newTeacher: Teacher = {
-        id: `t_${Date.now()}`,
+        id: `t_${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         nip: formData.nip.trim(),
         name: formData.name.trim(),
         role: (formData.role as any) || 'guru_mapel',
@@ -263,8 +263,14 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
   // Reset to initial default schedule
   const handleResetPiket = () => {
     if (!onUpdateAllPiketSchedules) return;
-    if (confirm('Kembalikan jadwal piket mingguan ke pengaturan awal sekolah?')) {
-      onUpdateAllPiketSchedules(initialPiketSchedules);
+    if (confirm('Kosongkan semua penugasan jadwal piket mingguan?')) {
+      const emptySchedules: PiketSchedule[] = DAYS_LIST.map(day => ({
+        day,
+        teacherIds: [],
+        dutyHours: day === 'Jumat' ? '06.30 - 14.00 WIB' : day === 'Sabtu' ? '06.30 - 13.00 WIB' : '06.30 - 15.00 WIB',
+        notes: `Pengawalan ketertiban dan disiplin hari ${day}`
+      }));
+      onUpdateAllPiketSchedules(emptySchedules);
     }
   };
 
@@ -1134,7 +1140,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
                 </label>
                 <input
                   type="text"
-                  placeholder="081234567890"
+                  placeholder="08xxxxxxxxxx"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"

@@ -114,7 +114,7 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
     if (!selectedStudentForComp) return;
 
     const newComp: CompensationRecord = {
-      id: `COMP-${Date.now()}`,
+      id: `COMP-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       studentId: selectedStudentForComp.id,
       studentName: selectedStudentForComp.name,
       studentClass: selectedStudentForComp.class,

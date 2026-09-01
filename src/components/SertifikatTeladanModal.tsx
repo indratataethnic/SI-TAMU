@@ -166,8 +166,8 @@ export const SertifikatTeladanModal: React.FC<SertifikatTeladanModalProps> = ({
                 <div className="text-center w-48">
                   <p className="text-slate-600 text-[11px]">Mengetahui,</p>
                   <p className="text-slate-700 font-semibold text-[11px] mb-12">Koordinator Bimbingan Konseling</p>
-                  <p className="font-bold text-emerald-950 text-xs sm:text-sm underline">{settings.bkCoordinatorName || 'Ibu Ratna, M.Pd.'}</p>
-                  <p className="text-[10px] text-slate-600">NIP. {settings.bkCoordinatorNip || '198203152006042018'}</p>
+                  <p className="font-bold text-emerald-950 text-xs sm:text-sm underline">{settings.bkCoordinatorName || 'Koordinator BK'}</p>
+                  <p className="text-[10px] text-slate-600">NIP. {settings.bkCoordinatorNip || '-'}</p>
                 </div>
 
                 {/* Official Golden Seal */}
@@ -183,10 +183,10 @@ export const SertifikatTeladanModal: React.FC<SertifikatTeladanModalProps> = ({
 
                 {/* Principal Signature */}
                 <div className="text-center w-48">
-                  <p className="text-slate-600 text-[11px]">Ditetapkan di {settings.schoolAddress.split(',')[1] || 'Kota'}</p>
+                  <p className="text-slate-600 text-[11px]">Ditetapkan di {settings.schoolAddress.split(',')[1] || 'Tempat'}</p>
                   <p className="text-slate-700 font-semibold text-[11px] mb-12">Pada tanggal {todayFormatted}<br />Kepala Sekolah</p>
-                  <p className="font-bold text-emerald-950 text-xs sm:text-sm underline">{settings.principalName || 'Drs. H. Mulyadi, M.Pd.'}</p>
-                  <p className="text-[10px] text-slate-600">NIP. {settings.principalNip || '197504122000031002'}</p>
+                  <p className="font-bold text-emerald-950 text-xs sm:text-sm underline">{settings.principalName || 'Kepala Sekolah'}</p>
+                  <p className="text-[10px] text-slate-600">NIP. {settings.principalNip || '-'}</p>
                 </div>
               </div>
             </div>

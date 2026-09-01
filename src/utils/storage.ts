@@ -14,13 +14,26 @@ const STORAGE_KEYS = {
   USER_ROLE: 'sitamu_user_role'
 };
 
+// Clear legacy initial data once if present
+try {
+  if (!localStorage.getItem('sitamu_data_emptied_v3')) {
+    localStorage.removeItem(STORAGE_KEYS.STUDENTS);
+    localStorage.removeItem(STORAGE_KEYS.TEACHERS);
+    localStorage.removeItem(STORAGE_KEYS.PIKET_SCHEDULES);
+    localStorage.removeItem(STORAGE_KEYS.VIOLATIONS);
+    localStorage.removeItem(STORAGE_KEYS.REWARDS);
+    localStorage.removeItem(STORAGE_KEYS.COMPENSATIONS);
+    localStorage.setItem('sitamu_data_emptied_v3', 'true');
+  }
+} catch (e) {}
+
 export const getStoredStudents = (): Student[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.STUDENTS);
-    return raw ? JSON.parse(raw) : initialStudents;
+    return raw ? JSON.parse(raw) : [];
   } catch (e) {
     console.error('Failed reading students from storage', e);
-    return initialStudents;
+    return [];
   }
 };
 
@@ -33,10 +46,10 @@ export const saveStudents = (students: Student[]): void => {
 export const getStoredTeachers = (): Teacher[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.TEACHERS);
-    return raw ? JSON.parse(raw) : initialTeachers;
+    return raw ? JSON.parse(raw) : [];
   } catch (e) {
     console.error('Failed reading teachers from storage', e);
-    return initialTeachers;
+    return [];
   }
 };
 
@@ -49,10 +62,10 @@ export const saveTeachers = (teachers: Teacher[]): void => {
 export const getStoredPiketSchedules = (): PiketSchedule[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.PIKET_SCHEDULES);
-    return raw ? JSON.parse(raw) : initialPiketSchedules;
+    return raw ? JSON.parse(raw) : [];
   } catch (e) {
     console.error('Failed reading piket schedules from storage', e);
-    return initialPiketSchedules;
+    return [];
   }
 };
 
@@ -95,9 +108,9 @@ export const saveRewardRules = (rules: RewardRule[]): void => {
 export const getStoredViolations = (): ViolationRecord[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.VIOLATIONS);
-    return raw ? JSON.parse(raw) : initialViolations;
+    return raw ? JSON.parse(raw) : [];
   } catch (e) {
-    return initialViolations;
+    return [];
   }
 };
 
@@ -110,9 +123,9 @@ export const saveViolations = (records: ViolationRecord[]): void => {
 export const getStoredRewards = (): RewardRecord[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.REWARDS);
-    return raw ? JSON.parse(raw) : initialRewards;
+    return raw ? JSON.parse(raw) : [];
   } catch (e) {
-    return initialRewards;
+    return [];
   }
 };
 
@@ -125,9 +138,9 @@ export const saveRewards = (records: RewardRecord[]): void => {
 export const getStoredCompensations = (): CompensationRecord[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.COMPENSATIONS);
-    return raw ? JSON.parse(raw) : initialCompensations;
+    return raw ? JSON.parse(raw) : [];
   } catch (e) {
-    return initialCompensations;
+    return [];
   }
 };
 
@@ -174,12 +187,14 @@ export const saveUserRole = (role: 'staff' | 'public'): void => {
 };
 
 export const resetAllToDefault = (): void => {
-  localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(initialStudents));
+  localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify([]));
+  localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify([]));
+  localStorage.setItem(STORAGE_KEYS.PIKET_SCHEDULES, JSON.stringify([]));
   localStorage.setItem(STORAGE_KEYS.VIOLATION_RULES, JSON.stringify(initialViolationRules));
   localStorage.setItem(STORAGE_KEYS.REWARD_RULES, JSON.stringify(initialRewardRules));
-  localStorage.setItem(STORAGE_KEYS.VIOLATIONS, JSON.stringify(initialViolations));
-  localStorage.setItem(STORAGE_KEYS.REWARDS, JSON.stringify(initialRewards));
-  localStorage.setItem(STORAGE_KEYS.COMPENSATIONS, JSON.stringify(initialCompensations));
+  localStorage.setItem(STORAGE_KEYS.VIOLATIONS, JSON.stringify([]));
+  localStorage.setItem(STORAGE_KEYS.REWARDS, JSON.stringify([]));
+  localStorage.setItem(STORAGE_KEYS.COMPENSATIONS, JSON.stringify([]));
   localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(initialSettings));
 };
 

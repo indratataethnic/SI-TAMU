@@ -150,7 +150,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
       });
     } else {
       const newStudent: Student = {
-        id: `STU-${Date.now()}`,
+        id: `STU-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         ...formData,
         accessCode: generatedAccess,
         createdAt: new Date().toISOString().slice(0, 10)
@@ -617,7 +617,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                     required
                     value={formData.parentPhone}
                     onChange={(e) => setFormData({ ...formData, parentPhone: e.target.value })}
-                    placeholder="081234567890"
+                    placeholder="08xxxxxxxxxx"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-mono"
                   />
                 </div>

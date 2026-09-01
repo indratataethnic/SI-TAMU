@@ -159,14 +159,14 @@ export const importStudentsFromExcel = async (file: File): Promise<Student[]> =>
           const accessCode = `${firstName.toUpperCase()}${cleanClass}`;
 
           return {
-            id: `STU-IMP-${Date.now()}-${index}`,
+            id: `STU-IMP-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 7)}`,
             nisn,
             nik: nik || undefined,
             name,
             class: studentClass,
             gender,
-            parentName: parentName || 'Orang Tua Murid',
-            parentPhone: parentPhone || '081234567890',
+            parentName: parentName || '',
+            parentPhone: parentPhone || '',
             parentAddress,
             accessCode,
             createdAt: new Date().toISOString().slice(0, 10)
