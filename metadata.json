@@ -1,0 +1,8 @@
+{
+  "name": "SI TAMU",
+  "description": "Sistem Informasi Tata Tertib Murid untuk pencatatan, pemantauan poin, dan penanganan ketertiban siswa.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

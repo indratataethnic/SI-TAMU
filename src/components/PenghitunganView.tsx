@@ -1,0 +1,547 @@
+import React, { useState } from 'react';
+import { Student, Teacher, StudentScoreSummary, CompensationRecord, SchoolSettings, ViolationRecord } from '../types';
+import {
+  Calculator,
+  Search,
+  Filter,
+  Download,
+  Plus,
+  ShieldAlert,
+  Printer,
+  MessageSquare,
+  Sparkles,
+  CheckCircle2,
+  FileSpreadsheet,
+  HeartHandshake,
+  Clock,
+  Trash2,
+  X,
+  AlertCircle,
+  GraduationCap
+} from 'lucide-react';
+import { exportPenghitunganToExcel } from '../utils/excel';
+import { openWhatsApp, generateThresholdWAMessage } from '../utils/whatsapp';
+
+interface PenghitunganViewProps {
+  summaries: StudentScoreSummary[];
+  teachers?: Teacher[];
+  compensations: CompensationRecord[];
+  violations: ViolationRecord[];
+  settings: SchoolSettings;
+  onAddCompensation: (compensation: CompensationRecord) => void;
+  onDeleteCompensation: (id: string) => void;
+  onOpenSurat: (summary: StudentScoreSummary, type: 'panggilan_100' | 'skorsing_300' | 'pembinaan_500') => void;
+}
+
+export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
+  summaries,
+  teachers = [],
+  compensations,
+  violations,
+  settings,
+  onAddCompensation,
+  onDeleteCompensation,
+  onOpenSurat
+}) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedClass, setSelectedClass] = useState('ALL');
+  const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [compensationModalOpen, setCompensationModalOpen] = useState(false);
+  const [selectedStudentForComp, setSelectedStudentForComp] = useState<Student | null>(null);
+
+  // Form for compensation
+  const [compTask, setCompTask] = useState('');
+  const [compPoints, setCompPoints] = useState<number>(10);
+  const [compSupervisor, setCompSupervisor] = useState(settings.bkCoordinatorName || 'Ibu Ratna, M.Pd.');
+  const [compSupervisorNip, setCompSupervisorNip] = useState(settings.bkCoordinatorNip || '');
+  const [compNotes, setCompNotes] = useState('');
+
+  const classesList = ['ALL', ...Array.from(new Set(summaries.map(s => s.student.class))).sort()];
+
+  const filteredSummaries = summaries.filter(s => {
+    const matchesCls = selectedClass === 'ALL' || s.student.class === selectedClass;
+    const matchesStatus =
+      selectedStatus === 'ALL' ||
+      (selectedStatus === 'peringatan' && s.activeViolationPoints >= 100 && s.activeViolationPoints < 300) ||
+      (selectedStatus === 'skorsing' && s.activeViolationPoints >= 300 && s.activeViolationPoints < 500) ||
+      (selectedStatus === 'pembinaan_rumah' && s.activeViolationPoints >= 500) ||
+      (selectedStatus === 'normal' && s.activeViolationPoints < 100);
+    const q = searchQuery.toLowerCase();
+    const matchesSearch =
+      s.student.name.toLowerCase().includes(q) ||
+      s.student.nisn.toLowerCase().includes(q) ||
+      s.student.parentName.toLowerCase().includes(q);
+    return matchesCls && matchesStatus && matchesSearch;
+  });
+
+  const handleOpenCompensationModal = (student: Student) => {
+    setSelectedStudentForComp(student);
+    setCompTask('');
+    setCompPoints(10);
+    setCompNotes('');
+    setCompensationModalOpen(true);
+  };
+
+  const handleSaveCompensation = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStudentForComp) return;
+
+    const newComp: CompensationRecord = {
+      id: `COMP-${Date.now()}`,
+      studentId: selectedStudentForComp.id,
+      studentName: selectedStudentForComp.name,
+      studentClass: selectedStudentForComp.class,
+      taskName: compTask,
+      deductedPoints: Number(compPoints) || 0,
+      date: new Date().toISOString().slice(0, 10),
+      supervisorName: compSupervisor,
+      supervisorNip: compSupervisorNip || undefined,
+      status: 'Disetujui',
+      notes: compNotes,
+      createdAt: new Date().toISOString()
+    };
+
+    onAddCompensation(newComp);
+    setCompensationModalOpen(false);
+  };
+
+  const handleSendThresholdWA = (summary: StudentScoreSummary) => {
+    const msg = generateThresholdWAMessage(summary, settings);
+    openWhatsApp(summary.student.parentPhone, msg);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header Bar */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <Calculator className="w-5 h-5 text-emerald-800" />
+            Penghitungan & Manajemen Akumulasi Poin Siswa
+          </h2>
+          <p className="text-xs text-slate-500 mt-1">
+            Kalkulasi otomatis poin aktif <span className="font-semibold text-emerald-950">(Pelanggaran - Kompensasi)</span> serta penanganan berjenjang (Ambang 100, 300, 500 Poin).
+          </p>
+        </div>
+
+        <button
+          onClick={() => exportPenghitunganToExcel(summaries)}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-900 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold transition shadow cursor-pointer"
+        >
+          <FileSpreadsheet className="w-3.5 h-3.5" />
+          Export Rekap Poin Excel
+        </button>
+      </div>
+
+      {/* Threshold Guide Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-200 text-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between font-bold text-amber-950 mb-1">
+              <span>Tingkat 1: Ambang ≥100 Poin</span>
+              <span className="bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full text-[10px]">Peringatan</span>
+            </div>
+            <p className="text-amber-900 font-medium">Sekolah Menghubungi Orang Tua</p>
+            <p className="text-slate-600 text-[11px] mt-1">
+              Penerbitan Surat Pemanggilan Orang Tua Tahap I untuk koordinasi bimbingan konseling dan pencegahan berlanjut.
+            </p>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-red-50 border-2 border-red-200 text-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between font-bold text-red-950 mb-1">
+              <span>Tingkat 2: Ambang ≥300 Poin</span>
+              <span className="bg-red-200 text-red-900 px-2 py-0.5 rounded-full text-[10px]">Skorsing</span>
+            </div>
+            <p className="text-red-950 font-medium">Sanksi Skorsing & Perjanjian Khusus</p>
+            <p className="text-slate-600 text-[11px] mt-1">
+              Pemberlakuan skorsing sementara. Murid dapat mengajukan <strong>pengurangan poin melalui tugas kompensasi positif</strong>.
+            </p>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between font-bold text-rose-950 mb-1">
+              <span>Tingkat 3: Ambang ≥500 Poin</span>
+              <span className="bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full text-[10px]">Maksimal</span>
+            </div>
+            <p className="text-rose-950 font-medium">Pembinaan di Rumah</p>
+            <p className="text-slate-600 text-[11px] mt-1">
+              Murid diserahkan kembali kepada orang tua untuk pembinaan intensif di lingkungan keluarga.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter & Search */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-3">
+        <div className="relative w-full lg:w-80">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cari Siswa, NISN..."
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+          {/* Status filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-500 font-medium">Status:</span>
+            {[
+              { id: 'ALL', label: 'Semua' },
+              { id: 'normal', label: '🟢 Aman (<100)' },
+              { id: 'peringatan', label: '⚠️ ≥100 Pt' },
+              { id: 'skorsing', label: '⛔ ≥300 Pt' },
+              { id: 'pembinaan_rumah', label: '🔴 ≥500 Pt' }
+            ].map((st) => (
+              <button
+                key={st.id}
+                onClick={() => setSelectedStatus(st.id)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  selectedStatus === st.id
+                    ? 'bg-emerald-950 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Class Filter */}
+          <div className="flex items-center gap-1.5 ml-2">
+            <span className="text-xs text-slate-500 font-medium">Kelas:</span>
+            <select
+              value={selectedClass}
+              onChange={(e) => setSelectedClass(e.target.value)}
+              className="px-2.5 py-1 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold focus:outline-none"
+            >
+              {classesList.map(c => (
+                <option key={c} value={c}>{c === 'ALL' ? 'Semua Kelas' : c}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Table */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-emerald-950 text-emerald-100 border-b border-emerald-900">
+                <th className="py-3 px-4 font-semibold">Nama Siswa / NISN</th>
+                <th className="py-3 px-4 font-semibold">Kelas</th>
+                <th className="py-3 px-4 font-semibold text-center">Total Pelanggaran</th>
+                <th className="py-3 px-4 font-semibold text-center">Kompensasi (Pengurangan)</th>
+                <th className="py-3 px-4 font-semibold text-center">Poin Pelanggaran Aktif</th>
+                <th className="py-3 px-4 font-semibold text-center">Poin Reward</th>
+                <th className="py-3 px-4 font-semibold text-center">Tingkat Status</th>
+                <th className="py-3 px-4 font-semibold text-center">Tindakan Resmi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredSummaries.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="text-center py-10 text-slate-400">
+                    Tidak ada data siswa yang cocok dengan filter.
+                  </td>
+                </tr>
+              ) : (
+                filteredSummaries.map((item) => {
+                  const s = item.student;
+                  const activePts = item.activeViolationPoints;
+
+                  return (
+                    <tr key={s.id} className="hover:bg-slate-50/80 transition">
+                      <td className="py-3 px-4">
+                        <span className="font-bold text-slate-900 block">{s.name}</span>
+                        <span className="text-[10px] text-slate-400 font-mono">NISN: {s.nisn}</span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded font-semibold text-[11px]">
+                          {s.class}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className="font-bold text-rose-700">
+                          {item.totalViolationPoints} Pt ({item.violationsCount}x)
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="inline-flex items-center gap-1.5">
+                          <span className="font-bold text-emerald-700">
+                            -{item.totalCompensationPoints} Pt
+                          </span>
+                          <button
+                            onClick={() => handleOpenCompensationModal(s)}
+                            className="p-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 rounded-md transition cursor-pointer"
+                            title="Beri Tugas Kompensasi Pengurangan Poin"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span
+                          className={`font-black text-sm px-3 py-1 rounded-full ${
+                            activePts >= 500
+                              ? 'bg-rose-600 text-white'
+                              : activePts >= 300
+                              ? 'bg-red-500 text-white'
+                              : activePts >= 100
+                              ? 'bg-amber-500 text-slate-950'
+                              : 'bg-emerald-100 text-emerald-900'
+                          }`}
+                        >
+                          {activePts} Poin
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className="font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                          +{item.totalRewardPoints} Pt
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${item.statusColor}`}>
+                          {item.statusBadge}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {/* Surat Tindakan Sesuai Level */}
+                          {activePts >= 500 ? (
+                            <button
+                              onClick={() => onOpenSurat(item, 'pembinaan_500')}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-700 hover:bg-rose-600 text-white font-bold rounded-lg text-[11px] transition shadow-xs cursor-pointer"
+                              title="Cetak Berita Acara Penyerahan ke Orang Tua"
+                            >
+                              <Printer className="w-3 h-3" />
+                              <span>Surat Penyerahan</span>
+                            </button>
+                          ) : activePts >= 300 ? (
+                            <button
+                              onClick={() => onOpenSurat(item, 'skorsing_300')}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg text-[11px] transition shadow-xs cursor-pointer"
+                              title="Cetak Surat Skorsing & Perjanjian"
+                            >
+                              <Printer className="w-3 h-3" />
+                              <span>Surat Skorsing</span>
+                            </button>
+                          ) : activePts >= 100 ? (
+                            <button
+                              onClick={() => onOpenSurat(item, 'panggilan_100')}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-emerald-950 font-bold rounded-lg text-[11px] transition shadow-xs cursor-pointer"
+                              title="Cetak Surat Panggilan Orang Tua"
+                            >
+                              <Printer className="w-3 h-3" />
+                              <span>Surat Panggilan</span>
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 font-medium">Dalam Batas Aman</span>
+                          )}
+
+                          {/* Tombol WA Alert */}
+                          {activePts >= 100 && (
+                            <button
+                              onClick={() => handleSendThresholdWA(item)}
+                              className="p-1.5 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
+                              title="Kirim Notifikasi WA Sesuai Level Poin"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Kompensasi History List */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+              <HeartHandshake className="w-4 h-4 text-emerald-700" />
+              Riwayat Tugas Kompensasi (Pengurangan Poin Pelanggaran)
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Kegiatan positif dan pembiasaan yang telah diselesaikan murid untuk mereduksi akumulasi poin pelanggaran.
+            </p>
+          </div>
+        </div>
+
+        {compensations.length === 0 ? (
+          <div className="text-center py-6 text-slate-400 text-xs">
+            Belum ada data kompensasi pengurangan poin yang dicatat.
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100 text-xs">
+            {compensations.map((c) => (
+              <div key={c.id} className="py-3 flex items-start justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-900">{c.studentName}</span>
+                    <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-medium rounded text-[10px]">
+                      Kelas {c.studentClass}
+                    </span>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                      ✓ {c.status}
+                    </span>
+                  </div>
+                  <p className="text-slate-800 font-medium">{c.taskName}</p>
+                  <p className="text-[11px] text-slate-400">
+                    {c.date} • Pembina/Saksi: {c.supervisorName} {c.notes ? `• "${c.notes}"` : ''}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                    -{c.deductedPoints} Poin
+                  </span>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Hapus catatan kompensasi ini?`)) {
+                        onDeleteCompensation(c.id);
+                      }
+                    }}
+                    className="p-1 text-slate-300 hover:text-rose-600 transition cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Compensation Dialog */}
+      {compensationModalOpen && selectedStudentForComp && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex justify-center items-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 text-xs">
+            <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between border-b border-emerald-800">
+              <div>
+                <h3 className="font-bold text-base text-emerald-100">Beri Tugas Kompensasi</h3>
+                <p className="text-emerald-300 text-[11px]">Pengurangan Poin Pelanggaran Siswa</p>
+              </div>
+              <button
+                onClick={() => setCompensationModalOpen(false)}
+                className="p-1 text-slate-300 hover:text-white rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCompensation} className="p-6 space-y-4">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <span className="font-bold text-slate-900 block text-sm">{selectedStudentForComp.name}</span>
+                <span className="text-slate-500">Kelas {selectedStudentForComp.class} • NISN: {selectedStudentForComp.nisn}</span>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Nama Tugas / Kegiatan Positif
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={compTask}
+                  onChange={(e) => setCompTask(e.target.value)}
+                  placeholder="Contoh: Resume 2 Buku Perpustakaan & Bakti Sosial"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Jumlah Pengurangan Poin
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    required
+                    value={compPoints}
+                    onChange={(e) => setCompPoints(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold text-emerald-800 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Guru Pembina / Saksi
+                  </label>
+                  {teachers.length > 0 ? (
+                    <select
+                      value={compSupervisor}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCompSupervisor(val);
+                        const t = teachers.find(item => item.name === val);
+                        if (t) setCompSupervisorNip(t.nip);
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none text-xs sm:text-sm font-medium text-slate-900"
+                    >
+                      {teachers.map(t => (
+                        <option key={t.id} value={t.name}>
+                          {t.name} ({t.role})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      required
+                      value={compSupervisor}
+                      onChange={(e) => setCompSupervisor(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Catatan Pelaksanaan (Opsional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={compNotes}
+                  onChange={(e) => setCompNotes(e.target.value)}
+                  placeholder="Siswa telah menyelesaikan tugas resume dengan baik dan tertib."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                ></textarea>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setCompensationModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-900 hover:bg-emerald-800 text-white rounded-lg font-bold transition shadow cursor-pointer"
+                >
+                  Simpan Kompensasi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

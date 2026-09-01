@@ -1,0 +1,664 @@
+import React, { useState, useRef } from 'react';
+import { Student, StudentScoreSummary, ViolationRecord, RewardRecord, CompensationRecord } from '../types';
+import {
+  Users,
+  Search,
+  Filter,
+  Plus,
+  Download,
+  Upload,
+  FileSpreadsheet,
+  Edit2,
+  Trash2,
+  Eye,
+  AlertTriangle,
+  Award,
+  Key,
+  X,
+  CheckCircle2,
+  Phone,
+  ArrowUpDown
+} from 'lucide-react';
+import { exportStudentsToExcel, downloadStudentTemplate, importStudentsFromExcel } from '../utils/excel';
+
+interface DataSiswaViewProps {
+  students: Student[];
+  summaries: StudentScoreSummary[];
+  violations: ViolationRecord[];
+  rewards: RewardRecord[];
+  compensations: CompensationRecord[];
+  onAddStudent: (student: Student) => void;
+  onUpdateStudent: (student: Student) => void;
+  onDeleteStudent: (id: string) => void;
+  onImportStudents: (imported: Student[]) => void;
+  onQuickInputViolation: (student: Student) => void;
+  onQuickInputReward: (student: Student) => void;
+}
+
+export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
+  students,
+  summaries,
+  violations,
+  rewards,
+  compensations,
+  onAddStudent,
+  onUpdateStudent,
+  onDeleteStudent,
+  onImportStudents,
+  onQuickInputViolation,
+  onQuickInputReward
+}) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedClass, setSelectedClass] = useState('ALL');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [detailStudent, setDetailStudent] = useState<Student | null>(null);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    nisn: '',
+    name: '',
+    class: 'VII-A',
+    gender: 'L' as 'L' | 'P',
+    parentName: '',
+    parentPhone: '',
+    parentAddress: '',
+    accessCode: ''
+  });
+
+  // Extract unique classes
+  const classesList = ['ALL', ...Array.from(new Set(students.map(s => s.class))).sort()];
+
+  // Summary lookup map
+  const summaryMap = new Map<string, StudentScoreSummary>(summaries.map(s => [s.student.id, s]));
+
+  // Filter students
+  const filteredStudents = students.filter(s => {
+    const matchesClass = selectedClass === 'ALL' || s.class === selectedClass;
+    const q = searchQuery.toLowerCase();
+    const matchesSearch =
+      s.name.toLowerCase().includes(q) ||
+      s.nisn.toLowerCase().includes(q) ||
+      s.class.toLowerCase().includes(q) ||
+      s.parentName.toLowerCase().includes(q);
+    return matchesClass && matchesSearch;
+  });
+
+  const openAddModal = () => {
+    setEditingStudent(null);
+    setFormData({
+      nisn: '',
+      name: '',
+      class: 'VII-A',
+      gender: 'L',
+      parentName: '',
+      parentPhone: '',
+      parentAddress: '',
+      accessCode: ''
+    });
+    setModalOpen(true);
+  };
+
+  const openEditModal = (student: Student) => {
+    setEditingStudent(student);
+    setFormData({
+      nisn: student.nisn,
+      name: student.name,
+      class: student.class,
+      gender: student.gender,
+      parentName: student.parentName,
+      parentPhone: student.parentPhone,
+      parentAddress: student.parentAddress || '',
+      accessCode: student.accessCode || ''
+    });
+    setModalOpen(true);
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanClass = formData.class.replace(/[^a-zA-Z0-9]/g, '');
+    const generatedAccess = formData.accessCode || `${formData.name.split(' ')[0].toUpperCase()}${cleanClass}`;
+
+    if (editingStudent) {
+      onUpdateStudent({
+        ...editingStudent,
+        ...formData,
+        accessCode: generatedAccess
+      });
+    } else {
+      const newStudent: Student = {
+        id: `STU-${Date.now()}`,
+        ...formData,
+        accessCode: generatedAccess,
+        createdAt: new Date().toISOString().slice(0, 10)
+      };
+      onAddStudent(newStudent);
+    }
+    setModalOpen(false);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setImportStatus('Membaca file Excel...');
+      const imported = await importStudentsFromExcel(file);
+      onImportStudents(imported);
+      setImportStatus(`Berhasil mengimpor ${imported.length} data siswa!`);
+      setTimeout(() => setImportStatus(null), 4000);
+    } catch (err: any) {
+      alert(`Gagal mengimpor data: ${err.message}`);
+      setImportStatus(null);
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header Bar */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <Users className="w-5 h-5 text-emerald-800" />
+            Database Master Data Siswa
+          </h2>
+          <p className="text-xs text-slate-500 mt-1">
+            Kelola data identitas murid, kontak wali murid, dan integrasi import/export Excel.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Download Template */}
+          <button
+            onClick={downloadStudentTemplate}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
+            title="Unduh Format Excel untuk Import Massal"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Template Excel
+          </button>
+
+          {/* Import Excel */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept=".xlsx, .xls, .csv"
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-900 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold transition shadow cursor-pointer"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            Import Excel
+          </button>
+
+          {/* Export Excel */}
+          <button
+            onClick={() => exportStudentsToExcel(students, summaries)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-teal-800 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold transition shadow cursor-pointer"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            Export Excel
+          </button>
+
+          {/* Add Student */}
+          <button
+            onClick={openAddModal}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-emerald-950 rounded-xl text-xs font-bold transition shadow cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Tambah Siswa
+          </button>
+        </div>
+      </div>
+
+      {/* Import Feedback Banner */}
+      {importStatus && (
+        <div className="p-3 bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-xl text-xs flex items-center gap-2 font-medium">
+          <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+          <span>{importStatus}</span>
+        </div>
+      )}
+
+      {/* Search & Filter Toolbar */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="relative w-full sm:w-80">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cari Nama Siswa, NISN, atau Wali..."
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+          />
+        </div>
+
+        {/* Class Filter */}
+        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+          <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <span className="text-xs text-slate-500 font-medium shrink-0">Filter Kelas:</span>
+          <div className="flex gap-1.5">
+            {classesList.map((cls) => (
+              <button
+                key={cls}
+                onClick={() => setSelectedClass(cls)}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer shrink-0 ${
+                  selectedClass === cls
+                    ? 'bg-emerald-900 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {cls === 'ALL' ? 'Semua Kelas' : cls}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Table of Students */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-emerald-950 text-emerald-100 border-b border-emerald-900">
+                <th className="py-3 px-4 font-semibold">No</th>
+                <th className="py-3 px-4 font-semibold">NISN</th>
+                <th className="py-3 px-4 font-semibold">Nama Siswa</th>
+                <th className="py-3 px-4 font-semibold">Kelas</th>
+                <th className="py-3 px-4 font-semibold">L/P</th>
+                <th className="py-3 px-4 font-semibold">Orang Tua / Kontak</th>
+                <th className="py-3 px-4 font-semibold text-center">Poin Pelanggaran</th>
+                <th className="py-3 px-4 font-semibold text-center">Poin Reward</th>
+                <th className="py-3 px-4 font-semibold text-center">Status</th>
+                <th className="py-3 px-4 font-semibold text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredStudents.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="text-center py-10 text-slate-400">
+                    Tidak ditemukan data siswa yang sesuai filter.
+                  </td>
+                </tr>
+              ) : (
+                filteredStudents.map((student, idx) => {
+                  const sum = summaryMap.get(student.id);
+                  const activePts = sum?.activeViolationPoints || 0;
+                  const rewardPts = sum?.totalRewardPoints || 0;
+
+                  return (
+                    <tr key={student.id} className="hover:bg-slate-50/80 transition">
+                      <td className="py-3 px-4 text-slate-500 font-mono">{idx + 1}</td>
+                      <td className="py-3 px-4 font-mono font-medium text-slate-700">{student.nisn}</td>
+                      <td className="py-3 px-4">
+                        <span className="font-bold text-slate-900 block">{student.name}</span>
+                        <span className="text-[10px] text-slate-400 font-mono">Kode Akses: {student.accessCode || '-'}</span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded font-semibold text-[11px]">
+                          {student.class}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-semibold text-slate-600">{student.gender}</td>
+                      <td className="py-3 px-4">
+                        <span className="font-medium text-slate-800 block">{student.parentName}</span>
+                        <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                          <Phone className="w-3 h-3 text-slate-400" />
+                          {student.parentPhone}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span
+                          className={`font-black text-xs px-2 py-0.5 rounded-full ${
+                            activePts >= 100
+                              ? 'bg-rose-100 text-rose-800'
+                              : activePts > 0
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {activePts} Poin
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className="font-black text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                          +{rewardPts} Poin
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${sum?.statusColor}`}>
+                          {sum?.statusBadge || '🟢 Normal'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => setDetailStudent(student)}
+                            className="p-1.5 text-slate-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
+                            title="Detail Rekam Jejak"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => onQuickInputViolation(student)}
+                            className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                            title="Input Pelanggaran"
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => onQuickInputReward(student)}
+                            className="p-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg transition cursor-pointer"
+                            title="Input Reward Prestasi"
+                          >
+                            <Award className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => openEditModal(student)}
+                            className="p-1.5 text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                            title="Edit Data"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Hapus data siswa ${student.name}?`)) {
+                                onDeleteStudent(student.id);
+                              }
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                            title="Hapus"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Add / Edit Student Modal */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex justify-center items-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200">
+            <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between border-b border-emerald-800">
+              <h3 className="font-bold text-base text-emerald-100">
+                {editingStudent ? 'Edit Data Siswa' : 'Tambah Siswa Baru'}
+              </h3>
+              <button
+                onClick={() => setModalOpen(false)}
+                className="p-1 text-slate-300 hover:text-white rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleFormSubmit} className="p-6 space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">NISN (Nomor Induk)</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.nisn}
+                    onChange={(e) => setFormData({ ...formData, nisn: e.target.value })}
+                    placeholder="Contoh: 0089123401"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Kelas</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.class}
+                    onChange={(e) => setFormData({ ...formData, class: e.target.value })}
+                    placeholder="Contoh: IX-A atau 7B"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Nama Lengkap Siswa</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Nama Lengkap Siswa"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Jenis Kelamin</label>
+                  <select
+                    value={formData.gender}
+                    onChange={(e) => setFormData({ ...formData, gender: e.target.value as 'L' | 'P' })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                  >
+                    <option value="L">Laki-Laki (L)</option>
+                    <option value="P">Perempuan (P)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">No. WhatsApp Orang Tua</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.parentPhone}
+                    onChange={(e) => setFormData({ ...formData, parentPhone: e.target.value })}
+                    placeholder="081234567890"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Nama Orang Tua / Wali Murid</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.parentName}
+                  onChange={(e) => setFormData({ ...formData, parentName: e.target.value })}
+                  placeholder="Bapak / Ibu Wali"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Alamat Rumah (Opsional)</label>
+                <input
+                  type="text"
+                  value={formData.parentAddress}
+                  onChange={(e) => setFormData({ ...formData, parentAddress: e.target.value })}
+                  placeholder="Jl. Contoh No. 12"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Kode Akses Wali Murid (Otomatis)</label>
+                <input
+                  type="text"
+                  value={formData.accessCode}
+                  onChange={(e) => setFormData({ ...formData, accessCode: e.target.value })}
+                  placeholder="Biarkan kosong untuk buat otomatis (cth: AHMAD9A)"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-mono"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-900 hover:bg-emerald-800 text-white rounded-lg font-bold transition shadow cursor-pointer"
+                >
+                  {editingStudent ? 'Simpan Perubahan' : 'Tambah Siswa'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Student Detail Modal */}
+      {detailStudent && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex justify-center items-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 text-xs">
+            <div className="bg-emerald-950 text-white px-6 py-4 flex items-center justify-between border-b border-emerald-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-900 border border-amber-400 rounded-full flex items-center justify-center font-bold text-amber-300">
+                  {detailStudent.name.charAt(0)}
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-emerald-100">{detailStudent.name}</h3>
+                  <p className="text-emerald-300 text-[11px]">
+                    NISN: {detailStudent.nisn} • Kelas: {detailStudent.class}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDetailStudent(null)}
+                className="p-1 text-slate-300 hover:text-white rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              {/* Score Snapshot */}
+              {(() => {
+                const sSum = summaryMap.get(detailStudent.id);
+                return (
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-rose-50 p-3 rounded-xl border border-rose-200 text-center">
+                      <span className="text-[10px] uppercase font-bold text-rose-600 block">Poin Pelanggaran</span>
+                      <span className="text-xl font-black text-rose-800">{sSum?.totalViolationPoints || 0}</span>
+                      <span className="text-[10px] text-rose-600 block">Aktif: {sSum?.activeViolationPoints || 0} Pt</span>
+                    </div>
+                    <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200 text-center">
+                      <span className="text-[10px] uppercase font-bold text-emerald-700 block">Kompensasi</span>
+                      <span className="text-xl font-black text-emerald-800">-{sSum?.totalCompensationPoints || 0}</span>
+                      <span className="text-[10px] text-emerald-600 block">Pengurangan</span>
+                    </div>
+                    <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 text-center">
+                      <span className="text-[10px] uppercase font-bold text-amber-700 block">Poin Reward</span>
+                      <span className="text-xl font-black text-amber-800">+{sSum?.totalRewardPoints || 0}</span>
+                      <span className="text-[10px] text-amber-600 block">Prestasi</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Bio Details */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Orang Tua / Wali:</span>
+                    <span className="font-semibold text-slate-800">{detailStudent.parentName}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">No. WhatsApp:</span>
+                    <span className="font-semibold text-slate-800">{detailStudent.parentPhone}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Alamat:</span>
+                    <span className="text-slate-700">{detailStudent.parentAddress || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Kode Akses Mandiri:</span>
+                    <span className="font-mono font-bold text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded">
+                      {detailStudent.accessCode || '-'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Violations List */}
+              <div className="space-y-2">
+                <h4 className="font-bold text-slate-900 flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-rose-600" />
+                  Riwayat Pelanggaran Siswa
+                </h4>
+                {violations.filter(v => v.studentId === detailStudent.id).length === 0 ? (
+                  <p className="text-slate-400 italic">Belum ada riwayat pelanggaran.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {violations
+                      .filter(v => v.studentId === detailStudent.id)
+                      .map((v) => (
+                        <div key={v.id} className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-start justify-between">
+                          <div>
+                            <span className="font-semibold text-slate-900 block">{v.ruleName}</span>
+                            <span className="text-[10px] text-slate-400">{v.date} • Saksi: {v.reporterName}</span>
+                            <p className="text-slate-600 text-[11px] mt-0.5">"{v.description}"</p>
+                          </div>
+                          <span className="font-black text-rose-600 shrink-0 ml-2">+{v.points} Pt</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Rewards List */}
+              <div className="space-y-2">
+                <h4 className="font-bold text-slate-900 flex items-center gap-1.5">
+                  <Award className="w-4 h-4 text-amber-500" />
+                  Riwayat Prestasi & Reward Siswa
+                </h4>
+                {rewards.filter(r => r.studentId === detailStudent.id).length === 0 ? (
+                  <p className="text-slate-400 italic">Belum ada catatan prestasi.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {rewards
+                      .filter(r => r.studentId === detailStudent.id)
+                      .map((r) => (
+                        <div key={r.id} className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-start justify-between">
+                          <div>
+                            <span className="font-semibold text-slate-900 block">{r.competitionName}</span>
+                            <span className="text-[10px] text-amber-800 font-medium">{r.rank} • Tingkat {r.level}</span>
+                          </div>
+                          <span className="font-black text-amber-600 shrink-0 ml-2">+{r.points} Pt</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-slate-50 px-6 py-3 border-t border-slate-200 flex justify-end">
+              <button
+                onClick={() => setDetailStudent(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-semibold transition"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
