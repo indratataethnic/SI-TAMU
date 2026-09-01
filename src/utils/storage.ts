@@ -141,7 +141,7 @@ export const getStoredSettings = (): SchoolSettings => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     const parsed = raw ? JSON.parse(raw) : initialSettings;
-    const defaultWebhook = 'https://script.google.com/macros/s/AKfycbyGbfZdmd1fop8QjjBAlFAe3ZRbfCpa0Ql1wxBrDoKMtzkWig4-FQOw9pN56HVKujc/exec';
+    const defaultWebhook = 'https://script.google.com/macros/s/AKfycbwOnSs6tO0me32w9R7x_ip6B2Eodj0Rt6WznSS_AlNDhIEhsLbNzHfl0MuWiHMAVkU/exec';
     if (!parsed.googleSheetsWebhook) {
       parsed.googleSheetsWebhook = defaultWebhook;
     }

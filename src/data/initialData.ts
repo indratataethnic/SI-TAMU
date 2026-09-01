@@ -562,7 +562,7 @@ export const initialSettings: SchoolSettings = {
   bkCoordinatorNip: '',
   staffPin: '',
   googleSheetsUrl: '',
-  googleSheetsWebhook: '',
+  googleSheetsWebhook: 'https://script.google.com/macros/s/AKfycbwOnSs6tO0me32w9R7x_ip6B2Eodj0Rt6WznSS_AlNDhIEhsLbNzHfl0MuWiHMAVkU/exec',
   waGatewayApiKey: '',
   waGatewayDevice: '',
   letterNumberPrefix: '',

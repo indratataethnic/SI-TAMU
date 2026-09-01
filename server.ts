@@ -18,7 +18,7 @@ if (!fs.existsSync(CONFIG_DIR)) {
 
 // GET API: Retrieve globally stored spreadsheet and webhook URL
 app.get("/api/global-config", (req, res) => {
-  const defaultWebhook = "https://script.google.com/macros/s/AKfycbyGbfZdmd1fop8QjjBAlFAe3ZRbfCpa0Ql1wxBrDoKMtzkWig4-FQOw9pN56HVKujc/exec";
+  const defaultWebhook = "https://script.google.com/macros/s/AKfycbwOnSs6tO0me32w9R7x_ip6B2Eodj0Rt6WznSS_AlNDhIEhsLbNzHfl0MuWiHMAVkU/exec";
   try {
     if (fs.existsSync(CONFIG_FILE)) {
       const data = fs.readFileSync(CONFIG_FILE, "utf-8");
