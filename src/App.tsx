@@ -134,42 +134,87 @@ export default function App() {
   useEffect(() => { saveSettings(settings); }, [settings]);
   useEffect(() => { saveUserRole(role); }, [role]);
 
-  // Background Google Sheets Sync Helper
-  const triggerSheetsSync = () => {
-    if (settings.googleSheetsWebhookUrl) {
+  // Background Google Sheets Sync Helper with direct state support
+  const triggerSheetsSync = (override?: {
+    students?: Student[];
+    violations?: ViolationRecord[];
+    rewards?: RewardRecord[];
+    compensations?: CompensationRecord[];
+  }) => {
+    const webhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '').trim();
+    if (!webhook) return;
+
+    const studentsToSync = override?.students ?? students;
+    const violationsToSync = override?.violations ?? violations;
+    const rewardsToSync = override?.rewards ?? rewards;
+    const compensationsToSync = override?.compensations ?? compensations;
+
+    syncFullStateToSheets(
+      webhook,
+      studentsToSync,
+      violationsToSync,
+      rewardsToSync,
+      compensationsToSync,
+      summaries,
+      settings.googleSheetsUrl
+    ).catch(err => console.log('Background sheets sync error:', err));
+  };
+
+  // Debounced Auto-Sync to Google Sheets whenever any dataset changes
+  useEffect(() => {
+    const webhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '').trim();
+    if (!webhook) return;
+
+    const timer = setTimeout(() => {
       syncFullStateToSheets(
-        settings.googleSheetsWebhookUrl,
+        webhook,
         students,
         violations,
         rewards,
         compensations,
-        summaries
-      ).catch(err => console.log('Background sheets sync:', err));
-    }
-  };
+        summaries,
+        settings.googleSheetsUrl
+      ).catch(err => console.log('Debounced sheets sync:', err));
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [students, violations, rewards, compensations, settings.googleSheetsWebhook, settings.googleSheetsWebhookUrl, settings.googleSheetsUrl, summaries]);
 
   // Handlers for Students
   const handleAddStudent = (student: Student) => {
-    setStudents(prev => [student, ...prev]);
-    triggerSheetsSync();
+    const updated = [student, ...students];
+    setStudents(updated);
+    triggerSheetsSync({ students: updated });
   };
 
   const handleUpdateStudent = (student: Student) => {
-    setStudents(prev => prev.map(s => s.id === student.id ? student : s));
-    triggerSheetsSync();
+    const updated = students.map(s => s.id === student.id ? student : s);
+    setStudents(updated);
+    triggerSheetsSync({ students: updated });
   };
 
   const handleDeleteStudent = (id: string) => {
-    setStudents(prev => prev.filter(s => s.id !== id));
-    setViolations(prev => prev.filter(v => v.studentId !== id));
-    setRewards(prev => prev.filter(r => r.studentId !== id));
-    setCompensations(prev => prev.filter(c => c.studentId !== id));
-    triggerSheetsSync();
+    const updatedStudents = students.filter(s => s.id !== id);
+    const updatedViolations = violations.filter(v => v.studentId !== id);
+    const updatedRewards = rewards.filter(r => r.studentId !== id);
+    const updatedCompensations = compensations.filter(c => c.studentId !== id);
+
+    setStudents(updatedStudents);
+    setViolations(updatedViolations);
+    setRewards(updatedRewards);
+    setCompensations(updatedCompensations);
+
+    triggerSheetsSync({
+      students: updatedStudents,
+      violations: updatedViolations,
+      rewards: updatedRewards,
+      compensations: updatedCompensations
+    });
   };
 
   const handleImportStudents = (imported: Student[]) => {
     setStudents(imported);
-    triggerSheetsSync();
+    triggerSheetsSync({ students: imported });
   };
 
   // Handlers for Teachers
@@ -211,35 +256,41 @@ export default function App() {
 
   // Handlers for Violations
   const handleSaveViolation = (violation: ViolationRecord) => {
-    setViolations(prev => [violation, ...prev]);
-    triggerSheetsSync();
+    const updated = [violation, ...violations];
+    setViolations(updated);
+    triggerSheetsSync({ violations: updated });
   };
 
   const handleDeleteViolation = (id: string) => {
-    setViolations(prev => prev.filter(v => v.id !== id));
-    triggerSheetsSync();
+    const updated = violations.filter(v => v.id !== id);
+    setViolations(updated);
+    triggerSheetsSync({ violations: updated });
   };
 
   // Handlers for Rewards
   const handleSaveReward = (reward: RewardRecord) => {
-    setRewards(prev => [reward, ...prev]);
-    triggerSheetsSync();
+    const updated = [reward, ...rewards];
+    setRewards(updated);
+    triggerSheetsSync({ rewards: updated });
   };
 
   const handleDeleteReward = (id: string) => {
-    setRewards(prev => prev.filter(r => r.id !== id));
-    triggerSheetsSync();
+    const updated = rewards.filter(r => r.id !== id);
+    setRewards(updated);
+    triggerSheetsSync({ rewards: updated });
   };
 
   // Handlers for Compensations
   const handleAddCompensation = (comp: CompensationRecord) => {
-    setCompensations(prev => [comp, ...prev]);
-    triggerSheetsSync();
+    const updated = [comp, ...compensations];
+    setCompensations(updated);
+    triggerSheetsSync({ compensations: updated });
   };
 
   const handleDeleteCompensation = (id: string) => {
-    setCompensations(prev => prev.filter(c => c.id !== id));
-    triggerSheetsSync();
+    const updated = compensations.filter(c => c.id !== id);
+    setCompensations(updated);
+    triggerSheetsSync({ compensations: updated });
   };
 
   // Rules Catalog Handlers

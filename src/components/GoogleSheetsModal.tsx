@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { SchoolSettings, Student, ViolationRecord, RewardRecord, CompensationRecord } from '../types';
-import { Table, Copy, Check, ExternalLink, RefreshCw, AlertCircle, Sparkles, CheckCircle2, X } from 'lucide-react';
-import { getGoogleAppsScriptTemplate, syncAllToGoogleSheets, testGoogleSheetsWebhook } from '../utils/sheetsSync';
+import { Table, Copy, Check, ExternalLink, RefreshCw, AlertCircle, Sparkles, CheckCircle2, X, HelpCircle, ShieldAlert, ArrowRight } from 'lucide-react';
+import { getGoogleAppsScriptTemplate, syncAllToGoogleSheets, testGoogleSheetsWebhook, validateWebhookUrl } from '../utils/sheetsSync';
 
 interface GoogleSheetsModalProps {
   settings: SchoolSettings;
@@ -22,14 +22,17 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
   violations,
   rewards,
   compensations,
+  summaries,
   onSaveSettings,
   onClose
 }) => {
   const [webhookUrl, setWebhookUrl] = useState(settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '');
   const [sheetUrl, setSheetUrl] = useState(settings.googleSheetsUrl || '');
   const [copied, setCopied] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{ success?: boolean; message?: string } | null>(null);
+  const [showTroubleshoot, setShowTroubleshoot] = useState(false);
 
   const scriptCode = getGoogleAppsScriptTemplate(settings.schoolName);
 
@@ -40,19 +43,41 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
   };
 
   const handleSave = () => {
+    const cleanWebhook = webhookUrl.trim();
+    const cleanSheet = sheetUrl.trim();
     const updatedSettings: SchoolSettings = {
       ...settings,
-      googleSheetsWebhook: webhookUrl.trim(),
-      googleSheetsWebhookUrl: webhookUrl.trim(),
-      googleSheetsUrl: sheetUrl.trim()
+      googleSheetsWebhook: cleanWebhook,
+      googleSheetsWebhookUrl: cleanWebhook,
+      googleSheetsUrl: cleanSheet
     };
     if (typeof onSaveSettings === 'function') {
       onSaveSettings(updatedSettings);
     }
   };
 
+  const handleTestConnection = async () => {
+    const clean = webhookUrl.trim();
+    if (!clean) {
+      setSyncStatus({
+        success: false,
+        message: 'Masukkan URL Webhook Google Apps Script terlebih dahulu.'
+      });
+      return;
+    }
+
+    setTesting(true);
+    setSyncStatus(null);
+    handleSave();
+
+    const res = await testGoogleSheetsWebhook(clean);
+    setTesting(false);
+    setSyncStatus(res);
+  };
+
   const handleSyncNow = async () => {
-    if (!webhookUrl) {
+    const clean = webhookUrl.trim();
+    if (!clean) {
       setSyncStatus({
         success: false,
         message: 'Masukkan URL Webhook Google Apps Script terlebih dahulu.'
@@ -66,16 +91,20 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
     // Save first
     handleSave();
 
-    const res = await syncAllToGoogleSheets(webhookUrl, {
+    const res = await syncAllToGoogleSheets(clean, {
       students,
       violations,
       rewards,
-      compensations
+      compensations,
+      summaries,
+      sheetUrl: sheetUrl.trim()
     });
 
     setSyncing(false);
     setSyncStatus(res);
   };
+
+  const urlValidation = validateWebhookUrl(webhookUrl);
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex justify-center items-start p-3 sm:p-6">
@@ -88,7 +117,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-lg text-emerald-100">Integrasi Database Google Spreadsheet</h3>
-              <p className="text-xs text-emerald-300">Hubungkan SI TAMU langsung ke Google Drive & Sheets sekolah</p>
+              <p className="text-xs text-emerald-300">Sinkronisasi otomatis data siswa, pelanggaran, dan reward ke Google Drive sekolah</p>
             </div>
           </div>
           <button
@@ -101,13 +130,13 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
 
         {/* Content */}
         <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto text-sm text-slate-700">
-          {/* Status Box */}
+          {/* Status Alert Box */}
           <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-3">
             <Sparkles className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
             <div>
-              <h4 className="font-semibold text-emerald-950">Database Real-Time & 100% Gratis</h4>
+              <h4 className="font-semibold text-emerald-950">Penyimpanan Terpusat & Real-Time di Google Drive Anda</h4>
               <p className="text-xs text-emerald-800 mt-0.5 leading-relaxed">
-                Anda dapat menghubungkan Google Spreadsheet milik akun Google sekolah Anda sendiri. Setiap pencatatan siswa, pelanggaran, reward, dan kompensasi akan otomatis terisi rapi dalam sheet terpisah.
+                Aplikasi SI TAMU akan mengirimkan setiap penambahan data siswa, input pelanggaran, dan pencatatan prestasi secara langsung ke Google Spreadsheet yang Anda miliki.
               </p>
             </div>
           </div>
@@ -115,24 +144,33 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
           {/* Form Input URL */}
           <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                1. URL Webhook Google Apps Script (Wajib untuk Sinkronisasi Otomatis)
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1">
+                1. URL Webhook Google Apps Script <span className="text-rose-600">* (Wajib)</span>
               </label>
               <input
                 type="url"
                 value={webhookUrl}
                 onChange={(e) => setWebhookUrl(e.target.value)}
                 placeholder="https://script.google.com/macros/s/AKfycbx.../exec"
-                className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                className={`w-full px-3.5 py-2.5 bg-white border rounded-lg text-xs font-mono focus:ring-2 focus:ring-emerald-600 focus:outline-none ${
+                  webhookUrl && !urlValidation.valid ? 'border-amber-400 bg-amber-50/40' : 'border-slate-300'
+                }`}
               />
-              <p className="text-[11px] text-slate-500 mt-1">
-                Didapat setelah Anda melakukan "Deploy as Web App" pada file Google Spreadsheet Anda.
-              </p>
+              {webhookUrl && !urlValidation.valid ? (
+                <p className="text-[11px] text-amber-700 font-semibold mt-1 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  {urlValidation.message}
+                </p>
+              ) : (
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Didapat dari hasil <strong>Penerapan Baru (Deploy as Web App)</strong> di Google Apps Script (berakhiran <code className="text-emerald-800 font-bold bg-emerald-100 px-1 rounded">/exec</code>).
+                </p>
+              )}
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                2. Tautan Langsung Google Spreadsheet (Opsional untuk Buka Cepat)
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1">
+                2. Tautan Buka Cepat Google Spreadsheet <span className="text-slate-400 font-normal">(Opsional)</span>
               </label>
               <input
                 type="url"
@@ -141,19 +179,33 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                 placeholder="https://docs.google.com/spreadsheets/d/1aB2c3.../edit"
                 className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-emerald-600 focus:outline-none"
               />
+              <p className="text-[11px] text-slate-500 mt-1">
+                Tautan file spreadsheet untuk tombol pintasan langsung membuka tabel di tab baru.
+              </p>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleTestConnection}
+                  disabled={testing || syncing || !webhookUrl}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg font-semibold text-xs transition border border-slate-300 cursor-pointer disabled:opacity-40"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${testing ? 'animate-spin' : ''}`} />
+                  {testing ? 'Menguji...' : 'Tes Koneksi'}
+                </button>
+
                 <button
                   type="button"
                   onClick={handleSyncNow}
-                  disabled={syncing}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg font-semibold text-xs transition shadow cursor-pointer disabled:opacity-50"
+                  disabled={syncing || testing || !webhookUrl}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-800 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition shadow cursor-pointer disabled:opacity-40"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-                  {syncing ? 'Menghubungkan...' : 'Sinkronkan Data Sekarang'}
+                  {syncing ? 'Menyinkronkan...' : `Sinkronkan ${students.length} Siswa & ${violations.length} Pelanggaran`}
                 </button>
+
                 {sheetUrl && (
                   <a
                     href={sheetUrl}
@@ -166,6 +218,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                   </a>
                 )}
               </div>
+
               <button
                 type="button"
                 onClick={handleSave}
@@ -177,56 +230,112 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
 
             {syncStatus && (
               <div
-                className={`p-3 rounded-lg text-xs flex items-center gap-2 ${
-                  syncStatus.success ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' : 'bg-rose-100 text-rose-900 border border-rose-300'
+                className={`p-3.5 rounded-xl text-xs flex items-start gap-2.5 ${
+                  syncStatus.success ? 'bg-emerald-100 text-emerald-950 border border-emerald-300' : 'bg-rose-100 text-rose-950 border border-rose-300'
                 }`}
               >
-                {syncStatus.success ? <CheckCircle2 className="w-4 h-4 text-emerald-700" /> : <AlertCircle className="w-4 h-4 text-rose-700" />}
-                <span>{syncStatus.message}</span>
+                {syncStatus.success ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-700 shrink-0 mt-0.5" />
+                )}
+                <div>
+                  <p className="font-semibold">{syncStatus.message}</p>
+                  {!syncStatus.success && (
+                    <p className="text-[11px] text-rose-800 mt-1">
+                      Tips: Pastikan URL berakhiran <strong>/exec</strong> dan pada Apps Script diatur <strong>"Siapa saja / Anyone"</strong>.
+                    </p>
+                  )}
+                </div>
               </div>
             )}
           </div>
 
-          {/* Panduan 3 Langkah Singkat */}
+          {/* TROUBLESHOOTING BOX */}
+          <div className="bg-amber-50 rounded-xl border border-amber-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowTroubleshoot(!showTroubleshoot)}
+              className="w-full px-4 py-3 text-left font-bold text-xs text-amber-950 flex items-center justify-between hover:bg-amber-100/60 transition cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <HelpCircle className="w-4 h-4 text-amber-700" />
+                <span>Kenapa Data Belum Masuk ke Spreadsheet? (Cek 4 Poin Ini)</span>
+              </div>
+              <span className="text-[11px] text-amber-800 font-semibold">
+                {showTroubleshoot ? 'Sembunyikan ▲' : 'Buka Petunjuk ▼'}
+              </span>
+            </button>
+
+            {showTroubleshoot && (
+              <div className="p-4 pt-1 space-y-3 text-xs text-amber-900 border-t border-amber-200/60 bg-white/70">
+                <div className="flex items-start gap-2">
+                  <span className="font-bold bg-amber-200 text-amber-950 w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[11px]">1</span>
+                  <p><strong>Pastikan URL berakhiran <code>/exec</code></strong>: URL yang disalin harus dari jendela "Penerapan Baru (New Deployment)", bukan link editor (<code>/edit</code>) dan bukan link spreadsheet (<code>docs.google.com/spreadsheets</code>).</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="font-bold bg-amber-200 text-amber-950 w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[11px]">2</span>
+                  <p><strong>Wajib Akses "Siapa saja (Anyone)"</strong>: Saat melakukan Deploy di Apps Script, pada pilihan <em>"Siapa yang memiliki akses" (Who has access)</em>, pastikan memilih <strong>"Siapa saja" (Anyone)</strong> agar sistem SI TAMU diizinkan mengirim data.</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="font-bold bg-amber-200 text-amber-950 w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[11px]">3</span>
+                  <p><strong>Jalankan sebagai: "Saya" (Me)</strong>: Pada setelan Deploy, <em>"Jalankan sebagai" (Execute as)</em> harus disetel ke <strong>"Saya" (email Google Anda)</strong>.</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="font-bold bg-amber-200 text-amber-950 w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[11px]">4</span>
+                  <p><strong>Wajib "Penerapan Baru" Setelah Ganti Kode</strong>: Setiap kali Anda memperbarui kode di Apps Script, Anda harus mengklik <strong>Deploy &gt; Penerapan Baru (New Deployment)</strong> agar skrip yang aktif menggunakan versi terbaru.</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Panduan 4 Langkah Singkat */}
           <div className="space-y-3">
-            <h4 className="font-bold text-slate-900 text-sm">Panduan Pemasangan Skrip (1 Menit):</h4>
-            <ol className="list-decimal list-inside space-y-2 text-xs text-slate-600 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <li>Buat <strong>Google Spreadsheet baru</strong> di Google Drive Anda.</li>
+            <h4 className="font-bold text-slate-900 text-sm">Panduan Pemasangan Skrip (Hanya 1 Menit):</h4>
+            <ol className="list-decimal list-inside space-y-2 text-xs text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <li>Buka file <strong>Google Spreadsheet baru</strong> di Google Drive Anda.</li>
               <li>Klik menu <strong>Ekstensi (Extensions)</strong> &gt; pilih <strong>Apps Script</strong>.</li>
-              <li>Hapus kode yang ada, lalu salin dan tempel kode skrip di bawah ini.</li>
-              <li>Klik tombol biru <strong>Terapkan (Deploy)</strong> &gt; <strong>Penerapan baru (New deployment)</strong>.</li>
-              <li>Pilih jenis <strong>Aplikasi Web</strong>, atur akses <strong>"Siapa saja" (Anyone)</strong>, lalu klik <strong>Terapkan</strong>.</li>
-              <li>Salin URL Aplikasi Web yang diberikan Google dan tempel ke kolom di atas.</li>
+              <li>Hapus seluruh kode yang ada di editor Apps Script, lalu <strong>Salin dan Tempel (Paste)</strong> kode di bawah ini.</li>
+              <li>Klik tombol <strong>Simpan (ikon Disket)</strong>.</li>
+              <li>Klik tombol biru <strong>Terapkan (Deploy)</strong> di kanan atas &gt; <strong>Penerapan baru (New deployment)</strong>.</li>
+              <li>Pilih jenis <strong>Aplikasi Web</strong>, atur akses <strong>"Siapa saja" (Anyone)</strong>, lalu klik <strong>Terapkan</strong> dan berikan izin.</li>
+              <li>Salin URL Aplikasi Web yang diberikan (berakhiran <code>/exec</code>) dan tempel ke kolom di atas.</li>
             </ol>
 
             {/* Skrip Code Viewer */}
             <div className="relative">
-              <div className="flex justify-between items-center bg-slate-900 text-slate-300 px-4 py-2 rounded-t-xl text-xs font-mono">
-                <span>GoogleAppsScript_SITAMU.gs</span>
+              <div className="flex justify-between items-center bg-slate-900 text-slate-300 px-4 py-2.5 rounded-t-xl text-xs font-mono">
+                <span className="font-semibold text-emerald-400">GoogleAppsScript_SITAMU.gs</span>
                 <button
                   onClick={handleCopyCode}
-                  className="inline-flex items-center gap-1 text-xs bg-emerald-800 hover:bg-emerald-700 text-emerald-100 px-2.5 py-1 rounded transition cursor-pointer"
+                  className="inline-flex items-center gap-1.5 text-xs bg-emerald-800 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg transition cursor-pointer shadow"
                 >
-                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copied ? 'Tersalin!' : 'Salin Kode Skrip'}
+                  {copied ? <Check className="w-4 h-4 text-amber-300" /> : <Copy className="w-4 h-4" />}
+                  {copied ? 'Kode Tersalin!' : 'Salin Seluruh Kode Skrip'}
                 </button>
               </div>
-              <pre className="bg-slate-950 text-slate-200 p-4 rounded-b-xl text-[11px] font-mono overflow-x-auto max-h-48 leading-normal border border-slate-800">
+              <pre className="bg-slate-950 text-slate-200 p-4 rounded-b-xl text-[11px] font-mono overflow-x-auto max-h-56 leading-relaxed border border-slate-800 select-all">
                 {scriptCode}
               </pre>
             </div>
           </div>
         </div>
 
-        <div className="bg-slate-50 px-6 py-3 border-t border-slate-200 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
-          >
-            Tutup
-          </button>
+        <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-200 flex items-center justify-between">
+          <span className="text-xs text-slate-500">
+            {students.length} Siswa terdaftar • {violations.length} Catatan pelanggaran
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold transition cursor-pointer"
+            >
+              Selesai / Tutup
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 };
+

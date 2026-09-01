@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { SchoolSettings } from '../types';
-import { Settings, Save, RotateCcw, X, Building, Phone, Mail, UserCheck, Key, MessageSquare, AlertTriangle, Shield } from 'lucide-react';
+import { Settings, Save, RotateCcw, X, Building, Phone, Mail, UserCheck, Key, MessageSquare, AlertTriangle, Shield, Table, ExternalLink } from 'lucide-react';
 import { resetAllToDefault } from '../utils/storage';
+import { validateWebhookUrl } from '../utils/sheetsSync';
 
 interface PengaturanModalProps {
   settings: SchoolSettings;
@@ -20,8 +21,14 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const updatedForm = {
+      ...form,
+      googleSheetsWebhook: (form.googleSheetsWebhook || form.googleSheetsWebhookUrl || '').trim(),
+      googleSheetsWebhookUrl: (form.googleSheetsWebhook || form.googleSheetsWebhookUrl || '').trim(),
+      googleSheetsUrl: (form.googleSheetsUrl || '').trim()
+    };
     if (typeof onSaveSettings === 'function') {
-      onSaveSettings(form);
+      onSaveSettings(updatedForm);
     }
     setSavedSuccess(true);
     setTimeout(() => {
@@ -199,6 +206,48 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                 />
                 <p className="text-[11px] text-slate-500 mt-1">Jika diisi, sistem dapat mengirim notifikasi otomatis di latar belakang.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* INTEGRASI GOOGLE SPREADSHEET */}
+          <div className="space-y-4">
+            <h4 className="font-bold text-emerald-950 flex items-center gap-2 border-b border-slate-200 pb-2">
+              <Table className="w-4 h-4 text-emerald-700" />
+              Integrasi Database Google Spreadsheet (Sinkronisasi Otomatis)
+            </h4>
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  URL Webhook Google Apps Script (Wajib berakhiran <code className="text-emerald-800 font-bold bg-emerald-100 px-1 rounded">/exec</code>)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://script.google.com/macros/s/AKfycbx.../exec"
+                  value={form.googleSheetsWebhook || form.googleSheetsWebhookUrl || ''}
+                  onChange={(e) => setForm({
+                    ...form,
+                    googleSheetsWebhook: e.target.value,
+                    googleSheetsWebhookUrl: e.target.value
+                  })}
+                  className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Didapat dari menu Ekstensi &gt; Apps Script &gt; Terapkan sebagai Aplikasi Web (Akses: <strong>Siapa saja / Anyone</strong>).
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Tautan File Google Spreadsheet (Opsional)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://docs.google.com/spreadsheets/d/1aB2c3.../edit"
+                  value={form.googleSheetsUrl || ''}
+                  onChange={(e) => setForm({ ...form, googleSheetsUrl: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                />
               </div>
             </div>
           </div>
