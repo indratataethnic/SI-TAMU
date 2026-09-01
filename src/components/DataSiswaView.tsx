@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Student, StudentScoreSummary, ViolationRecord, RewardRecord, CompensationRecord } from '../types';
 import {
   Users,
@@ -17,9 +17,11 @@ import {
   X,
   CheckCircle2,
   Phone,
-  ArrowUpDown
+  ArrowUpDown,
+  GraduationCap
 } from 'lucide-react';
 import { exportStudentsToExcel, downloadStudentTemplate, importStudentsFromExcel } from '../utils/excel';
+import { PRIMARY_SCHOOL_CLASSES, PRIMARY_SCHOOL_PARALLEL_CLASSES, getAvailableClasses, matchClassFilter } from '../data/classOptions';
 
 interface DataSiswaViewProps {
   students: Student[];
@@ -60,38 +62,45 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
   const [formData, setFormData] = useState({
     nisn: '',
     name: '',
-    class: 'VII-A',
+    class: 'Kelas 1',
     gender: 'L' as 'L' | 'P',
     parentName: '',
     parentPhone: '',
     parentAddress: '',
     accessCode: ''
   });
+  const [customClassMode, setCustomClassMode] = useState(false);
 
-  // Extract unique classes
-  const classesList = ['ALL', ...Array.from(new Set(students.map(s => s.class))).sort()];
+  // Extract unique classes with Kelas 1 s.d. Kelas 6
+  const classesList = useMemo(() => {
+    return ['ALL', ...getAvailableClasses(students)];
+  }, [students]);
 
   // Summary lookup map
   const summaryMap = new Map<string, StudentScoreSummary>(summaries.map(s => [s.student.id, s]));
 
   // Filter students
-  const filteredStudents = students.filter(s => {
-    const matchesClass = selectedClass === 'ALL' || s.class === selectedClass;
-    const q = searchQuery.toLowerCase();
-    const matchesSearch =
-      s.name.toLowerCase().includes(q) ||
-      s.nisn.toLowerCase().includes(q) ||
-      s.class.toLowerCase().includes(q) ||
-      s.parentName.toLowerCase().includes(q);
-    return matchesClass && matchesSearch;
-  });
+  const filteredStudents = useMemo(() => {
+    return students.filter(s => {
+      const matchesClass = matchClassFilter(s.class, selectedClass);
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        s.name.toLowerCase().includes(q) ||
+        s.nisn.toLowerCase().includes(q) ||
+        s.class.toLowerCase().includes(q) ||
+        s.parentName.toLowerCase().includes(q);
+      return matchesClass && matchesSearch;
+    });
+  }, [students, selectedClass, searchQuery]);
 
   const openAddModal = () => {
     setEditingStudent(null);
+    setCustomClassMode(false);
     setFormData({
       nisn: '',
       name: '',
-      class: 'VII-A',
+      class: 'Kelas 1',
       gender: 'L',
       parentName: '',
       parentPhone: '',
@@ -103,10 +112,12 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
 
   const openEditModal = (student: Student) => {
     setEditingStudent(student);
+    const isStandardClass = PRIMARY_SCHOOL_CLASSES.includes(student.class) || PRIMARY_SCHOOL_PARALLEL_CLASSES.includes(student.class);
+    setCustomClassMode(!isStandardClass);
     setFormData({
       nisn: student.nisn,
       name: student.name,
-      class: student.class,
+      class: student.class || 'Kelas 1',
       gender: student.gender,
       parentName: student.parentName,
       parentPhone: student.parentPhone,
@@ -229,37 +240,89 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
       )}
 
       {/* Search & Filter Toolbar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari Nama Siswa, NISN, atau Wali..."
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"
-          />
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          {/* Text Search Input */}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari Nama Siswa, NISN, Kelas, atau Nama Orang Tua..."
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 text-xs"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Dedicated Class Dropdown Filter */}
+          <div className="flex items-center gap-2">
+            <GraduationCap className="w-4 h-4 text-emerald-700 shrink-0" />
+            <span className="text-xs text-slate-600 font-semibold shrink-0">Pilihan Kelas:</span>
+            <select
+              value={selectedClass}
+              onChange={(e) => setSelectedClass(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer"
+            >
+              <option value="ALL">Semua Kelas (Semua Siswa)</option>
+              <optgroup label="Pilihan Kelas Utama (SD)">
+                {PRIMARY_SCHOOL_CLASSES.map(cls => (
+                  <option key={cls} value={cls}>{cls}</option>
+                ))}
+              </optgroup>
+              {classesList.filter(c => c !== 'ALL' && !PRIMARY_SCHOOL_CLASSES.includes(c)).length > 0 && (
+                <optgroup label="Kelas Lainnya / Paralel">
+                  {classesList.filter(c => c !== 'ALL' && !PRIMARY_SCHOOL_CLASSES.includes(c)).map(cls => (
+                    <option key={cls} value={cls}>{cls}</option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </div>
         </div>
 
-        {/* Class Filter */}
-        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-          <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <span className="text-xs text-slate-500 font-medium shrink-0">Filter Kelas:</span>
-          <div className="flex gap-1.5">
-            {classesList.map((cls) => (
+        {/* Quick Class Badges (Kelas 1 s.d. Kelas 6 + ALL) */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 border-t border-slate-100">
+          <span className="text-[11px] text-slate-400 font-medium shrink-0 mr-1">Akses Cepat:</span>
+          <button
+            onClick={() => setSelectedClass('ALL')}
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
+              selectedClass === 'ALL'
+                ? 'bg-emerald-950 text-white shadow-xs ring-2 ring-emerald-700/50'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            Semua Kelas ({students.length})
+          </button>
+          {PRIMARY_SCHOOL_CLASSES.map((cls) => {
+            const count = students.filter(s => matchClassFilter(s.class, cls)).length;
+            const isSelected = selectedClass === cls;
+            return (
               <button
                 key={cls}
                 onClick={() => setSelectedClass(cls)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer shrink-0 ${
-                  selectedClass === cls
-                    ? 'bg-emerald-900 text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-emerald-900 text-amber-300 shadow-xs ring-2 ring-amber-400/50'
+                    : 'bg-emerald-50 text-emerald-900 hover:bg-emerald-100 border border-emerald-200'
                 }`}
               >
-                {cls === 'ALL' ? 'Semua Kelas' : cls}
+                <span>{cls}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                  isSelected ? 'bg-amber-400 text-slate-950' : 'bg-emerald-200/80 text-emerald-950'
+                }`}>
+                  {count}
+                </span>
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </div>
 
@@ -285,7 +348,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
               {filteredStudents.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="text-center py-10 text-slate-400">
-                    Tidak ditemukan data siswa yang sesuai filter.
+                    Tidak ditemukan data siswa yang sesuai pencarian atau filter kelas.
                   </td>
                 </tr>
               ) : (
@@ -303,7 +366,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                         <span className="text-[10px] text-slate-400 font-mono">Kode Akses: {student.accessCode || '-'}</span>
                       </td>
                       <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded font-semibold text-[11px]">
+                        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-950 border border-emerald-200 rounded-lg font-bold text-[11px]">
                           {student.class}
                         </span>
                       </td>
@@ -407,7 +470,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
             </div>
 
             <form onSubmit={handleFormSubmit} className="p-6 space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">NISN (Nomor Induk)</label>
                   <input
@@ -420,17 +483,75 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Kelas</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.class}
-                    onChange={(e) => setFormData({ ...formData, class: e.target.value })}
-                    placeholder="Contoh: IX-A atau 7B"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-700">Pilihan Kelas</label>
+                    <button
+                      type="button"
+                      onClick={() => setCustomClassMode(!customClassMode)}
+                      className="text-[10px] text-emerald-700 hover:underline font-semibold"
+                    >
+                      {customClassMode ? '← Pilih Kelas 1-6' : 'Ketik Manual'}
+                    </button>
+                  </div>
+                  {customClassMode ? (
+                    <input
+                      type="text"
+                      required
+                      value={formData.class}
+                      onChange={(e) => setFormData({ ...formData, class: e.target.value })}
+                      placeholder="Contoh: Kelas 1-A atau 6B"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold"
+                    />
+                  ) : (
+                    <select
+                      value={formData.class}
+                      onChange={(e) => {
+                        if (e.target.value === 'CUSTOM') {
+                          setCustomClassMode(true);
+                        } else {
+                          setFormData({ ...formData, class: e.target.value });
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold text-slate-900"
+                    >
+                      <optgroup label="Kelas Utama (SD)">
+                        {PRIMARY_SCHOOL_CLASSES.map(cls => (
+                          <option key={cls} value={cls}>{cls}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Kelas Paralel">
+                        {PRIMARY_SCHOOL_PARALLEL_CLASSES.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c)).map(cls => (
+                          <option key={cls} value={cls}>{cls}</option>
+                        ))}
+                      </optgroup>
+                      <option value="CUSTOM">+ Tulis Format Kelas Lain...</option>
+                    </select>
+                  )}
                 </div>
               </div>
+
+              {/* Quick Class Selector Buttons for Add/Edit */}
+              {!customClassMode && (
+                <div>
+                  <span className="text-[11px] text-slate-500 font-medium block mb-1">Pilih Cepat Kelas:</span>
+                  <div className="grid grid-cols-6 gap-1.5">
+                    {PRIMARY_SCHOOL_CLASSES.map(cls => (
+                      <button
+                        key={cls}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, class: cls })}
+                        className={`py-1.5 text-center rounded-lg text-xs font-bold transition cursor-pointer ${
+                          formData.class === cls
+                            ? 'bg-emerald-900 text-amber-300 shadow-xs border border-emerald-950'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                        }`}
+                      >
+                        {cls.replace('Kelas ', 'Kls ')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Nama Lengkap Siswa</label>

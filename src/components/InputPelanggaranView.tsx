@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Student, Teacher, ViolationRule, ViolationRecord, SchoolSettings, StudentScoreSummary } from '../types';
 import {
   AlertTriangle,
@@ -11,9 +11,11 @@ import {
   CheckCircle2,
   Search,
   MessageSquare,
-  ShieldCheck
+  ShieldCheck,
+  GraduationCap
 } from 'lucide-react';
 import { openWhatsApp, generateViolationWAMessage, sendViaGateway } from '../utils/whatsapp';
+import { PRIMARY_SCHOOL_CLASSES, getAvailableClasses, matchClassFilter } from '../data/classOptions';
 
 interface InputPelanggaranViewProps {
   students: Student[];
@@ -39,6 +41,7 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
   const [selectedStudentId, setSelectedStudentId] = useState<string>(
     preselectedStudent ? preselectedStudent.id : (students[0]?.id || '')
   );
+  const [selectedClass, setSelectedClass] = useState<string>('ALL');
   const [studentSearch, setStudentSearch] = useState('');
   const [selectedRuleId, setSelectedRuleId] = useState<string>(violationRules[0]?.id || '');
   const [customPoints, setCustomPoints] = useState<number>(violationRules[0]?.points || 20);
@@ -50,16 +53,25 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
   const [autoSendWA, setAutoSendWA] = useState<boolean>(true);
   const [feedback, setFeedback] = useState<string | null>(null);
 
+  const availableClasses = useMemo(() => getAvailableClasses(students), [students]);
+
+  // Filter students for searchable picker
+  const filteredStudents = useMemo(() => {
+    return students.filter(s => {
+      const matchesClass = matchClassFilter(s.class, selectedClass);
+      const q = studentSearch.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        s.name.toLowerCase().includes(q) ||
+        s.nisn.includes(q) ||
+        s.class.toLowerCase().includes(q);
+      return matchesClass && matchesSearch;
+    });
+  }, [students, selectedClass, studentSearch]);
+
   const selectedStudent = students.find(s => s.id === selectedStudentId);
   const selectedRule = violationRules.find(r => r.id === selectedRuleId);
   const studentSummary = summaries.find(s => s.student.id === selectedStudentId);
-
-  // Filter students for searchable picker
-  const filteredStudents = students.filter(s =>
-    s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
-    s.nisn.includes(studentSearch) ||
-    s.class.toLowerCase().includes(studentSearch.toLowerCase())
-  );
 
   const handleRuleChange = (ruleId: string) => {
     setSelectedRuleId(ruleId);
@@ -146,8 +158,75 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
       {/* Form */}
       <form onSubmit={handleSubmit} className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-5 text-xs">
         {/* Step 1: Select Student */}
-        <div className="space-y-2">
-          <label className="block font-bold text-slate-800 text-sm">1. Pilih Identitas Siswa</label>
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <label className="block font-bold text-slate-800 text-sm">1. Pilih Identitas Siswa</label>
+            <div className="flex items-center gap-1.5">
+              <GraduationCap className="w-3.5 h-3.5 text-emerald-700" />
+              <span className="text-[11px] font-semibold text-slate-500">Pilihan Kelas:</span>
+              <select
+                value={selectedClass}
+                onChange={(e) => {
+                  setSelectedClass(e.target.value);
+                  const firstMatch = students.find(s => matchClassFilter(s.class, e.target.value));
+                  if (firstMatch) setSelectedStudentId(firstMatch.id);
+                }}
+                className="px-2 py-1 bg-slate-100 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-none"
+              >
+                <option value="ALL">Semua Kelas</option>
+                <optgroup label="Kelas SD (Utama)">
+                  {PRIMARY_SCHOOL_CLASSES.map(cls => (
+                    <option key={cls} value={cls}>{cls}</option>
+                  ))}
+                </optgroup>
+                {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c)).length > 0 && (
+                  <optgroup label="Kelas Lain">
+                    {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c)).map(cls => (
+                      <option key={cls} value={cls}>{cls}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+          </div>
+
+          {/* Quick Class Pills for instant filter */}
+          <div className="flex items-center gap-1 overflow-x-auto pb-1">
+            <button
+              type="button"
+              onClick={() => setSelectedClass('ALL')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold cursor-pointer transition ${
+                selectedClass === 'ALL'
+                  ? 'bg-emerald-950 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Semua ({students.length})
+            </button>
+            {PRIMARY_SCHOOL_CLASSES.map(cls => {
+              const count = students.filter(s => matchClassFilter(s.class, cls)).length;
+              return (
+                <button
+                  key={cls}
+                  type="button"
+                  onClick={() => {
+                    setSelectedClass(cls);
+                    const firstMatch = students.find(s => matchClassFilter(s.class, cls));
+                    if (firstMatch) setSelectedStudentId(firstMatch.id);
+                  }}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold cursor-pointer transition flex items-center gap-1 ${
+                    selectedClass === cls
+                      ? 'bg-emerald-900 text-amber-300 ring-1 ring-amber-400'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>{cls}</span>
+                  <span className="text-[9px] opacity-75">({count})</span>
+                </button>
+              );
+            })}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
@@ -155,20 +234,24 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
                 type="text"
                 value={studentSearch}
                 onChange={(e) => setStudentSearch(e.target.value)}
-                placeholder="Filter nama/NISN/kelas..."
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                placeholder="Cari nama, NISN, atau kelas..."
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium"
               />
             </div>
             <select
               value={selectedStudentId}
               onChange={(e) => setSelectedStudentId(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-semibold text-slate-900"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold text-slate-900"
             >
-              {filteredStudents.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.class}) - NISN: {s.nisn}
-                </option>
-              ))}
+              {filteredStudents.length === 0 ? (
+                <option value="">Tidak ada siswa di pilihan filter ini</option>
+              ) : (
+                filteredStudents.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.class}) - NISN: {s.nisn}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
@@ -176,7 +259,7 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
           {selectedStudent && (
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between mt-2">
               <div>
-                <span className="font-bold text-slate-900 block">{selectedStudent.name} (Kelas {selectedStudent.class})</span>
+                <span className="font-bold text-slate-900 block">{selectedStudent.name} ({selectedStudent.class})</span>
                 <span className="text-[11px] text-slate-500">
                   Orang Tua: {selectedStudent.parentName} • WA: {selectedStudent.parentPhone}
                 </span>

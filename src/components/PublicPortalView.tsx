@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Student, StudentScoreSummary, ViolationRecord, RewardRecord, CompensationRecord, SchoolSettings } from '../types';
 import {
   Search,
@@ -14,9 +14,11 @@ import {
   Calendar,
   Lock,
   User,
-  ExternalLink
+  ExternalLink,
+  GraduationCap
 } from 'lucide-react';
 import { openWhatsApp } from '../utils/whatsapp';
+import { PRIMARY_SCHOOL_CLASSES, getAvailableClasses, matchClassFilter } from '../data/classOptions';
 
 interface PublicPortalViewProps {
   students: Student[];
@@ -39,8 +41,15 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
 }) => {
   const [inputNisn, setInputNisn] = useState('');
   const [inputAccessCode, setInputAccessCode] = useState('');
+  const [filterClass, setFilterClass] = useState('ALL');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const availableClasses = useMemo(() => getAvailableClasses(students), [students]);
+
+  const filteredQuickStudents = useMemo(() => {
+    return students.filter(s => matchClassFilter(s.class, filterClass));
+  }, [students, filterClass]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,21 +186,56 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
             </button>
           </form>
 
-          {/* Quick Picker for Demo Convenience */}
-          <div className="pt-4 border-t border-slate-100">
-            <span className="text-slate-400 text-xs block mb-2 font-medium">
-              💡 Atau pilih langsung nama siswa dari daftar:
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {students.slice(0, 6).map((s) => (
+          {/* Quick Picker for Demo & Parents Convenience */}
+          <div className="pt-4 border-t border-slate-100 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span className="text-slate-500 text-xs font-semibold flex items-center gap-1.5">
+                <GraduationCap className="w-4 h-4 text-emerald-800" />
+                Pilih Berdasarkan Kelas:
+              </span>
+              <div className="flex items-center gap-1 overflow-x-auto pb-1">
                 <button
-                  key={s.id}
-                  onClick={() => handleSelectDirect(s)}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-emerald-100 hover:text-emerald-900 text-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer border border-slate-200"
+                  type="button"
+                  onClick={() => setFilterClass('ALL')}
+                  className={`px-2 py-1 rounded-md text-[11px] font-bold cursor-pointer transition ${
+                    filterClass === 'ALL'
+                      ? 'bg-emerald-950 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
                 >
-                  {s.name} ({s.class})
+                  Semua
                 </button>
-              ))}
+                {PRIMARY_SCHOOL_CLASSES.map(cls => (
+                  <button
+                    key={cls}
+                    type="button"
+                    onClick={() => setFilterClass(cls)}
+                    className={`px-2 py-1 rounded-md text-[11px] font-bold cursor-pointer transition ${
+                      filterClass === cls
+                        ? 'bg-emerald-900 text-amber-300 ring-1 ring-amber-400'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {cls}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {filteredQuickStudents.length === 0 ? (
+                <span className="text-xs text-slate-400 italic">Tidak ada data siswa untuk kelas ini.</span>
+              ) : (
+                filteredQuickStudents.slice(0, 10).map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => handleSelectDirect(s)}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-emerald-100 hover:text-emerald-900 text-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer border border-slate-200"
+                  >
+                    {s.name} ({s.class})
+                  </button>
+                ))
+              )}
             </div>
           </div>
         </div>

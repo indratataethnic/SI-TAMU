@@ -1,12 +1,12 @@
 import * as XLSX from 'xlsx';
-import { Student, Teacher, ViolationRecord, RewardRecord, StudentScoreSummary } from '../types';
+import { Student, ViolationRecord, RewardRecord, StudentScoreSummary } from '../types';
 
 export const downloadStudentTemplate = () => {
   const templateData = [
     {
       'NISN': '0089123410',
       'Nama Siswa': 'Contoh Siswa Baru',
-      'Kelas': 'VII-A',
+      'Kelas': 'Kelas 1',
       'Jenis Kelamin (L/P)': 'L',
       'Nama Orang Tua / Wali': 'Nama Bapak/Ibu',
       'No WhatsApp Orang Tua': '081234567890',
@@ -15,7 +15,7 @@ export const downloadStudentTemplate = () => {
     {
       'NISN': '0089123411',
       'Nama Siswa': 'Contoh Siswi Baru',
-      'Kelas': 'VII-A',
+      'Kelas': 'Kelas 2',
       'Jenis Kelamin (L/P)': 'P',
       'Nama Orang Tua / Wali': 'Nama Ibu/Bapak',
       'No WhatsApp Orang Tua': '085233445566',
@@ -171,105 +171,6 @@ export const importStudentsFromExcel = async (file: File): Promise<Student[]> =>
         resolve(parsedStudents);
       } catch (err: any) {
         reject(new Error(err?.message || 'Gagal membaca file Excel.'));
-      }
-    };
-
-    reader.onerror = () => reject(new Error('Gagal membuka file.'));
-    reader.readAsArrayBuffer(file);
-  });
-};
-
-export const downloadTeacherTemplate = () => {
-  const templateData = [
-    {
-      'NIP / NUPTK': '19850310 200902 1 004',
-      'Nama Guru & Gelar': 'Bambang Sudarsono, S.Pd.',
-      'Jabatan / Peran': 'Wali Kelas IX-A & Pembina Kesiswaan',
-      'Wali Kelas (Opsional)': 'IX-A',
-      'No WhatsApp': '085211223344',
-      'Email (Opsional)': 'bambang.s@sekolah.sch.id'
-    },
-    {
-      'NIP / NUPTK': '19881120 201201 2 009',
-      'Nama Guru & Gelar': 'Siti Rahmawati, S.Pd., M.Hum.',
-      'Jabatan / Peran': 'Wali Kelas VIII-B & Guru Bahasa',
-      'Wali Kelas (Opsional)': 'VIII-B',
-      'No WhatsApp': '087812349876',
-      'Email (Opsional)': 'siti.rahma@sekolah.sch.id'
-    },
-    {
-      'NIP / NUPTK': '19900214 201402 1 005',
-      'Nama Guru & Gelar': 'Indra Hermawan, S.Kom.',
-      'Jabatan / Peran': 'Guru Piket & Tim Kedisiplinan',
-      'Wali Kelas (Opsional)': '',
-      'No WhatsApp': '081987654321',
-      'Email (Opsional)': 'indra.h@sekolah.sch.id'
-    }
-  ];
-
-  const ws = XLSX.utils.json_to_sheet(templateData);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Template_Guru');
-  XLSX.writeFile(wb, 'Template_Import_Guru_SITAMU.xlsx');
-};
-
-export const exportTeachersToExcel = (teachers: Teacher[]) => {
-  const rows = teachers.map((t, idx) => ({
-    'No': idx + 1,
-    'NIP / NUPTK': t.nip,
-    'Nama Lengkap & Gelar': t.name,
-    'Jabatan / Peran': t.role,
-    'Wali Kelas': t.assignedClass || '-',
-    'No WhatsApp': t.phone,
-    'Email': t.email || '-',
-    'Terdaftar': t.createdAt
-  }));
-
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Data_Guru');
-  XLSX.writeFile(wb, `Data_Guru_GTK_SITAMU_${new Date().toISOString().slice(0, 10)}.xlsx`);
-};
-
-export const importTeachersFromExcel = async (file: File): Promise<Teacher[]> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const rawJson: any[] = XLSX.utils.sheet_to_json(worksheet);
-
-        if (!rawJson || rawJson.length === 0) {
-          throw new Error('File excel kosong atau format tidak sesuai.');
-        }
-
-        const parsedTeachers: Teacher[] = rawJson.map((row, index) => {
-          const nip = String(row['NIP / NUPTK'] || row['NIP'] || row['nuptk'] || row['nip'] || `NIP-${Date.now()}-${index}`).trim();
-          const name = String(row['Nama Guru & Gelar'] || row['Nama Guru'] || row['Nama Lengkap'] || row['Nama'] || row['nama'] || `Guru ${index + 1}`).trim();
-          const role = String(row['Jabatan / Peran'] || row['Jabatan'] || row['Peran'] || row['Tugas'] || 'Guru Mapel').trim();
-          const assignedClass = String(row['Wali Kelas (Opsional)'] || row['Wali Kelas'] || row['Kelas'] || row['kelas'] || '').trim();
-          const phone = String(row['No WhatsApp'] || row['WhatsApp'] || row['No HP'] || row['Telepon'] || row['phone'] || '081234567890').replace(/[^0-9]/g, '');
-          const email = String(row['Email (Opsional)'] || row['Email'] || row['email'] || '').trim();
-
-          return {
-            id: `TCH-IMP-${Date.now()}-${index}`,
-            nip,
-            name,
-            role,
-            assignedClass: assignedClass || undefined,
-            phone: phone || '081234567890',
-            email: email || undefined,
-            createdAt: new Date().toISOString().slice(0, 10)
-          };
-        });
-
-        resolve(parsedTeachers);
-      } catch (err: any) {
-        reject(new Error(err?.message || 'Gagal membaca file Excel guru.'));
       }
     };
 

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Teacher, PiketSchedule, ViolationRecord, RewardRecord, DayOfWeek } from '../types';
 import { initialPiketSchedules } from '../data/initialData';
+import { PRIMARY_SCHOOL_CLASSES } from '../data/classOptions';
 import {
   GraduationCap,
   Plus,
@@ -1084,11 +1085,33 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    placeholder="Cth: VII-A, VIII-B"
+                    list="classListGuru"
+                    placeholder="Pilih atau ketik: Kelas 1 - Kelas 6"
                     value={formData.classAssigned}
                     onChange={(e) => setFormData({ ...formData, classAssigned: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                   />
+                  <datalist id="classListGuru">
+                    {PRIMARY_SCHOOL_CLASSES.map(cls => (
+                      <option key={cls} value={cls} />
+                    ))}
+                  </datalist>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {PRIMARY_SCHOOL_CLASSES.map(cls => (
+                      <button
+                        key={cls}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, classAssigned: cls })}
+                        className={`text-[10px] px-1.5 py-0.5 rounded border transition cursor-pointer ${
+                          formData.classAssigned === cls
+                            ? 'bg-emerald-950 text-white border-emerald-950 font-bold'
+                            : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-emerald-50'
+                        }`}
+                      >
+                        {cls}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
@@ -1097,7 +1120,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
                   </label>
                   <input
                     type="text"
-                    placeholder="Cth: Matematika, IPA"
+                    placeholder="Cth: Matematika, Tematik, PJOK, PAI"
                     value={formData.subject}
                     onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"

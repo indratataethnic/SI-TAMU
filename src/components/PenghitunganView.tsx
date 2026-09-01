@@ -20,11 +20,13 @@ import {
   Crown,
   Star,
   Award,
-  ShieldCheck
+  ShieldCheck,
+  GraduationCap
 } from 'lucide-react';
 import { exportPenghitunganToExcel } from '../utils/excel';
 import { openWhatsApp, generateThresholdWAMessage } from '../utils/whatsapp';
 import { SertifikatTeladanModal } from './SertifikatTeladanModal';
+import { PRIMARY_SCHOOL_CLASSES, getAvailableClasses, matchClassFilter } from '../data/classOptions';
 
 interface PenghitunganViewProps {
   summaries: StudentScoreSummary[];
@@ -62,10 +64,8 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
   const [compSupervisor, setCompSupervisor] = useState(settings.bkCoordinatorName || 'Ibu Ratna, M.Pd.');
   const [compNotes, setCompNotes] = useState('');
 
-  const classesList = ['ALL', ...Array.from(new Set(summaries.map(s => s.student.class))).sort()];
-  const realClasses = useMemo(() => {
-    return Array.from(new Set(summaries.map(s => s.student.class))).sort();
-  }, [summaries]);
+  const allStudents = useMemo(() => summaries.map(s => s.student), [summaries]);
+  const availableClasses = useMemo(() => getAvailableClasses(allStudents), [allStudents]);
 
   // Teladan Candidates: STRICT REQUIREMENT: Total Violations === 0 and Active Points === 0
   const teladanCandidates = useMemo(() => {
@@ -77,25 +77,27 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
   // Group Teladan Candidates by Class
   const teladanByClass = useMemo(() => {
     const map: Record<string, StudentScoreSummary[]> = {};
-    realClasses.forEach(cls => {
-      map[cls] = teladanCandidates.filter(s => s.student.class === cls);
+    availableClasses.forEach(cls => {
+      map[cls] = teladanCandidates.filter(s => matchClassFilter(s.student.class, cls));
     });
     return map;
-  }, [realClasses, teladanCandidates]);
+  }, [availableClasses, teladanCandidates]);
 
   const filteredSummaries = summaries.filter(s => {
-    const matchesCls = selectedClass === 'ALL' || s.student.class === selectedClass;
+    const matchesCls = matchClassFilter(s.student.class, selectedClass);
     const matchesStatus =
       selectedStatus === 'ALL' ||
       (selectedStatus === 'peringatan' && s.activeViolationPoints >= 100 && s.activeViolationPoints < 300) ||
       (selectedStatus === 'skorsing' && s.activeViolationPoints >= 300 && s.activeViolationPoints < 500) ||
       (selectedStatus === 'pembinaan_rumah' && s.activeViolationPoints >= 500) ||
       (selectedStatus === 'normal' && s.activeViolationPoints < 100);
-    const q = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase().trim();
     const matchesSearch =
+      !q ||
       s.student.name.toLowerCase().includes(q) ||
       s.student.nisn.toLowerCase().includes(q) ||
-      s.student.parentName.toLowerCase().includes(q);
+      s.student.parentName.toLowerCase().includes(q) ||
+      s.student.class.toLowerCase().includes(q);
     return matchesCls && matchesStatus && matchesSearch;
   });
 
@@ -248,19 +250,62 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
           </div>
 
           {/* Class Filter */}
-          <div className="flex items-center gap-1.5 ml-2">
+          <div className="flex items-center gap-1.5 ml-0 lg:ml-2">
+            <GraduationCap className="w-3.5 h-3.5 text-emerald-800" />
             <span className="text-xs text-slate-500 font-medium">Kelas:</span>
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
               className="px-2.5 py-1 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold focus:outline-none"
             >
-              {classesList.map(c => (
-                <option key={c} value={c}>{c === 'ALL' ? 'Semua Kelas' : c}</option>
-              ))}
+              <option value="ALL">Semua Kelas</option>
+              <optgroup label="Kelas SD (Utama)">
+                {PRIMARY_SCHOOL_CLASSES.map(cls => (
+                  <option key={cls} value={cls}>{cls}</option>
+                ))}
+              </optgroup>
+              {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c)).length > 0 && (
+                <optgroup label="Kelas Lain">
+                  {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c)).map(cls => (
+                    <option key={cls} value={cls}>{cls}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
         </div>
+      </div>
+
+      {/* Quick Class Pills for instant filter */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        <span className="text-[11px] font-bold text-slate-400 shrink-0">Filter Cepat:</span>
+        <button
+          onClick={() => setSelectedClass('ALL')}
+          className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
+            selectedClass === 'ALL'
+              ? 'bg-emerald-950 text-white shadow'
+              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+          }`}
+        >
+          Semua Kelas ({summaries.length})
+        </button>
+        {PRIMARY_SCHOOL_CLASSES.map(cls => {
+          const count = summaries.filter(s => matchClassFilter(s.student.class, cls)).length;
+          return (
+            <button
+              key={cls}
+              onClick={() => setSelectedClass(cls)}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 flex items-center gap-1 ${
+                selectedClass === cls
+                  ? 'bg-emerald-900 text-amber-300 ring-1 ring-amber-400 shadow'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              <span>{cls}</span>
+              <span className="text-[10px] opacity-75">({count})</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Main Table */}
@@ -616,7 +661,7 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
               >
                 Semua Kelas ({teladanCandidates.length} Siswa)
               </button>
-              {realClasses.map(cls => {
+              {availableClasses.map(cls => {
                 const count = (teladanByClass[cls] || []).length;
                 return (
                   <button
@@ -628,7 +673,7 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
                         : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
                     }`}
                   >
-                    Kelas {cls} ({count})
+                    {cls} ({count})
                   </button>
                 );
               })}
@@ -636,7 +681,7 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
 
             {/* Candidate List per Class */}
             <div className="p-6 max-h-[65vh] overflow-y-auto space-y-6">
-              {(teladanSelectedClassTab === 'ALL' ? realClasses : [teladanSelectedClassTab]).map(cls => {
+              {(teladanSelectedClassTab === 'ALL' ? availableClasses : [teladanSelectedClassTab]).map(cls => {
                 const classCandidates = teladanByClass[cls] || [];
                 const topCandidate = classCandidates[0];
 
@@ -645,7 +690,7 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
                     {/* Class Section Header */}
                     <div className="bg-slate-100 px-4 py-2.5 flex items-center justify-between border-b border-slate-200">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 text-sm">Kelas {cls}</span>
+                        <span className="font-bold text-slate-900 text-sm">{cls}</span>
                         <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-semibold text-[10px]">
                           {classCandidates.length} Siswa 0 Pelanggaran
                         </span>

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Student, Teacher, RewardRule, RewardRecord, SchoolSettings } from '../types';
+import React, { useState, useMemo } from 'react';
+import { Student, RewardRule, RewardRecord, SchoolSettings } from '../types';
 import {
   Award,
   Sparkles,
@@ -13,10 +13,10 @@ import {
   GraduationCap
 } from 'lucide-react';
 import { openWhatsApp, generateRewardWAMessage } from '../utils/whatsapp';
+import { PRIMARY_SCHOOL_CLASSES, getAvailableClasses, matchClassFilter } from '../data/classOptions';
 
 interface InputRewardViewProps {
   students: Student[];
-  teachers?: Teacher[];
   rewardRules: RewardRule[];
   settings: SchoolSettings;
   preselectedStudent?: Student | null;
@@ -27,7 +27,6 @@ interface InputRewardViewProps {
 
 export const InputRewardView: React.FC<InputRewardViewProps> = ({
   students,
-  teachers = [],
   rewardRules,
   settings,
   preselectedStudent,
@@ -38,6 +37,7 @@ export const InputRewardView: React.FC<InputRewardViewProps> = ({
   const [selectedStudentId, setSelectedStudentId] = useState<string>(
     preselectedStudent ? preselectedStudent.id : (students[0]?.id || '')
   );
+  const [selectedClass, setSelectedClass] = useState<string>('ALL');
   const [studentSearch, setStudentSearch] = useState('');
   const [competitionName, setCompetitionName] = useState('');
   const [organizer, setOrganizer] = useState('');
@@ -46,26 +46,12 @@ export const InputRewardView: React.FC<InputRewardViewProps> = ({
   const [points, setPoints] = useState<number>(3);
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
-
-  // Teacher connection
-  const initialTeacher = teachers[0];
-  const [selectedTeacherId, setSelectedTeacherId] = useState<string>(initialTeacher?.id || '');
-  const [reporterName, setReporterName] = useState<string>(initialTeacher?.name || 'Koordinator Kesiswaan & Prestasi');
-  const [reporterNip, setReporterNip] = useState<string>(initialTeacher?.nip || '');
-  const [isCustomReporter, setIsCustomReporter] = useState<boolean>(teachers.length === 0);
-
   const [autoSendWA, setAutoSendWA] = useState<boolean>(true);
   const [feedbackRecord, setFeedbackRecord] = useState<RewardRecord | null>(null);
 
-  const selectedStudent = students.find(s => s.id === selectedStudentId);
+  const availableClasses = useMemo(() => getAvailableClasses(students), [students]);
 
-  useEffect(() => {
-    if (teachers.length > 0 && !isCustomReporter && !selectedTeacherId) {
-      setSelectedTeacherId(teachers[0].id);
-      setReporterName(teachers[0].name);
-      setReporterNip(teachers[0].nip);
-    }
-  }, [teachers, isCustomReporter, selectedTeacherId]);
+  const selectedStudent = students.find(s => s.id === selectedStudentId);
 
   // Auto calculate reward points according to user's formula
   const updatePoints = (newRank: string, newLevel: string) => {
@@ -98,12 +84,19 @@ export const InputRewardView: React.FC<InputRewardViewProps> = ({
     updatePoints(rank, l);
   };
 
-  // Filter students for search
-  const filteredStudents = students.filter(s =>
-    s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
-    s.nisn.includes(studentSearch) ||
-    s.class.toLowerCase().includes(studentSearch.toLowerCase())
-  );
+  // Filter students for search with class option
+  const filteredStudents = useMemo(() => {
+    return students.filter(s => {
+      const matchesClass = matchClassFilter(s.class, selectedClass);
+      const q = studentSearch.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        s.name.toLowerCase().includes(q) ||
+        s.nisn.includes(q) ||
+        s.class.toLowerCase().includes(q);
+      return matchesClass && matchesSearch;
+    });
+  }, [students, selectedClass, studentSearch]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,8 +118,7 @@ export const InputRewardView: React.FC<InputRewardViewProps> = ({
       organizer: organizer.trim() || undefined,
       points: Number(points) || 0,
       date,
-      reporterName: reporterName.trim() || 'Koordinator Prestasi & Kesiswaan',
-      reporterNip: reporterNip.trim() || undefined,
+      reporterName: 'Koordinator Prestasi & Kesiswaan',
       certificateNumber: `PIAGAM/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`,
       notes,
       createdAt: new Date().toISOString()
@@ -193,8 +185,75 @@ export const InputRewardView: React.FC<InputRewardViewProps> = ({
       {/* Form */}
       <form onSubmit={handleSubmit} className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-5 text-xs">
         {/* Step 1: Select Student */}
-        <div className="space-y-2">
-          <label className="block font-bold text-slate-800 text-sm">1. Pilih Identitas Siswa Berprestasi</label>
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <label className="block font-bold text-slate-800 text-sm">1. Pilih Identitas Siswa Berprestasi</label>
+            <div className="flex items-center gap-1.5">
+              <GraduationCap className="w-3.5 h-3.5 text-amber-700" />
+              <span className="text-[11px] font-semibold text-slate-500">Pilihan Kelas:</span>
+              <select
+                value={selectedClass}
+                onChange={(e) => {
+                  setSelectedClass(e.target.value);
+                  const firstMatch = students.find(s => matchClassFilter(s.class, e.target.value));
+                  if (firstMatch) setSelectedStudentId(firstMatch.id);
+                }}
+                className="px-2 py-1 bg-slate-100 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-none"
+              >
+                <option value="ALL">Semua Kelas</option>
+                <optgroup label="Kelas SD (Utama)">
+                  {PRIMARY_SCHOOL_CLASSES.map(cls => (
+                    <option key={cls} value={cls}>{cls}</option>
+                  ))}
+                </optgroup>
+                {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c)).length > 0 && (
+                  <optgroup label="Kelas Lain">
+                    {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c)).map(cls => (
+                      <option key={cls} value={cls}>{cls}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+          </div>
+
+          {/* Quick Class Pills for instant filter */}
+          <div className="flex items-center gap-1 overflow-x-auto pb-1">
+            <button
+              type="button"
+              onClick={() => setSelectedClass('ALL')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold cursor-pointer transition ${
+                selectedClass === 'ALL'
+                  ? 'bg-emerald-950 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Semua ({students.length})
+            </button>
+            {PRIMARY_SCHOOL_CLASSES.map(cls => {
+              const count = students.filter(s => matchClassFilter(s.class, cls)).length;
+              return (
+                <button
+                  key={cls}
+                  type="button"
+                  onClick={() => {
+                    setSelectedClass(cls);
+                    const firstMatch = students.find(s => matchClassFilter(s.class, cls));
+                    if (firstMatch) setSelectedStudentId(firstMatch.id);
+                  }}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold cursor-pointer transition flex items-center gap-1 ${
+                    selectedClass === cls
+                      ? 'bg-amber-500 text-emerald-950 ring-1 ring-amber-600 font-black'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>{cls}</span>
+                  <span className="text-[9px] opacity-75">({count})</span>
+                </button>
+              );
+            })}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
@@ -209,15 +268,33 @@ export const InputRewardView: React.FC<InputRewardViewProps> = ({
             <select
               value={selectedStudentId}
               onChange={(e) => setSelectedStudentId(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-semibold text-slate-900"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold text-slate-900"
             >
-              {filteredStudents.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.class}) - NISN: {s.nisn}
-                </option>
-              ))}
+              {filteredStudents.length === 0 ? (
+                <option value="">Tidak ada siswa di pilihan filter ini</option>
+              ) : (
+                filteredStudents.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.class}) - NISN: {s.nisn}
+                  </option>
+                ))
+              )}
             </select>
           </div>
+
+          {selectedStudent && (
+            <div className="p-3 bg-amber-50/60 border border-amber-200 rounded-xl flex items-center justify-between mt-2">
+              <div>
+                <span className="font-bold text-slate-900 text-xs block">{selectedStudent.name}</span>
+                <span className="text-[11px] text-slate-600">
+                  {selectedStudent.class} • NISN: {selectedStudent.nisn} • Wali: {selectedStudent.parentName}
+                </span>
+              </div>
+              <span className="text-amber-800 bg-amber-200/80 px-2.5 py-0.5 rounded-full font-bold text-[10px]">
+                Siswa Aktif
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Step 2: Competition Info */}
@@ -255,55 +332,6 @@ export const InputRewardView: React.FC<InputRewardViewProps> = ({
                 onChange={(e) => setDate(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none"
               />
-            </div>
-
-            <div className="sm:col-span-2">
-              <div className="flex items-center justify-between mb-1">
-                <label className="block font-semibold text-slate-600 text-xs sm:text-sm">
-                  Guru Pembina / Pelapor Prestasi
-                </label>
-                {teachers.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setIsCustomReporter(!isCustomReporter)}
-                    className="text-xs text-emerald-700 hover:text-emerald-800 font-bold underline"
-                  >
-                    {isCustomReporter ? '← Pilih dari Database Guru' : 'Ketik Manual...'}
-                  </button>
-                )}
-              </div>
-
-              {!isCustomReporter && teachers.length > 0 ? (
-                <select
-                  value={selectedTeacherId}
-                  onChange={(e) => {
-                    const tId = e.target.value;
-                    setSelectedTeacherId(tId);
-                    const t = teachers.find(item => item.id === tId);
-                    if (t) {
-                      setReporterName(t.name);
-                      setReporterNip(t.nip);
-                    }
-                  }}
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium text-slate-900 text-xs sm:text-sm"
-                >
-                  <optgroup label="Daftar Guru & GTK Sekolah">
-                    {teachers.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} — {t.role}{t.assignedClass ? ` (Wali Kelas ${t.assignedClass})` : ''}
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={reporterName}
-                  onChange={(e) => setReporterName(e.target.value)}
-                  placeholder="Nama Guru Pembina / Pelapor"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium text-xs sm:text-sm"
-                />
-              )}
             </div>
           </div>
         </div>
