@@ -249,6 +249,7 @@ export default function App() {
     violations?: ViolationRecord[];
     rewards?: RewardRecord[];
     compensations?: CompensationRecord[];
+    piketSchedules?: any[];
   }) => {
     if (imported.settings) {
       setSettings(prev => {
@@ -274,30 +275,34 @@ export default function App() {
       });
     }
 
-    const mergedStudents = imported.students || students;
-    const sMap = new Map(mergedStudents.map(s => [s.nisn, s.id]));
-
-    if (imported.students) {
+    if (imported.students && imported.students.length > 0) {
       setStudents(imported.students);
     }
-    if (imported.teachers) {
+    if (imported.teachers && imported.teachers.length > 0) {
       setTeachers(imported.teachers);
     }
-    if (imported.violations) {
+    if (imported.piketSchedules && imported.piketSchedules.length > 0) {
+      setPiketSchedules(imported.piketSchedules);
+    }
+
+    const mergedStudents = (imported.students && imported.students.length > 0) ? imported.students : students;
+    const sMap = new Map(mergedStudents.map(s => [s.nisn, s.id]));
+
+    if (imported.violations && imported.violations.length > 0) {
       const mappedViolations = imported.violations.map(v => ({
         ...v,
         studentId: v.studentId || sMap.get((v as any).studentNisn || '') || ''
       }));
       setViolations(mappedViolations);
     }
-    if (imported.rewards) {
+    if (imported.rewards && imported.rewards.length > 0) {
       const mappedRewards = imported.rewards.map(r => ({
         ...r,
         studentId: r.studentId || sMap.get((r as any).studentNisn || '') || ''
       }));
       setRewards(mappedRewards);
     }
-    if (imported.compensations) {
+    if (imported.compensations && imported.compensations.length > 0) {
       const mappedCompensations = imported.compensations.map(c => ({
         ...c,
         studentId: c.studentId || sMap.get((c as any).studentNisn || '') || ''

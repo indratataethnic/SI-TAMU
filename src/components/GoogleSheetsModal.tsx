@@ -166,6 +166,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
           settings: mergedSettings,
           students: res.data.students,
           teachers: res.data.teachers,
+          piketSchedules: res.data.piketSchedules,
           violations: res.data.violations,
           rewards: res.data.rewards,
           compensations: res.data.compensations

@@ -750,6 +750,7 @@ export const fetchFullStateFromSheets = async (
     settings?: any;
     students?: any[];
     teachers?: any[];
+    piketSchedules?: any[];
     violations?: any[];
     rewards?: any[];
     compensations?: any[];
