@@ -36,7 +36,7 @@ import {
   saveUserRole,
   calculateSummaries
 } from './utils/storage';
-import { syncFullStateToSheets } from './utils/sheetsSync';
+import { syncFullStateToSheets, fetchFullStateFromSheets } from './utils/sheetsSync';
 
 // Components & Views
 import { Navbar } from './components/Navbar';
@@ -156,6 +156,25 @@ export default function App() {
       })
       .catch(err => console.log('Error loading global configuration:', err));
   }, []);
+
+  // Automatic full data sync/fetch from Google Sheets on startup
+  useEffect(() => {
+    const webhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '').trim();
+    if (!webhook) return;
+
+    const hasAutoFetched = sessionStorage.getItem('si_tamu_auto_fetched');
+    if (hasAutoFetched) return;
+    sessionStorage.setItem('si_tamu_auto_fetched', 'true');
+
+    fetchFullStateFromSheets(webhook)
+      .then(res => {
+        if (res.success && res.data) {
+          console.log('Auto-loaded data from Google Sheets successfully');
+          handleImportFullData(res.data);
+        }
+      })
+      .catch(err => console.log('Auto-fetch from sheets error:', err));
+  }, [settings.googleSheetsWebhook, settings.googleSheetsWebhookUrl]);
 
   useEffect(() => { 
     saveSettings(settings); 
