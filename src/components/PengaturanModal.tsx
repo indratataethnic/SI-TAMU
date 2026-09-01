@@ -16,7 +16,25 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
   onSaveSettings,
   onClose
 }) => {
-  const [form, setForm] = useState<SchoolSettings>({ ...settings });
+  const [form, setForm] = useState<SchoolSettings>({
+    ...settings,
+    schoolName: settings.schoolName || '',
+    schoolSubtitle: settings.schoolSubtitle || '',
+    schoolAddress: settings.schoolAddress || '',
+    schoolPhone: settings.schoolPhone || '',
+    schoolEmail: settings.schoolEmail || '',
+    academicYear: settings.academicYear || '',
+    principalName: settings.principalName || '',
+    principalNip: settings.principalNip || '',
+    bkCoordinatorName: settings.bkCoordinatorName || '',
+    bkCoordinatorNip: settings.bkCoordinatorNip || '',
+    letterNumberPrefix: settings.letterNumberPrefix || '',
+    staffPin: settings.staffPin || '',
+    waGatewayApiKey: settings.waGatewayApiKey || '',
+    googleSheetsWebhook: settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '',
+    googleSheetsWebhookUrl: settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '',
+    googleSheetsUrl: settings.googleSheetsUrl || ''
+  });
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -73,12 +91,12 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
               Identitas Satuan Pendidikan
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
+               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Nama Satuan Pendidikan / Sekolah</label>
                 <input
                   type="text"
                   required
-                  value={form.schoolName}
+                  value={form.schoolName || ''}
                   onChange={(e) => setForm({ ...form, schoolName: e.target.value })}
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                 />
@@ -87,7 +105,7 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Motto / Subtitle Sekolah</label>
                 <input
                   type="text"
-                  value={form.schoolSubtitle}
+                  value={form.schoolSubtitle || ''}
                   onChange={(e) => setForm({ ...form, schoolSubtitle: e.target.value })}
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                 />
@@ -96,7 +114,7 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Alamat Lengkap Sekolah (Untuk Kop Surat)</label>
                 <input
                   type="text"
-                  value={form.schoolAddress}
+                  value={form.schoolAddress || ''}
                   onChange={(e) => setForm({ ...form, schoolAddress: e.target.value })}
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                 />
@@ -105,7 +123,7 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor Telepon / Kontak Resmi</label>
                 <input
                   type="text"
-                  value={form.schoolPhone}
+                  value={form.schoolPhone || ''}
                   onChange={(e) => setForm({ ...form, schoolPhone: e.target.value })}
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                 />
@@ -114,7 +132,7 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Email Sekolah</label>
                 <input
                   type="email"
-                  value={form.schoolEmail}
+                  value={form.schoolEmail || ''}
                   onChange={(e) => setForm({ ...form, schoolEmail: e.target.value })}
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                 />
@@ -144,7 +162,7 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Nama Kepala Sekolah & Gelar</label>
                 <input
                   type="text"
-                  value={form.principalName}
+                  value={form.principalName || ''}
                   onChange={(e) => setForm({ ...form, principalName: e.target.value })}
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                 />
@@ -153,7 +171,7 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
                 <label className="block text-xs font-semibold text-slate-700 mb-1">NIP Kepala Sekolah</label>
                 <input
                   type="text"
-                  value={form.principalNip}
+                  value={form.principalNip || ''}
                   onChange={(e) => setForm({ ...form, principalNip: e.target.value })}
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                 />
@@ -162,7 +180,7 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Nama Koordinator BK / Kesiswaan</label>
                 <input
                   type="text"
-                  value={form.bkCoordinatorName}
+                  value={form.bkCoordinatorName || ''}
                   onChange={(e) => setForm({ ...form, bkCoordinatorName: e.target.value })}
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                 />
@@ -171,7 +189,7 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
                 <label className="block text-xs font-semibold text-slate-700 mb-1">NIP Koordinator BK</label>
                 <input
                   type="text"
-                  value={form.bkCoordinatorNip}
+                  value={form.bkCoordinatorNip || ''}
                   onChange={(e) => setForm({ ...form, bkCoordinatorNip: e.target.value })}
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                 />
@@ -180,7 +198,7 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Prefix / Kode Penomoran Surat</label>
                 <input
                   type="text"
-                  value={form.letterNumberPrefix}
+                  value={form.letterNumberPrefix || ''}
                   onChange={(e) => setForm({ ...form, letterNumberPrefix: e.target.value })}
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                 />
@@ -200,7 +218,7 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
                 <input
                   type="text"
                   maxLength={12}
-                  value={form.staffPin}
+                  value={form.staffPin || ''}
                   onChange={(e) => setForm({ ...form, staffPin: e.target.value })}
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono font-bold tracking-widest focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                 />
@@ -212,7 +230,7 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
                 <input
                   type="password"
                   placeholder="Kosongkan jika hanya menggunakan 1-Klik WA"
-                  value={form.waGatewayApiKey}
+                  value={form.waGatewayApiKey || ''}
                   onChange={(e) => setForm({ ...form, waGatewayApiKey: e.target.value })}
                   className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                 />
