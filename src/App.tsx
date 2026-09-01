@@ -251,7 +251,27 @@ export default function App() {
     compensations?: CompensationRecord[];
   }) => {
     if (imported.settings) {
-      setSettings(imported.settings);
+      setSettings(prev => {
+        const fetched = (imported.settings || {}) as any;
+        return {
+          ...prev,
+          schoolName: fetched.schoolName ? String(fetched.schoolName) : prev.schoolName,
+          schoolSubtitle: fetched.schoolSubtitle ? String(fetched.schoolSubtitle) : prev.schoolSubtitle,
+          schoolAddress: fetched.schoolAddress ? String(fetched.schoolAddress) : prev.schoolAddress,
+          schoolPhone: fetched.schoolPhone ? String(fetched.schoolPhone) : prev.schoolPhone,
+          schoolEmail: fetched.schoolEmail ? String(fetched.schoolEmail) : prev.schoolEmail,
+          schoolWebsite: fetched.schoolWebsite ? String(fetched.schoolWebsite) : prev.schoolWebsite,
+          principalName: fetched.principalName || fetched.headmasterName ? String(fetched.principalName || fetched.headmasterName) : prev.principalName,
+          principalNip: fetched.principalNip || fetched.headmasterNip ? String(fetched.principalNip || fetched.headmasterNip) : prev.principalNip,
+          bkCoordinatorName: fetched.bkCoordinatorName ? String(fetched.bkCoordinatorName) : prev.bkCoordinatorName,
+          bkCoordinatorNip: fetched.bkCoordinatorNip ? String(fetched.bkCoordinatorNip) : prev.bkCoordinatorNip,
+          staffPin: fetched.staffPin ? String(fetched.staffPin) : prev.staffPin,
+          letterNumberPrefix: fetched.letterNumberPrefix ? String(fetched.letterNumberPrefix) : prev.letterNumberPrefix,
+          academicYear: fetched.academicYear ? String(fetched.academicYear) : prev.academicYear,
+          waGatewayApiKey: fetched.waGatewayApiKey ? String(fetched.waGatewayApiKey) : prev.waGatewayApiKey,
+          waGatewayDevice: fetched.waGatewayDevice ? String(fetched.waGatewayDevice) : prev.waGatewayDevice
+        };
+      });
     }
 
     const mergedStudents = imported.students || students;
