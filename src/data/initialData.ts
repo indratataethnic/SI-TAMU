@@ -562,7 +562,7 @@ export const initialSettings: SchoolSettings = {
   bkCoordinatorNip: '19820715 200801 2 007',
   staffPin: '1234',
   googleSheetsUrl: '',
-  googleSheetsWebhook: '',
+  googleSheetsWebhook: 'https://script.google.com/macros/s/AKfycbyGbfZdmd1fop8QjjBAlFAe3ZRbfCpa0Ql1wxBrDoKMtzkWig4-FQOw9pN56HVKujc/exec',
   waGatewayApiKey: '',
   waGatewayDevice: '',
   letterNumberPrefix: '421.2/SD/SI-TAMU',

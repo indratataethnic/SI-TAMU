@@ -26,7 +26,10 @@ app.get("/api/global-config", (req, res) => {
   } catch (err) {
     console.error("Error reading global config:", err);
   }
-  return res.json({ googleSheetsWebhook: "", googleSheetsUrl: "" });
+  return res.json({
+    googleSheetsWebhook: "https://script.google.com/macros/s/AKfycbyGbfZdmd1fop8QjjBAlFAe3ZRbfCpa0Ql1wxBrDoKMtzkWig4-FQOw9pN56HVKujc/exec",
+    googleSheetsUrl: ""
+  });
 });
 
 // POST API: Store spreadsheet and webhook URL globally
