@@ -311,30 +311,6 @@ export default function App() {
     }
   };
 
-  // Debounced Auto-Sync to Google Sheets whenever any dataset changes
-  useEffect(() => {
-    if (isInitialLoadingRef.current) return; // Do not auto-sync / write back to sheets on initial load/fetch
-    const webhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '').trim();
-    if (!webhook) return;
-
-    const timer = setTimeout(() => {
-      syncFullStateToSheets(
-        webhook,
-        students,
-        violations,
-        rewards,
-        compensations,
-        summaries,
-        settings.googleSheetsUrl,
-        teachers,
-        piketSchedules,
-        settings
-      ).catch(err => console.log('Debounced sheets sync:', err));
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [students, teachers, piketSchedules, violations, rewards, compensations, settings.googleSheetsWebhook, settings.googleSheetsWebhookUrl, settings.googleSheetsUrl, summaries, settings]);
-
   // Handlers for Students
   const handleAddStudent = (student: Student) => {
     const updated = [student, ...students];
