@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Student,
   Teacher,
@@ -122,6 +122,8 @@ export default function App() {
     return summaries.filter(s => s.activeViolationPoints >= 100).length;
   }, [summaries]);
 
+  const isInitialLoadingRef = useRef(true);
+
   // Auto-save listeners
   useEffect(() => { saveStudents(students); }, [students]);
   useEffect(() => { saveTeachers(teachers); }, [teachers]);
@@ -154,16 +156,24 @@ export default function App() {
           });
         }
       })
-      .catch(err => console.log('Error loading global configuration:', err));
+      .catch(err => console.log('Error loading global configuration:', err))
+      .finally(() => {
+        setTimeout(() => {
+          isInitialLoadingRef.current = false;
+        }, 3000);
+      });
   }, []);
 
-  // Automatic full data sync/fetch from Google Sheets on startup
+  // Automatic full data sync/fetch from Google Sheets on startup (LOAD ONLY, DO NOT SAVE BACK)
   useEffect(() => {
     const webhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '').trim();
     if (!webhook) return;
 
     const hasAutoFetched = sessionStorage.getItem('si_tamu_auto_fetched');
-    if (hasAutoFetched) return;
+    if (hasAutoFetched) {
+      isInitialLoadingRef.current = false;
+      return;
+    }
     sessionStorage.setItem('si_tamu_auto_fetched', 'true');
 
     fetchFullStateFromSheets(webhook)
@@ -173,11 +183,17 @@ export default function App() {
           handleImportFullData(res.data);
         }
       })
-      .catch(err => console.log('Auto-fetch from sheets error:', err));
+      .catch(err => console.log('Auto-fetch from sheets error:', err))
+      .finally(() => {
+        setTimeout(() => {
+          isInitialLoadingRef.current = false;
+        }, 1500);
+      });
   }, [settings.googleSheetsWebhook, settings.googleSheetsWebhookUrl]);
 
   useEffect(() => { 
     saveSettings(settings); 
+    if (isInitialLoadingRef.current) return; // DO NOT post/save back to server during initial load
     // Persist configuration & school settings to the Express backend container server
     const webhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '').trim();
     const sheetUrl = (settings.googleSheetsUrl || '').trim();
@@ -272,6 +288,7 @@ export default function App() {
 
   // Debounced Auto-Sync to Google Sheets whenever any dataset changes
   useEffect(() => {
+    if (isInitialLoadingRef.current) return; // Do not auto-sync / write back to sheets on initial load/fetch
     const webhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '').trim();
     if (!webhook) return;
 
