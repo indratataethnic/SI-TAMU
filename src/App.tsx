@@ -123,6 +123,8 @@ export default function App() {
   }, [summaries]);
 
   const isInitialLoadingRef = useRef(true);
+  const [isReloading, setIsReloading] = useState(false);
+  const serverSaveTimeoutRef = useRef<any>(null);
 
   // Auto-save listeners
   useEffect(() => { saveStudents(students); }, [students]);
@@ -133,8 +135,52 @@ export default function App() {
   useEffect(() => { saveViolations(violations); }, [violations]);
   useEffect(() => { saveRewards(rewards); }, [rewards]);
   useEffect(() => { saveCompensations(compensations); }, [compensations]);
-  // Load global server-side config on mount to sync across different laptops / HP devices
+  useEffect(() => { saveSettings(settings); }, [settings]);
+  useEffect(() => { saveUserRole(role); }, [role]);
+
+  // High-speed debounced database persistence to server
   useEffect(() => {
+    if (isInitialLoadingRef.current) return;
+    if (serverSaveTimeoutRef.current) clearTimeout(serverSaveTimeoutRef.current);
+    serverSaveTimeoutRef.current = setTimeout(() => {
+      fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          students,
+          teachers,
+          piketSchedules,
+          violationRules,
+          rewardRules,
+          violations,
+          rewards,
+          compensations,
+          settings
+        })
+      }).catch(err => console.log('Error caching db to server:', err));
+    }, 400);
+  }, [students, teachers, piketSchedules, violationRules, rewardRules, violations, rewards, compensations, settings]);
+
+  // Load initial global config & server data instantly on mount
+  useEffect(() => {
+    // 1. Instant check from local server database cache
+    fetch('/api/data')
+      .then(res => res.json())
+      .then(json => {
+        if (json?.data) {
+          const locStudents = loadStudents();
+          // If browser storage is empty or server has data, populate seamlessly
+          if (locStudents.length === 0 && (json.data.students?.length > 0 || json.data.teachers?.length > 0)) {
+            handleImportFullData(json.data);
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        isInitialLoadingRef.current = false;
+      });
+
+    // 2. Global settings sync
     fetch('/api/global-config')
       .then(res => res.json())
       .then(data => {
@@ -156,51 +202,71 @@ export default function App() {
           });
         }
       })
-      .catch(err => console.log('Error loading global configuration:', err))
-      .finally(() => {
-        setTimeout(() => {
-          isInitialLoadingRef.current = false;
-        }, 3000);
-      });
+      .catch(err => console.log('Error loading global configuration:', err));
   }, []);
 
-  // Automatic full data sync/fetch from Google Sheets on startup (LOAD ONLY, DO NOT SAVE BACK)
+  // Automatic non-blocking background fetch from Google Sheets on startup (only if valid webhook exists)
   useEffect(() => {
     const webhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '').trim();
     if (!webhook) return;
 
-    fetchFullStateFromSheets(webhook)
+    fetchFullStateFromSheets(webhook, 5000)
       .then(res => {
         if (res.success && res.data) {
-          console.log('Auto-loaded data from Google Sheets successfully');
           handleImportFullData(res.data);
         }
       })
-      .catch(err => console.log('Auto-fetch from sheets error:', err))
-      .finally(() => {
-        setTimeout(() => {
-          isInitialLoadingRef.current = false;
-        }, 1500);
-      });
+      .catch(err => console.log('Background sheets fetch notice:', err));
   }, [settings.googleSheetsWebhook, settings.googleSheetsWebhookUrl]);
 
-  useEffect(() => { 
-    saveSettings(settings); 
-    if (isInitialLoadingRef.current) return; // DO NOT post/save back to server during initial load
-    // Persist configuration & school settings to the Express backend container server
-    const webhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '').trim();
-    const sheetUrl = (settings.googleSheetsUrl || '').trim();
-    fetch('/api/global-config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        googleSheetsWebhook: webhook,
-        googleSheetsUrl: sheetUrl,
-        settings: settings
-      })
-    }).catch(err => console.log('Error writing global config to server:', err));
-  }, [settings]);
-  useEffect(() => { saveUserRole(role); }, [role]);
+  // Instant Manual Reload Handler
+  const handleReloadData = async () => {
+    setIsReloading(true);
+    try {
+      // 1. Load instantly from localStorage
+      const locStudents = loadStudents();
+      const locTeachers = loadTeachers();
+      const locPikets = loadPiketSchedules();
+      const locViolationRules = loadViolationRules();
+      const locRewardRules = loadRewardRules();
+      const locViolations = loadViolations();
+      const locRewards = loadRewards();
+      const locCompensations = loadCompensations();
+      const locSettings = loadSettings();
+
+      setStudents(locStudents);
+      setTeachers(locTeachers);
+      setPiketSchedules(locPikets);
+      setViolationRules(locViolationRules);
+      setRewardRules(locRewardRules);
+      setViolations(locViolations);
+      setRewards(locRewards);
+      setCompensations(locCompensations);
+      setSettings(locSettings);
+
+      // 2. Refresh from local server cache in milliseconds
+      const srvRes = await fetch('/api/data').catch(() => null);
+      if (srvRes && srvRes.ok) {
+        const srvJson = await srvRes.json();
+        if (srvJson?.data) {
+          handleImportFullData(srvJson.data);
+        }
+      }
+
+      // 3. If Google Sheets configured, fetch with strict timeout
+      const webhook = (locSettings.googleSheetsWebhook || locSettings.googleSheetsWebhookUrl || '').trim();
+      if (webhook) {
+        const sheetsRes = await fetchFullStateFromSheets(webhook, 4000);
+        if (sheetsRes.success && sheetsRes.data) {
+          handleImportFullData(sheetsRes.data);
+        }
+      }
+    } catch (e) {
+      console.log('Reload error:', e);
+    } finally {
+      setIsReloading(false);
+    }
+  };
 
   // Background Google Sheets Sync Helper with direct state support
   const triggerSheetsSync = (override?: {
@@ -508,6 +574,8 @@ export default function App() {
         onOpenSettingsModal={() => setSettingsModalOpen(true)}
         onToggleMobileSidebar={() => setMobileSidebarOpen(prev => !prev)}
         urgentAlertCount={urgentAlertCount}
+        onReloadData={handleReloadData}
+        isReloading={isReloading}
       />
 
       {/* Main Body Layout */}

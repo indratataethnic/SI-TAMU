@@ -739,10 +739,11 @@ export const syncFullStateToSheets = async (
 };
 
 /**
- * Loads entire database and school settings from Google Sheets Webhook
+ * Loads entire database and school settings from Google Sheets Webhook with fast timeout
  */
 export const fetchFullStateFromSheets = async (
-  webhookUrl: string
+  webhookUrl: string,
+  timeoutMs: number = 6000
 ): Promise<{
   success: boolean;
   message: string;
@@ -762,6 +763,9 @@ export const fetchFullStateFromSheets = async (
   }
 
   try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
     const response = await fetch(webhookUrl.trim(), {
       method: 'POST',
       headers: {
@@ -770,8 +774,11 @@ export const fetchFullStateFromSheets = async (
       body: JSON.stringify({
         action: 'FETCH_ALL',
         sentAt: new Date().toISOString()
-      })
+      }),
+      signal: controller.signal
     });
+
+    clearTimeout(timer);
 
     if (!response.ok) {
       throw new Error(`HTTP Error: ${response.status}`);
@@ -788,6 +795,12 @@ export const fetchFullStateFromSheets = async (
       throw new Error(json.message || 'Format data dari Google Sheets tidak dikenali.');
     }
   } catch (err: any) {
+    if (err.name === 'AbortError') {
+      return {
+        success: false,
+        message: 'Waktu permintaan Google Sheets habis (timeout). Silakan periksa jaringan Anda.'
+      };
+    }
     return {
       success: false,
       message: `Gagal memuat data: ${err.message || 'Periksa koneksi internet atau izin Web App (harus "Siapa saja / Anyone")'}`

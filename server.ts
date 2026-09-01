@@ -6,33 +6,44 @@ import { createServer as createViteServer } from "vite";
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
 
 const CONFIG_DIR = path.join(process.cwd(), "data");
 const CONFIG_FILE = path.join(CONFIG_DIR, "global-config.json");
+const DB_FILE = path.join(CONFIG_DIR, "app-db.json");
 
 // Ensure data folder exists
 if (!fs.existsSync(CONFIG_DIR)) {
   fs.mkdirSync(CONFIG_DIR, { recursive: true });
 }
 
+// In-memory caches for sub-millisecond response
+let cachedConfig: any = null;
+let cachedDb: any = null;
+
+try {
+  if (fs.existsSync(CONFIG_FILE)) {
+    cachedConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+  }
+} catch (e) {
+  cachedConfig = null;
+}
+
+try {
+  if (fs.existsSync(DB_FILE)) {
+    cachedDb = JSON.parse(fs.readFileSync(DB_FILE, "utf-8"));
+  }
+} catch (e) {
+  cachedDb = null;
+}
+
 // GET API: Retrieve globally stored spreadsheet and webhook URL
 app.get("/api/global-config", (req, res) => {
-  const defaultWebhook = "https://script.google.com/macros/s/AKfycbwOnSs6tO0me32w9R7x_ip6B2Eodj0Rt6WznSS_AlNDhIEhsLbNzHfl0MuWiHMAVkU/exec";
-  try {
-    if (fs.existsSync(CONFIG_FILE)) {
-      const data = fs.readFileSync(CONFIG_FILE, "utf-8");
-      const parsed = JSON.parse(data);
-      if (!parsed.googleSheetsWebhook) {
-        parsed.googleSheetsWebhook = defaultWebhook;
-      }
-      return res.json(parsed);
-    }
-  } catch (err) {
-    console.error("Error reading global config:", err);
+  if (cachedConfig) {
+    return res.json(cachedConfig);
   }
   return res.json({
-    googleSheetsWebhook: defaultWebhook,
+    googleSheetsWebhook: "",
     googleSheetsUrl: "",
     settings: null
   });
@@ -47,10 +58,32 @@ app.post("/api/global-config", (req, res) => {
       googleSheetsUrl: googleSheetsUrl || "",
       settings: settings || null
     };
+    cachedConfig = config;
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), "utf-8");
     return res.json({ success: true, config });
   } catch (err: any) {
     console.error("Error writing global config:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET API: Retrieve full fast local database cache
+app.get("/api/data", (req, res) => {
+  if (cachedDb) {
+    return res.json({ success: true, data: cachedDb });
+  }
+  return res.json({ success: true, data: null });
+});
+
+// POST API: Fast persistence of full local database cache
+app.post("/api/data", (req, res) => {
+  try {
+    const data = req.body;
+    cachedDb = data;
+    fs.writeFileSync(DB_FILE, JSON.stringify(data), "utf-8");
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("Error writing database cache:", err);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
