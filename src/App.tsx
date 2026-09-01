@@ -131,7 +131,48 @@ export default function App() {
   useEffect(() => { saveViolations(violations); }, [violations]);
   useEffect(() => { saveRewards(rewards); }, [rewards]);
   useEffect(() => { saveCompensations(compensations); }, [compensations]);
-  useEffect(() => { saveSettings(settings); }, [settings]);
+  // Load global server-side config on mount to sync across different laptops / HP devices
+  useEffect(() => {
+    fetch('/api/global-config')
+      .then(res => res.json())
+      .then(data => {
+        if (data && (data.googleSheetsWebhook || data.googleSheetsUrl)) {
+          setSettings(prev => {
+            const webhook = data.googleSheetsWebhook || '';
+            const sheetUrl = data.googleSheetsUrl || '';
+            if (prev.googleSheetsWebhook !== webhook || prev.googleSheetsUrl !== sheetUrl) {
+              const updated = {
+                ...prev,
+                googleSheetsWebhook: webhook,
+                googleSheetsWebhookUrl: webhook,
+                googleSheetsUrl: sheetUrl
+              };
+              saveSettings(updated);
+              return updated;
+            }
+            return prev;
+          });
+        }
+      })
+      .catch(err => console.log('Error loading global configuration:', err));
+  }, []);
+
+  useEffect(() => { 
+    saveSettings(settings); 
+    // Persist configuration to the Express backend container server
+    const webhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '').trim();
+    const sheetUrl = (settings.googleSheetsUrl || '').trim();
+    if (webhook || sheetUrl) {
+      fetch('/api/global-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          googleSheetsWebhook: webhook,
+          googleSheetsUrl: sheetUrl
+        })
+      }).catch(err => console.log('Error writing global config to server:', err));
+    }
+  }, [settings]);
   useEffect(() => { saveUserRole(role); }, [role]);
 
   // Background Google Sheets Sync Helper with direct state support
