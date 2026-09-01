@@ -137,6 +137,8 @@ export default function App() {
   // Background Google Sheets Sync Helper with direct state support
   const triggerSheetsSync = (override?: {
     students?: Student[];
+    teachers?: Teacher[];
+    piketSchedules?: PiketSchedule[];
     violations?: ViolationRecord[];
     rewards?: RewardRecord[];
     compensations?: CompensationRecord[];
@@ -145,6 +147,8 @@ export default function App() {
     if (!webhook) return;
 
     const studentsToSync = override?.students ?? students;
+    const teachersToSync = override?.teachers ?? teachers;
+    const piketSchedulesToSync = override?.piketSchedules ?? piketSchedules;
     const violationsToSync = override?.violations ?? violations;
     const rewardsToSync = override?.rewards ?? rewards;
     const compensationsToSync = override?.compensations ?? compensations;
@@ -156,7 +160,9 @@ export default function App() {
       rewardsToSync,
       compensationsToSync,
       summaries,
-      settings.googleSheetsUrl
+      settings.googleSheetsUrl,
+      teachersToSync,
+      piketSchedulesToSync
     ).catch(err => console.log('Background sheets sync error:', err));
   };
 
@@ -173,12 +179,14 @@ export default function App() {
         rewards,
         compensations,
         summaries,
-        settings.googleSheetsUrl
+        settings.googleSheetsUrl,
+        teachers,
+        piketSchedules
       ).catch(err => console.log('Debounced sheets sync:', err));
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [students, violations, rewards, compensations, settings.googleSheetsWebhook, settings.googleSheetsWebhookUrl, settings.googleSheetsUrl, summaries]);
+  }, [students, teachers, piketSchedules, violations, rewards, compensations, settings.googleSheetsWebhook, settings.googleSheetsWebhookUrl, settings.googleSheetsUrl, summaries]);
 
   // Handlers for Students
   const handleAddStudent = (student: Student) => {
@@ -219,34 +227,44 @@ export default function App() {
 
   // Handlers for Teachers
   const handleAddTeacher = (teacher: Teacher) => {
-    setTeachers(prev => [teacher, ...prev]);
+    const updated = [teacher, ...teachers];
+    setTeachers(updated);
+    triggerSheetsSync({ teachers: updated });
   };
 
   const handleUpdateTeacher = (teacher: Teacher) => {
-    setTeachers(prev => prev.map(t => t.id === teacher.id ? teacher : t));
+    const updated = teachers.map(t => t.id === teacher.id ? teacher : t);
+    setTeachers(updated);
+    triggerSheetsSync({ teachers: updated });
   };
 
   const handleDeleteTeacher = (id: string) => {
-    setTeachers(prev => prev.filter(t => t.id !== id));
+    const updated = teachers.filter(t => t.id !== id);
+    setTeachers(updated);
+    triggerSheetsSync({ teachers: updated });
   };
 
   const handleImportTeachers = (imported: Teacher[]) => {
     setTeachers(imported);
+    triggerSheetsSync({ teachers: imported });
   };
 
   // Handlers for Piket Schedules
   const handleUpdatePiketSchedule = (schedule: PiketSchedule) => {
-    setPiketSchedules(prev => {
-      const exists = prev.some(p => p.day === schedule.day);
-      if (exists) {
-        return prev.map(p => p.day === schedule.day ? schedule : p);
-      }
-      return [...prev, schedule];
-    });
+    let updated: PiketSchedule[];
+    const exists = piketSchedules.some(p => p.day === schedule.day);
+    if (exists) {
+      updated = piketSchedules.map(p => p.day === schedule.day ? schedule : p);
+    } else {
+      updated = [...piketSchedules, schedule];
+    }
+    setPiketSchedules(updated);
+    triggerSheetsSync({ piketSchedules: updated });
   };
 
   const handleUpdateAllPiketSchedules = (schedules: PiketSchedule[]) => {
     setPiketSchedules(schedules);
+    triggerSheetsSync({ piketSchedules: schedules });
   };
 
   const handleOpenJurnalPiket = (dayName: DayOfWeek, dutyTeachers: Teacher[]) => {
@@ -560,6 +578,8 @@ export default function App() {
           onClose={() => setSheetsModalOpen(false)}
           settings={settings}
           students={students}
+          teachers={teachers}
+          piketSchedules={piketSchedules}
           violations={violations}
           rewards={rewards}
           compensations={compensations}

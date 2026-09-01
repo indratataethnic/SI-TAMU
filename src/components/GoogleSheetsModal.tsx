@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { SchoolSettings, Student, ViolationRecord, RewardRecord, CompensationRecord } from '../types';
+import { SchoolSettings, Student, Teacher, PiketSchedule, ViolationRecord, RewardRecord, CompensationRecord } from '../types';
 import { Table, Copy, Check, ExternalLink, RefreshCw, AlertCircle, Sparkles, CheckCircle2, X, HelpCircle, ShieldAlert, ArrowRight } from 'lucide-react';
 import { getGoogleAppsScriptTemplate, syncAllToGoogleSheets, testGoogleSheetsWebhook, validateWebhookUrl } from '../utils/sheetsSync';
 
 interface GoogleSheetsModalProps {
   settings: SchoolSettings;
   students: Student[];
+  teachers?: Teacher[];
+  piketSchedules?: PiketSchedule[];
   violations: ViolationRecord[];
   rewards: RewardRecord[];
   compensations: CompensationRecord[];
@@ -19,6 +21,8 @@ interface GoogleSheetsModalProps {
 export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
   settings,
   students,
+  teachers = [],
+  piketSchedules = [],
   violations,
   rewards,
   compensations,
@@ -93,6 +97,8 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
 
     const res = await syncAllToGoogleSheets(clean, {
       students,
+      teachers,
+      piketSchedules,
       violations,
       rewards,
       compensations,
@@ -117,7 +123,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-lg text-emerald-100">Integrasi Database Google Spreadsheet</h3>
-              <p className="text-xs text-emerald-300">Sinkronisasi otomatis data siswa, pelanggaran, dan reward ke Google Drive sekolah</p>
+              <p className="text-xs text-emerald-300">Sinkronisasi otomatis data siswa, guru, jadwal piket, pelanggaran, dan reward ke Google Drive</p>
             </div>
           </div>
           <button
@@ -203,7 +209,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                   className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-800 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition shadow cursor-pointer disabled:opacity-40"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-                  {syncing ? 'Menyinkronkan...' : `Sinkronkan ${students.length} Siswa & ${violations.length} Pelanggaran`}
+                  {syncing ? 'Menyinkronkan...' : `Sinkronkan Seluruh Data (${students.length} Siswa, ${teachers.length} Guru, ${violations.length} Pelanggaran)`}
                 </button>
 
                 {sheetUrl && (
@@ -323,7 +329,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
 
         <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-200 flex items-center justify-between">
           <span className="text-xs text-slate-500">
-            {students.length} Siswa terdaftar • {violations.length} Catatan pelanggaran
+            {students.length} Siswa • {teachers.length} Guru • {violations.length} Catatan pelanggaran
           </span>
           <div className="flex gap-2">
             <button

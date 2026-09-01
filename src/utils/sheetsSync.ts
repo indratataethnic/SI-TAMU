@@ -66,6 +66,12 @@ function doPost(e) {
       if (postData.students && postData.students.length >= 0) {
         writeStudentsSheet(ss, postData.students);
       }
+      if (postData.teachers && postData.teachers.length >= 0) {
+        writeTeachersSheet(ss, postData.teachers);
+      }
+      if (postData.piketSchedules && postData.piketSchedules.length >= 0) {
+        writePiketSheet(ss, postData.piketSchedules, postData.teachers || []);
+      }
       if (postData.violations && postData.violations.length >= 0) {
         writeViolationsSheet(ss, postData.violations);
       }
@@ -81,7 +87,7 @@ function doPost(e) {
 
       return ContentService.createTextOutput(JSON.stringify({
         status: "success",
-        message: "Seluruh data SI TAMU (" + (postData.students ? postData.students.length : 0) + " siswa, " + (postData.violations ? postData.violations.length : 0) + " pelanggaran) berhasil diperbarui ke Google Spreadsheet!",
+        message: "Seluruh data SI TAMU (" + (postData.students ? postData.students.length : 0) + " siswa, " + (postData.teachers ? postData.teachers.length : 0) + " guru, " + (postData.violations ? postData.violations.length : 0) + " pelanggaran) berhasil diperbarui ke Google Spreadsheet!",
         timestamp: new Date().toISOString()
       })).setMimeType(ContentService.MimeType.JSON);
     }
@@ -112,6 +118,8 @@ function doGet(e) {
 function setupAllSheets(ss) {
   var sheets = [
     { name: "Data_Siswa", color: "#064E3B" },
+    { name: "Data_Guru", color: "#134E4A" },
+    { name: "Jadwal_Piket", color: "#4338CA" },
     { name: "Data_Pelanggaran", color: "#881337" },
     { name: "Data_Reward", color: "#78350F" },
     { name: "Data_Kompensasi", color: "#1E3A8A" },
@@ -157,6 +165,68 @@ function writeStudentsSheet(ss, students) {
       "'" + (s.accessCode || ""),
       s.notes || "",
       s.id || ""
+    ];
+  });
+
+  sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+  sheet.autoResizeColumns(1, headers.length);
+}
+
+function writeTeachersSheet(ss, teachers) {
+  var sheet = ss.getSheetByName("Data_Guru") || ss.insertSheet("Data_Guru");
+  var headers = ["NIP / NUPTK", "Nama Guru & Gelar", "Jabatan / Tugas", "Mata Pelajaran", "Penugasan Kelas / Wali", "No HP / WhatsApp", "ID Guru"];
+  formatHeaderRow(sheet, headers, "#134E4A");
+
+  if (!teachers || teachers.length === 0) return;
+
+  var roleLabels = {
+    "guru_mapel": "Guru Mata Pelajaran",
+    "wali_kelas": "Wali Kelas",
+    "guru_bk": "Guru Bimbingan Konseling (BK)",
+    "guru_piket": "Guru Tim Piket",
+    "pembina_osis": "Pembina OSIS / Kesiswaan",
+    "kepala_sekolah": "Kepala Sekolah"
+  };
+
+  var rows = teachers.map(function(t) {
+    return [
+      "'" + (t.nip || "-"),
+      t.name || "",
+      roleLabels[t.role] || t.role || "Guru",
+      t.subject || "-",
+      t.classAssigned || "-",
+      "'" + (t.phone || "-"),
+      t.id || ""
+    ];
+  });
+
+  sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+  sheet.autoResizeColumns(1, headers.length);
+}
+
+function writePiketSheet(ss, piketSchedules, teachers) {
+  var sheet = ss.getSheetByName("Jadwal_Piket") || ss.insertSheet("Jadwal_Piket");
+  var headers = ["Hari", "Jam Bertugas", "Jumlah Guru", "Daftar Nama Guru Piket", "Catatan / Instruksi Khusus"];
+  formatHeaderRow(sheet, headers, "#4338CA");
+
+  if (!piketSchedules || piketSchedules.length === 0) return;
+
+  var teacherMap = {};
+  (teachers || []).forEach(function(t) {
+    teacherMap[t.id] = t.name;
+  });
+
+  var rows = piketSchedules.map(function(p) {
+    var names = (p.teacherIds || []).map(function(id) {
+      return teacherMap[id] || id;
+    }).join(", ");
+
+    return [
+      p.day || "",
+      p.dutyHours || "06.30 - 15.00 WIB",
+      (p.teacherIds || []).length,
+      names || "Belum ada guru piket",
+      p.notes || "-"
     ];
   });
 
@@ -344,6 +414,8 @@ export const syncAllToGoogleSheets = async (
   webhookUrl: string,
   payload: {
     students: any[];
+    teachers?: any[];
+    piketSchedules?: any[];
     violations: any[];
     rewards: any[];
     compensations: any[];
@@ -361,6 +433,8 @@ export const syncAllToGoogleSheets = async (
       action: 'SYNC_ALL',
       sheetUrl: payload.sheetUrl,
       students: payload.students || [],
+      teachers: payload.teachers || [],
+      piketSchedules: payload.piketSchedules || [],
       violations: payload.violations || [],
       rewards: payload.rewards || [],
       compensations: payload.compensations || [],
@@ -380,7 +454,7 @@ export const syncAllToGoogleSheets = async (
 
     return {
       success: true,
-      message: `Data berhasil dikirim ke Google Spreadsheet (${payload.students.length} siswa, ${payload.violations.length} pelanggaran, ${payload.rewards.length} reward).`
+      message: `Data berhasil dikirim ke Google Spreadsheet (${payload.students?.length || 0} siswa, ${payload.teachers?.length || 0} guru, ${payload.violations?.length || 0} pelanggaran, ${payload.rewards?.length || 0} reward).`
     };
   } catch (err: any) {
     return {
@@ -400,10 +474,14 @@ export const syncFullStateToSheets = async (
   rewards: any[],
   compensations: any[],
   summaries?: any[],
-  sheetUrl?: string
+  sheetUrl?: string,
+  teachers?: any[],
+  piketSchedules?: any[]
 ): Promise<{ success: boolean; message: string }> => {
   return syncAllToGoogleSheets(webhookUrl, {
     students,
+    teachers,
+    piketSchedules,
     violations,
     rewards,
     compensations,
