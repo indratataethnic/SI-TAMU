@@ -46,7 +46,7 @@ export const InputRewardView: React.FC<InputRewardViewProps> = ({
   const [points, setPoints] = useState<number>(3);
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
-  const [autoSendWA, setAutoSendWA] = useState<boolean>(true);
+  const [autoSendWA, setAutoSendWA] = useState<boolean>(false);
   const [feedbackRecord, setFeedbackRecord] = useState<RewardRecord | null>(null);
 
   const availableClasses = useMemo(() => getAvailableClasses(students), [students]);

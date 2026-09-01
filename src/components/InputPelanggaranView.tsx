@@ -17,6 +17,36 @@ import {
 import { openWhatsApp, generateViolationWAMessage, sendViaGateway } from '../utils/whatsapp';
 import { PRIMARY_SCHOOL_CLASSES, getAvailableClasses, matchClassFilter } from '../data/classOptions';
 
+const LOCATION_OPTIONS = [
+  'Ruang Kelas',
+  'Gerbang Utama Sekolah',
+  'Halaman / Lapangan Upacara',
+  'Kantin Sekolah',
+  'Toilet / Kamar Mandi Siswa',
+  'Perpustakaan Sekolah',
+  'Laboratorium Komputer / IPA',
+  'Musholla / Tempat Ibadah',
+  'Koridor / Lorong Kelas',
+  'Area Parkir Sekolah',
+  'UKS (Ruang Kesehatan)',
+  'Luar Pagar / Sekitar Sekolah',
+  'Lainnya (Ketik Manual)'
+];
+
+const CHRONOLOGY_TEMPLATES = [
+  'Siswa tiba di sekolah terlambat melewati bel masuk dan jam apel pagi.',
+  'Siswa tidak mengenakan atribut seragam lengkap (topi/dasi/kaos kaki) sesuai ketentuan.',
+  'Siswa izin keluar ruang kelas saat KBM berlangsung dan tidak kunjung kembali.',
+  'Siswa kedapatan meninggalkan area sekolah tanpa izin petugas piket (membolos).',
+  'Siswa membuat kegaduhan / bercanda berlebihan dan mengganggu ketenangan KBM.',
+  'Siswa kedapatan membawa barang / gawai yang dilarang dalam tata tertib sekolah.',
+  'Siswa bersikap tidak sopan dan membantah arahan dari bapak/ibu guru.',
+  'Siswa terlibat perselisihan / perkelahian dengan sesama siswa di lingkungan sekolah.',
+  'Siswa kedapatan merusak / mencoret fasilitas inventaris sekolah.',
+  'Siswa tidak masuk sekolah tanpa surat pemberitahuan dari orang tua/wali (alpa).',
+  'Siswa tidak mengikuti upacara bendera / apel rutin tanpa keterangan sah.'
+];
+
 interface InputPelanggaranViewProps {
   students: Student[];
   teachers?: Teacher[];
@@ -47,10 +77,10 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
   const [customPoints, setCustomPoints] = useState<number>(violationRules[0]?.points || 20);
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [time, setTime] = useState<string>(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
-  const [location, setLocation] = useState<string>('Lingkungan Sekolah');
+  const [location, setLocation] = useState<string>('Ruang Kelas');
   const [description, setDescription] = useState<string>('');
   const [reporterName, setReporterName] = useState<string>(settings.bkCoordinatorName || 'Guru Piket');
-  const [autoSendWA, setAutoSendWA] = useState<boolean>(true);
+  const [autoSendWA, setAutoSendWA] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const availableClasses = useMemo(() => getAvailableClasses(students), [students]);
@@ -357,13 +387,35 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
             </div>
             <div>
               <label className="block font-semibold text-slate-600 mb-1">Lokasi Kejadian</label>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="Contoh: Gerbang Sekolah / Kelas"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none"
-              />
+              <select
+                value={LOCATION_OPTIONS.includes(location) ? location : 'Lainnya (Ketik Manual)'}
+                onChange={(e) => {
+                  if (e.target.value === 'Lainnya (Ketik Manual)') {
+                    if (LOCATION_OPTIONS.includes(location)) {
+                      setLocation('');
+                    }
+                  } else {
+                    setLocation(e.target.value);
+                  }
+                }}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none text-xs font-medium"
+              >
+                {LOCATION_OPTIONS.map((loc) => (
+                  <option key={loc} value={loc}>
+                    📍 {loc}
+                  </option>
+                ))}
+              </select>
+              {(!LOCATION_OPTIONS.slice(0, -1).includes(location)) && (
+                <input
+                  type="text"
+                  required
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="Ketik detail lokasi kejadian..."
+                  className="mt-1.5 w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium text-xs"
+                />
+              )}
             </div>
             <div>
               <label className="block font-semibold text-slate-600 mb-1">Guru Pencatat / Saksi</label>
@@ -408,15 +460,46 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
           </div>
         </div>
 
-        {/* Step 4: Chronology Description */}
-        <div className="space-y-1 pt-2 border-t border-slate-100">
-          <label className="block font-bold text-slate-800 text-sm">4. Kronologi & Keterangan Tambahan</label>
+        {/* Step 4: Chronology Description with Predefined Options */}
+        <div className="space-y-2 pt-2 border-t border-slate-100">
+          <div className="flex items-center justify-between">
+            <label className="block font-bold text-slate-800 text-sm">4. Kronologi & Keterangan Tambahan</label>
+            <span className="text-[11px] text-slate-500 font-medium">Pilih opsi atau sesuaikan kronologi</span>
+          </div>
+
+          <div>
+            <label className="block font-semibold text-slate-600 mb-1">Opsi Pilihan Kronologi Cepat</label>
+            <select
+              value=""
+              onChange={(e) => {
+                const val = e.target.value;
+                if (!val) return;
+                if (val === '__AUTO_RULE__') {
+                  setDescription(selectedRule ? `Terjadi pelanggaran tata tertib: ${selectedRule.name}.` : '');
+                } else {
+                  setDescription(val);
+                }
+              }}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium text-xs text-slate-700"
+            >
+              <option value="">-- Pilih Opsi Template Kronologi --</option>
+              <option value="__AUTO_RULE__">
+                ⚡ Otomatis Sesuai Jenis Pelanggaran ({selectedRule?.name || 'Tata Tertib'})
+              </option>
+              {CHRONOLOGY_TEMPLATES.map((tmpl, idx) => (
+                <option key={idx} value={tmpl}>
+                  • {tmpl}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <textarea
             rows={3}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Jelaskan detail singkat kronologi kejadian saat siswa melakukan pelanggaran..."
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+            placeholder="Pilih opsi kronologi di atas atau ketik detail kronologi kejadian secara manual..."
+            className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none text-xs leading-relaxed"
           ></textarea>
         </div>
 
