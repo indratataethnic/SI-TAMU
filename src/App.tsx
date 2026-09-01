@@ -114,8 +114,8 @@ export default function App() {
 
   // Calculated Summaries
   const summaries = useMemo(() => {
-    return calculateSummaries(students, violations, rewards, compensations);
-  }, [students, violations, rewards, compensations]);
+    return calculateSummaries(students, violations, rewards, compensations, settings.academicYear || '2026/2027');
+  }, [students, violations, rewards, compensations, settings.academicYear]);
 
   // Urgent alerts for >=100 points
   const urgentAlertCount = useMemo(() => {
@@ -223,6 +223,13 @@ export default function App() {
   const handleImportStudents = (imported: Student[]) => {
     setStudents(imported);
     triggerSheetsSync({ students: imported });
+  };
+
+  const handlePromoteYear = (promotedStudents: Student[], nextYear: string) => {
+    setStudents(promotedStudents);
+    const updatedSettings = { ...settings, academicYear: nextYear };
+    setSettings(updatedSettings);
+    triggerSheetsSync({ students: promotedStudents });
   };
 
   // Handlers for Teachers
@@ -433,12 +440,14 @@ export default function App() {
               violations={violations}
               rewards={rewards}
               compensations={compensations}
+              currentAcademicYear={settings.academicYear || '2026/2027'}
               onAddStudent={handleAddStudent}
               onUpdateStudent={handleUpdateStudent}
               onDeleteStudent={handleDeleteStudent}
               onImportStudents={handleImportStudents}
               onQuickInputViolation={handleQuickInputViolation}
               onQuickInputReward={handleQuickInputReward}
+              onPromoteYear={handlePromoteYear}
             />
           )}
 

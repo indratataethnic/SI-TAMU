@@ -121,6 +121,7 @@ export const InputRewardView: React.FC<InputRewardViewProps> = ({
       reporterName: 'Koordinator Prestasi & Kesiswaan',
       certificateNumber: `PIAGAM/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`,
       notes,
+      academicYear: settings.academicYear || '2026/2027',
       createdAt: new Date().toISOString()
     };
 

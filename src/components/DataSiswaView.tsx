@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { exportStudentsToExcel, downloadStudentTemplate, importStudentsFromExcel } from '../utils/excel';
 import { PRIMARY_SCHOOL_CLASSES, PRIMARY_SCHOOL_PARALLEL_CLASSES, getAvailableClasses, matchClassFilter } from '../data/classOptions';
+import { KenaikanKelasModal } from './KenaikanKelasModal';
 
 interface DataSiswaViewProps {
   students: Student[];
@@ -29,12 +30,14 @@ interface DataSiswaViewProps {
   violations: ViolationRecord[];
   rewards: RewardRecord[];
   compensations: CompensationRecord[];
+  currentAcademicYear: string;
   onAddStudent: (student: Student) => void;
   onUpdateStudent: (student: Student) => void;
   onDeleteStudent: (id: string) => void;
   onImportStudents: (imported: Student[]) => void;
   onQuickInputViolation: (student: Student) => void;
   onQuickInputReward: (student: Student) => void;
+  onPromoteYear: (promotedStudents: Student[], nextYear: string) => void;
 }
 
 export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
@@ -43,16 +46,19 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
   violations,
   rewards,
   compensations,
+  currentAcademicYear,
   onAddStudent,
   onUpdateStudent,
   onDeleteStudent,
   onImportStudents,
   onQuickInputViolation,
-  onQuickInputReward
+  onQuickInputReward,
+  onPromoteYear
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClass, setSelectedClass] = useState('ALL');
   const [modalOpen, setModalOpen] = useState(false);
+  const [promotionModalOpen, setPromotionModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [detailStudent, setDetailStudent] = useState<Student | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
@@ -222,6 +228,15 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             Export Excel
+          </button>
+
+          {/* Kenaikan Kelas otomatis */}
+          <button
+            onClick={() => setPromotionModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-emerald-800 to-emerald-950 hover:from-emerald-700 hover:to-emerald-900 text-white rounded-xl text-xs font-bold transition shadow cursor-pointer"
+          >
+            <GraduationCap className="w-4 h-4 text-emerald-300" />
+            Kenaikan Kelas otomatis
           </button>
 
           {/* Add Student */}
@@ -805,6 +820,17 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Kenaikan Kelas Modal */}
+      {promotionModalOpen && (
+        <KenaikanKelasModal
+          isOpen={promotionModalOpen}
+          onClose={() => setPromotionModalOpen(false)}
+          students={students}
+          currentAcademicYear={currentAcademicYear}
+          onPromoteYear={onPromoteYear}
+        />
       )}
     </div>
   );

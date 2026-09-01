@@ -124,6 +124,7 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
       supervisorName: compSupervisor,
       status: 'Disetujui',
       notes: compNotes,
+      academicYear: settings.academicYear || '2026/2027',
       createdAt: new Date().toISOString()
     };
 

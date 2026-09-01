@@ -430,15 +430,54 @@ export const syncAllToGoogleSheets = async (
   }
 
   try {
+    // Map data to ensure perfect Apps Script schema compatibility
+    const studentMap = new Map(payload.students?.map(s => [s.id, s]) || []);
+
+    const enrichedViolations = (payload.violations || []).map(v => {
+      const student = studentMap.get(v.studentId);
+      return {
+        ...v,
+        studentNisn: student?.nisn || '',
+        violationName: v.ruleName || '',
+        reporterTeacherName: v.reporterName || '',
+        parentName: student?.parentName || '',
+        parentPhone: student?.parentPhone || '',
+        note: v.description || '',
+        parentNotified: !!v.whatsappSent
+      };
+    });
+
+    const enrichedRewards = (payload.rewards || []).map(r => {
+      const student = studentMap.get(r.studentId);
+      return {
+        ...r,
+        studentNisn: student?.nisn || '',
+        reporterTeacherName: r.reporterName || '',
+        note: r.notes || ''
+      };
+    });
+
+    const enrichedCompensations = (payload.compensations || []).map(c => {
+      const student = studentMap.get(c.studentId);
+      return {
+        ...c,
+        studentNisn: student?.nisn || '',
+        actionType: c.taskName || '',
+        pointsReduced: c.deductedPoints || 0,
+        supervisorTeacherName: c.supervisorName || '',
+        status: c.status || 'Disetujui'
+      };
+    });
+
     const bodyString = JSON.stringify({
       action: 'SYNC_ALL',
       sheetUrl: payload.sheetUrl,
       students: payload.students || [],
       teachers: payload.teachers || [],
       piketSchedules: payload.piketSchedules || [],
-      violations: payload.violations || [],
-      rewards: payload.rewards || [],
-      compensations: payload.compensations || [],
+      violations: enrichedViolations,
+      rewards: enrichedRewards,
+      compensations: enrichedCompensations,
       summaries: payload.summaries || [],
       sentAt: new Date().toISOString()
     });

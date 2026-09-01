@@ -565,7 +565,8 @@ export const initialSettings: SchoolSettings = {
   googleSheetsWebhook: '',
   waGatewayApiKey: '',
   waGatewayDevice: '',
-  letterNumberPrefix: '421.2/SD/SI-TAMU'
+  letterNumberPrefix: '421.2/SD/SI-TAMU',
+  academicYear: '2026/2027'
 };
 
 export const educationalArticles = [

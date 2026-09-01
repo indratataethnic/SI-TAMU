@@ -179,13 +179,22 @@ export const calculateStudentSummaries = (
   students: Student[],
   violations: ViolationRecord[],
   rewards: RewardRecord[],
-  compensations: CompensationRecord[]
+  compensations: CompensationRecord[],
+  activeAcademicYear?: string
 ): StudentScoreSummary[] => {
   return students.map(student => {
-    const studentViolations = violations.filter(v => v.studentId === student.id);
-    const studentRewards = rewards.filter(r => r.studentId === student.id);
+    const studentViolations = violations.filter(v => 
+      v.studentId === student.id && 
+      (!activeAcademicYear || !v.academicYear || v.academicYear === activeAcademicYear)
+    );
+    const studentRewards = rewards.filter(r => 
+      r.studentId === student.id && 
+      (!activeAcademicYear || !r.academicYear || r.academicYear === activeAcademicYear)
+    );
     const studentCompensations = compensations.filter(
-      c => c.studentId === student.id && c.status === 'Disetujui'
+      c => c.studentId === student.id && 
+      c.status === 'Disetujui' && 
+      (!activeAcademicYear || !c.academicYear || c.academicYear === activeAcademicYear)
     );
 
     const totalViolationPoints = studentViolations.reduce((sum, v) => sum + (Number(v.points) || 0), 0);

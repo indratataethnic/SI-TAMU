@@ -102,6 +102,7 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
       location,
       description: description.trim() || selectedRule.name,
       reporterName,
+      academicYear: settings.academicYear || '2026/2027',
       createdAt: new Date().toISOString()
     };
 

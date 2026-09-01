@@ -14,6 +14,7 @@ export interface Student {
   parentAddress?: string;
   accessCode?: string; // Pin for parent private lookup
   avatar?: string;
+  academicYear?: string; // e.g. "2026/2027"
   createdAt: string;
 }
 
@@ -72,6 +73,7 @@ export interface ViolationRecord {
   description: string;
   evidenceNote?: string;
   whatsappSent?: boolean;
+  academicYear?: string; // e.g. "2026/2027"
   createdAt: string;
 }
 
@@ -92,6 +94,7 @@ export interface RewardRecord {
   reporterName: string;
   notes?: string;
   whatsappSent?: boolean;
+  academicYear?: string; // e.g. "2026/2027"
   createdAt: string;
 }
 
@@ -106,6 +109,7 @@ export interface CompensationRecord {
   supervisorName: string; // Guru BK / Wali Kelas pembina
   status: 'Disetujui' | 'Sedang Berjalan' | 'Ditolak';
   notes?: string;
+  academicYear?: string; // e.g. "2026/2027"
   createdAt: string;
 }
 
@@ -129,6 +133,7 @@ export interface SchoolSettings {
   waGatewayApiKey: string;
   waGatewayDevice: string;
   letterNumberPrefix: string;
+  academicYear?: string; // e.g. "2026/2027"
 }
 
 export interface StudentScoreSummary {
