@@ -28,10 +28,47 @@ try {
   }
 } catch (e) {}
 
+// Sanitization helpers to prevent duplicate React keys or invalid phone-number IDs
+export const sanitizeStudents = (students: Student[]): Student[] => {
+  const seenIds = new Set<string>();
+  return (students || []).map((s, idx) => {
+    let cleanId = s.id ? String(s.id).trim() : '';
+    if (!cleanId || seenIds.has(cleanId) || /^(\+?62|08)\d+$/.test(cleanId)) {
+      cleanId = `STU-${s.nisn || 'NO_NISN'}-${idx}-${Math.random().toString(36).substring(2, 6)}`;
+    }
+    seenIds.add(cleanId);
+    return { ...s, id: cleanId };
+  });
+};
+
+export const sanitizeTeachers = (teachers: Teacher[]): Teacher[] => {
+  const seenIds = new Set<string>();
+  return (teachers || []).map((t, idx) => {
+    let cleanId = t.id ? String(t.id).trim() : '';
+    if (!cleanId || seenIds.has(cleanId) || /^(\+?62|08)\d+$/.test(cleanId)) {
+      cleanId = `TCH-${t.nip || 'NO_NIP'}-${idx}-${Math.random().toString(36).substring(2, 6)}`;
+    }
+    seenIds.add(cleanId);
+    return { ...t, id: cleanId };
+  });
+};
+
+export const sanitizeRecords = <T extends { id: string }>(records: T[], prefix: string): T[] => {
+  const seenIds = new Set<string>();
+  return (records || []).map((r, idx) => {
+    let cleanId = r.id ? String(r.id).trim() : '';
+    if (!cleanId || seenIds.has(cleanId) || /^(\+?62|08)\d+$/.test(cleanId)) {
+      cleanId = `${prefix}-${idx}-${Math.random().toString(36).substring(2, 6)}`;
+    }
+    seenIds.add(cleanId);
+    return { ...r, id: cleanId };
+  });
+};
+
 export const getStoredStudents = (): Student[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.STUDENTS);
-    return raw ? JSON.parse(raw) : [];
+    return raw ? sanitizeStudents(JSON.parse(raw)) : [];
   } catch (e) {
     console.error('Failed reading students from storage', e);
     return [];
@@ -41,13 +78,13 @@ export const getStoredStudents = (): Student[] => {
 export const loadStudents = getStoredStudents;
 
 export const saveStudents = (students: Student[]): void => {
-  localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
+  localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(sanitizeStudents(students)));
 };
 
 export const getStoredTeachers = (): Teacher[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.TEACHERS);
-    return raw ? JSON.parse(raw) : [];
+    return raw ? sanitizeTeachers(JSON.parse(raw)) : [];
   } catch (e) {
     console.error('Failed reading teachers from storage', e);
     return [];
@@ -57,7 +94,7 @@ export const getStoredTeachers = (): Teacher[] => {
 export const loadTeachers = getStoredTeachers;
 
 export const saveTeachers = (teachers: Teacher[]): void => {
-  localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(teachers));
+  localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(sanitizeTeachers(teachers)));
 };
 
 export const getStoredPiketSchedules = (): PiketSchedule[] => {
@@ -109,7 +146,7 @@ export const saveRewardRules = (rules: RewardRule[]): void => {
 export const getStoredViolations = (): ViolationRecord[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.VIOLATIONS);
-    return raw ? JSON.parse(raw) : [];
+    return raw ? sanitizeRecords(JSON.parse(raw), 'VIOL') : [];
   } catch (e) {
     return [];
   }
@@ -118,13 +155,13 @@ export const getStoredViolations = (): ViolationRecord[] => {
 export const loadViolations = getStoredViolations;
 
 export const saveViolations = (records: ViolationRecord[]): void => {
-  localStorage.setItem(STORAGE_KEYS.VIOLATIONS, JSON.stringify(records));
+  localStorage.setItem(STORAGE_KEYS.VIOLATIONS, JSON.stringify(sanitizeRecords(records, 'VIOL')));
 };
 
 export const getStoredRewards = (): RewardRecord[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.REWARDS);
-    return raw ? JSON.parse(raw) : [];
+    return raw ? sanitizeRecords(JSON.parse(raw), 'REW') : [];
   } catch (e) {
     return [];
   }
@@ -133,13 +170,13 @@ export const getStoredRewards = (): RewardRecord[] => {
 export const loadRewards = getStoredRewards;
 
 export const saveRewards = (records: RewardRecord[]): void => {
-  localStorage.setItem(STORAGE_KEYS.REWARDS, JSON.stringify(records));
+  localStorage.setItem(STORAGE_KEYS.REWARDS, JSON.stringify(sanitizeRecords(records, 'REW')));
 };
 
 export const getStoredCompensations = (): CompensationRecord[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.COMPENSATIONS);
-    return raw ? JSON.parse(raw) : [];
+    return raw ? sanitizeRecords(JSON.parse(raw), 'COMP') : [];
   } catch (e) {
     return [];
   }
@@ -148,7 +185,7 @@ export const getStoredCompensations = (): CompensationRecord[] => {
 export const loadCompensations = getStoredCompensations;
 
 export const saveCompensations = (records: CompensationRecord[]): void => {
-  localStorage.setItem(STORAGE_KEYS.COMPENSATIONS, JSON.stringify(records));
+  localStorage.setItem(STORAGE_KEYS.COMPENSATIONS, JSON.stringify(sanitizeRecords(records, 'COMP')));
 };
 
 export const getStoredSettings = (): SchoolSettings => {

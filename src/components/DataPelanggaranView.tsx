@@ -196,12 +196,12 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredViolations.map((v) => {
+                filteredViolations.map((v, idx) => {
                   const student = studentMap.get(v.studentId);
                   const summary = summaryMap.get(v.studentId);
 
                   return (
-                    <tr key={v.id} className="hover:bg-slate-50/80 transition">
+                    <tr key={`${v.id || 'v'}-${idx}`} className="hover:bg-slate-50/80 transition">
                       <td className="py-3 px-4 font-mono text-slate-600">
                         <span>{v.date}</span>
                         {v.time && <span className="block text-[10px] text-slate-400">{v.time}</span>}

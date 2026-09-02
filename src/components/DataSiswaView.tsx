@@ -34,6 +34,7 @@ interface DataSiswaViewProps {
   onAddStudent: (student: Student) => void;
   onUpdateStudent: (student: Student) => void;
   onDeleteStudent: (id: string) => void;
+  onDeleteAllStudents?: () => void;
   onImportStudents: (imported: Student[]) => void;
   onQuickInputViolation: (student: Student) => void;
   onQuickInputReward: (student: Student) => void;
@@ -50,6 +51,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
   onAddStudent,
   onUpdateStudent,
   onDeleteStudent,
+  onDeleteAllStudents,
   onImportStudents,
   onQuickInputViolation,
   onQuickInputReward,
@@ -59,6 +61,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
   const [selectedClass, setSelectedClass] = useState('ALL');
   const [modalOpen, setModalOpen] = useState(false);
   const [promotionModalOpen, setPromotionModalOpen] = useState(false);
+  const [deleteAllModalOpen, setDeleteAllModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [detailStudent, setDetailStudent] = useState<Student | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
@@ -230,6 +233,17 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
             Export Excel
           </button>
 
+          {/* Hapus Semua Data Siswa */}
+          <button
+            onClick={() => setDeleteAllModalOpen(true)}
+            disabled={students.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 disabled:opacity-50 disabled:cursor-not-allowed border border-rose-200 rounded-xl text-xs font-semibold transition cursor-pointer"
+            title="Hapus Seluruh Data Siswa"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Hapus Semua Data
+          </button>
+
           {/* Kenaikan Kelas otomatis */}
           <button
             onClick={() => setPromotionModalOpen(true)}
@@ -377,7 +391,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                   const rewardPts = sum?.totalRewardPoints || 0;
 
                   return (
-                    <tr key={student.id} className="hover:bg-slate-50/80 transition">
+                    <tr key={`${student.id || 'stu'}-${idx}`} className="hover:bg-slate-50/80 transition">
                       <td className="py-3 px-4 text-slate-500 font-mono">{idx + 1}</td>
                       <td className="py-3 px-4 font-mono font-medium text-slate-700">
                         <div>{student.nisn}</div>
@@ -770,8 +784,8 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                   <div className="space-y-1.5">
                     {violations
                       .filter(v => v.studentId === detailStudent.id)
-                      .map((v) => (
-                        <div key={v.id} className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-start justify-between">
+                      .map((v, idx) => (
+                        <div key={`${v.id || 'v'}-${idx}`} className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-start justify-between">
                           <div>
                             <span className="font-semibold text-slate-900 block">{v.ruleName}</span>
                             <span className="text-[10px] text-slate-400">{v.date} • Saksi: {v.reporterName}</span>
@@ -796,8 +810,8 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                   <div className="space-y-1.5">
                     {rewards
                       .filter(r => r.studentId === detailStudent.id)
-                      .map((r) => (
-                        <div key={r.id} className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-start justify-between">
+                      .map((r, idx) => (
+                        <div key={`${r.id || 'r'}-${idx}`} className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-start justify-between">
                           <div>
                             <span className="font-semibold text-slate-900 block">{r.competitionName}</span>
                             <span className="text-[10px] text-amber-800 font-medium">{r.rank} • Tingkat {r.level}</span>
@@ -831,6 +845,50 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
           currentAcademicYear={currentAcademicYear}
           onPromoteYear={onPromoteYear}
         />
+      )}
+
+      {/* Confirmation Modal Hapus Semua Data Siswa */}
+      {deleteAllModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex justify-center items-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-rose-100 space-y-4 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-3 bg-rose-100 rounded-full shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Konfirmasi Hapus Semua Siswa</h3>
+                <p className="text-xs text-rose-600 font-semibold">Tindakan ini tidak dapat dibatalkan</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Apakah Anda yakin ingin menghapus <strong className="text-rose-700 font-bold">{students.length} data siswa</strong>? Seluruh rekam jejak poin pelanggaran, reward, dan kompensasi yang terikat juga akan dibersihkan.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                onClick={() => setDeleteAllModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => {
+                  if (onDeleteAllStudents) {
+                    onDeleteAllStudents();
+                  } else {
+                    onImportStudents([]);
+                  }
+                  setDeleteAllModalOpen(false);
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition shadow cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Ya, Hapus Semua Data
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

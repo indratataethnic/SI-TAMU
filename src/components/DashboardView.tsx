@@ -346,8 +346,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
               {alert100.length > 0 && (
                 <div className="mt-3 space-y-1.5">
-                  {alert100.slice(0, 2).map((item) => (
-                    <div key={item.student.id} className="flex items-center justify-between text-xs bg-amber-50/70 p-1.5 rounded">
+                  {alert100.slice(0, 2).map((item, idx) => (
+                    <div key={`${item.student.id || 'stu'}-${idx}`} className="flex items-center justify-between text-xs bg-amber-50/70 p-1.5 rounded">
                       <span className="font-semibold text-slate-900 truncate max-w-[130px]">{item.student.name}</span>
                       <button
                         onClick={() => onSelectStudentForSurat(item, 'panggilan_100')}
@@ -372,8 +372,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
               {alert300.length > 0 && (
                 <div className="mt-3 space-y-1.5">
-                  {alert300.slice(0, 2).map((item) => (
-                    <div key={item.student.id} className="flex items-center justify-between text-xs bg-red-50/70 p-1.5 rounded">
+                  {alert300.slice(0, 2).map((item, idx) => (
+                    <div key={`${item.student.id || 'stu'}-${idx}`} className="flex items-center justify-between text-xs bg-red-50/70 p-1.5 rounded">
                       <span className="font-semibold text-slate-900 truncate max-w-[130px]">{item.student.name}</span>
                       <button
                         onClick={() => onSelectStudentForSurat(item, 'skorsing_300')}
@@ -398,8 +398,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
               {alert500.length > 0 && (
                 <div className="mt-3 space-y-1.5">
-                  {alert500.slice(0, 2).map((item) => (
-                    <div key={item.student.id} className="flex items-center justify-between text-xs bg-rose-50/70 p-1.5 rounded">
+                  {alert500.slice(0, 2).map((item, idx) => (
+                    <div key={`${item.student.id || 'stu'}-${idx}`} className="flex items-center justify-between text-xs bg-rose-50/70 p-1.5 rounded">
                       <span className="font-semibold text-slate-900 truncate max-w-[130px]">{item.student.name}</span>
                       <button
                         onClick={() => onSelectStudentForSurat(item, 'pembinaan_500')}
@@ -852,8 +852,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {recentViolations.map((v) => (
-                <div key={v.id} className="py-3 flex items-start justify-between gap-3 text-xs">
+              {recentViolations.map((v, idx) => (
+                <div key={`${v.id || 'viol'}-${idx}`} className="py-3 flex items-start justify-between gap-3 text-xs">
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-slate-900">{v.studentName}</span>
@@ -908,8 +908,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {recentRewards.map((r) => (
-                <div key={r.id} className="py-3 flex items-start justify-between gap-3 text-xs">
+              {recentRewards.map((r, idx) => (
+                <div key={`${r.id || 'rew'}-${idx}`} className="py-3 flex items-start justify-between gap-3 text-xs">
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-slate-900">{r.studentName}</span>

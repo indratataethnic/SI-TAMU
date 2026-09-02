@@ -417,23 +417,97 @@ function fetchAllData(ss) {
     }
   }
 
-  // 2. Students
+  // 2. Students (Data_Siswa)
   var studentSheet = ss.getSheetByName("Data_Siswa");
   if (studentSheet) {
     var values = studentSheet.getDataRange().getValues();
-    for (var i = 1; i < values.length; i++) {
-      var row = values[i];
-      if (row[0]) {
+    if (values.length > 1) {
+      // Find the header row (scan up to row 10 for a row containing key student column names)
+      var headerRowIdx = 0;
+      for (var r = 0; r < Math.min(values.length, 10); r++) {
+        var rowStr = values[r].map(function(c) { return String(c || "").toLowerCase().trim(); }).join(" ");
+        if (rowStr.indexOf("nisn") !== -1 || rowStr.indexOf("nik") !== -1 || rowStr.indexOf("nama siswa") !== -1 || rowStr.indexOf("kelas") !== -1 || rowStr.indexOf("rombel") !== -1) {
+          headerRowIdx = r;
+          break;
+        }
+      }
+
+      var headers = values[headerRowIdx].map(function(h) { return String(h || "").toLowerCase().trim(); });
+
+      var colNik = -1, colNisn = -1, colName = -1, colClass = -1, colGender = -1, colParentName = -1, colParentPhone = -1, colParentAddress = -1, colAccessCode = -1, colNotes = -1, colId = -1;
+
+      headers.forEach(function(h, idx) {
+        if (!h) return;
+        if (h === "nik" || (h.indexOf("nik") !== -1 && h.indexOf("teknik") === -1)) colNik = idx;
+        else if (h.indexOf("nisn") !== -1 || h === "nis" || h.indexOf("no induk") !== -1 || h.indexOf("induk") !== -1) colNisn = idx;
+        else if ((h.indexOf("nama siswa") !== -1 || h === "nama" || h.indexOf("nama lengkap") !== -1 || h.indexOf("peserta didik") !== -1 || h.indexOf("murid") !== -1) && h.indexOf("wali") === -1 && h.indexOf("orang") === -1 && h.indexOf("guru") === -1 && h.indexOf("ortu") === -1 && h.indexOf("ayah") === -1 && h.indexOf("ibu") === -1) colName = idx;
+        else if (h.indexOf("kelas") !== -1 || h.indexOf("rombel") !== -1 || h.indexOf("rombongan") !== -1) colClass = idx;
+        else if (h.indexOf("kelamin") !== -1 || h.indexOf("gender") !== -1 || h === "l/p" || h === "jk") colGender = idx;
+        else if (h.indexOf("orang tua") !== -1 || h.indexOf("wali") !== -1 || h.indexOf("ortu") !== -1 || h.indexOf("ayah") !== -1 || h.indexOf("ibu") !== -1) colParentName = idx;
+        else if (h.indexOf("hp") !== -1 || h.indexOf("wa") !== -1 || h.indexOf("telepon") !== -1 || h.indexOf("whatsapp") !== -1 || h.indexOf("kontak") !== -1) colParentPhone = idx;
+        else if (h.indexOf("alamat") !== -1 || h.indexOf("domisili") !== -1) colParentAddress = idx;
+        else if (h.indexOf("kode") !== -1 || h.indexOf("akses") !== -1 || h.indexOf("pin") !== -1) colAccessCode = idx;
+        else if (h.indexOf("catatan") !== -1 || h.indexOf("keterangan") !== -1) colNotes = idx;
+        else if (h.indexOf("id sistem") !== -1 || h === "id" || h.indexOf("id_siswa") !== -1) colId = idx;
+      });
+
+      // Standard 11-column template fallback indices (NIK=0, NISN=1, Nama=2, Kelas=3, Gender=4, Ortu=5, WA=6, Alamat=7, Kode=8, Catatan=9, ID=10)
+      if (colNik === -1) colNik = 0;
+      if (colNisn === -1) colNisn = 1;
+      if (colName === -1) colName = 2;
+      if (colClass === -1) colClass = 3;
+      if (colGender === -1) colGender = 4;
+      if (colParentName === -1) colParentName = 5;
+      if (colParentPhone === -1) colParentPhone = 6;
+      if (colParentAddress === -1) colParentAddress = 7;
+      if (colAccessCode === -1) colAccessCode = 8;
+      if (colNotes === -1) colNotes = 9;
+      if (colId === -1) colId = 10;
+
+      for (var i = headerRowIdx + 1; i < values.length; i++) {
+        var row = values[i];
+        if (!row || row.length === 0) continue;
+
+        var rawNisn = colNisn !== -1 && row[colNisn] !== undefined ? String(row[colNisn]).replace(/^'/, '').trim() : "";
+        var rawName = colName !== -1 && row[colName] !== undefined ? String(row[colName]).trim() : "";
+        var rawNik = colNik !== -1 && row[colNik] !== undefined ? String(row[colNik]).replace(/^'/, '').trim() : "";
+
+        // Skip header re-declarations or completely empty rows
+        if (!rawNisn && !rawName && !rawNik) continue;
+        if (rawName.toLowerCase().indexOf("nama siswa") !== -1 || rawName.toLowerCase().indexOf("nama lengkap") !== -1) continue;
+
+        var rawClass = colClass !== -1 && row[colClass] !== undefined ? String(row[colClass]).trim() : "Kelas 1";
+        var rawGender = colGender !== -1 && row[colGender] !== undefined ? String(row[colGender]).trim().toUpperCase() : "L";
+        var parsedGender = rawGender.indexOf("P") !== -1 || rawGender.indexOf("PEREMPUAN") !== -1 ? "P" : "L";
+        var rawParentName = colParentName !== -1 && row[colParentName] !== undefined ? String(row[colParentName]).trim() : "";
+        var rawParentPhone = colParentPhone !== -1 && row[colParentPhone] !== undefined ? String(row[colParentPhone]).replace(/^'/, '').replace(/[^0-9+]/g, '') : "";
+        var rawParentAddress = colParentAddress !== -1 && row[colParentAddress] !== undefined ? String(row[colParentAddress]).trim() : "";
+        var rawAccessCode = colAccessCode !== -1 && row[colAccessCode] !== undefined ? String(row[colAccessCode]).replace(/^'/, '').trim() : "";
+        var rawIdCandidate = colId !== -1 && row[colId] ? String(row[colId]).trim() : "";
+        if (!rawIdCandidate || /^(\+?62|08)\d+$/.test(rawIdCandidate)) {
+          rawIdCandidate = "student_" + (rawNisn || (i + "_" + Math.random().toString(36).substring(2, 6)));
+        }
+        var rawId = rawIdCandidate;
+
+        if (!rawAccessCode && rawName) {
+          var firstName = rawName.split(" ")[0] || "SISWA";
+          var cleanClass = rawClass.replace(/[^a-zA-Z0-9]/g, "");
+          rawAccessCode = (firstName + cleanClass).toUpperCase();
+        }
+
         data.students.push({
-          id: row[6] ? String(row[6]) : ("student_" + i),
-          nisn: String(row[0]),
-          name: String(row[1] || ""),
-          class: String(row[2] || ""),
-          parentName: String(row[3] || ""),
-          parentPhone: String(row[4] || ""),
-          parentAddress: String(row[5] || ""),
-          academicYear: row[7] ? String(row[7]) : "2026/2027",
-          createdAt: row[8] ? String(row[8]) : new Date().toISOString()
+          id: rawId,
+          nik: rawNik !== "-" && rawNik ? rawNik : undefined,
+          nisn: rawNisn || ("NISN-" + i),
+          name: rawName || ("Siswa " + i),
+          class: rawClass || "Kelas 1",
+          gender: parsedGender,
+          parentName: rawParentName,
+          parentPhone: rawParentPhone,
+          parentAddress: rawParentAddress,
+          accessCode: rawAccessCode,
+          academicYear: "2026/2027",
+          createdAt: new Date().toISOString()
         });
       }
     }

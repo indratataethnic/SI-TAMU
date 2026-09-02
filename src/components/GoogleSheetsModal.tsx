@@ -349,6 +349,38 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
             )}
           </div>
 
+          {/* SPREADSHEET STRUCTURE GUIDE */}
+          <div className="bg-emerald-50 rounded-xl border border-emerald-200 overflow-hidden">
+            <div className="px-4 py-3 bg-emerald-900 text-emerald-100 font-bold text-xs flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Table className="w-4 h-4 text-amber-300" />
+                <span>Format Kolom Tab "Data_Siswa" di Google Spreadsheet</span>
+              </div>
+              <span className="text-[10px] bg-emerald-800 text-emerald-200 px-2 py-0.5 rounded font-mono">11 Kolom Terpadu</span>
+            </div>
+            <div className="p-4 bg-white space-y-2 text-xs text-slate-700">
+              <p className="text-[11px] text-slate-600">
+                Skrip secara otomatis menyusun dan membaca kolom <strong>Data_Siswa</strong> dengan urutan standar berikut:
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 font-mono text-[11px]">
+                <div className="p-1.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-800">1. NIK</div>
+                <div className="p-1.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-800">2. NISN</div>
+                <div className="p-1.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-800">3. Nama Siswa</div>
+                <div className="p-1.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-800">4. Kelas</div>
+                <div className="p-1.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-800">5. Jenis Kelamin (L/P)</div>
+                <div className="p-1.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-800">6. Nama Orang Tua / Wali</div>
+                <div className="p-1.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-800">7. No HP / WA Wali</div>
+                <div className="p-1.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-800">8. Alamat Rumah</div>
+                <div className="p-1.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-800">9. Kode Akses Siswa</div>
+                <div className="p-1.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-800">10. Catatan Khusus</div>
+                <div className="p-1.5 bg-slate-50 border border-slate-200 rounded font-semibold text-slate-800">11. ID Sistem</div>
+              </div>
+              <p className="text-[10px] text-emerald-800 font-medium pt-1">
+                ✓ SI TAMU dilengkapi pencocokan nama header cerdas, sehingga data akan tetap terbaca tepat meskipun Anda memindahkan urutan kolom di Spreadsheet.
+              </p>
+            </div>
+          </div>
+
           {/* TROUBLESHOOTING BOX */}
           <div className="bg-amber-50 rounded-xl border border-amber-200 overflow-hidden">
             <button

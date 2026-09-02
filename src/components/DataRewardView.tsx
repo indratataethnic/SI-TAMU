@@ -171,11 +171,11 @@ export const DataRewardView: React.FC<DataRewardViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredRewards.map((r) => {
+                filteredRewards.map((r, idx) => {
                   const student = studentMap.get(r.studentId);
 
                   return (
-                    <tr key={r.id} className="hover:bg-slate-50/80 transition">
+                    <tr key={`${r.id || 'r'}-${idx}`} className="hover:bg-slate-50/80 transition">
                       <td className="py-3 px-4 font-mono text-slate-600">{r.date}</td>
                       <td className="py-3 px-4">
                         <span className="font-bold text-slate-900 block">{r.studentName}</span>

@@ -277,8 +277,8 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
               {filteredStudents.length === 0 ? (
                 <option value="">Tidak ada siswa di pilihan filter ini</option>
               ) : (
-                filteredStudents.map((s) => (
-                  <option key={s.id} value={s.id}>
+                filteredStudents.map((s, idx) => (
+                  <option key={`${s.id || 'stu'}-${idx}`} value={s.id}>
                     {s.name} ({s.class}) - NISN: {s.nisn}
                   </option>
                 ))
@@ -431,8 +431,8 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium text-xs"
                   >
                     <option value="custom">-- Ketik Nama Guru Lainnya --</option>
-                    {teachers.map(t => (
-                      <option key={t.id} value={t.name}>
+                    {teachers.map((t, idx) => (
+                      <option key={`${t.id || 'tch'}-${idx}`} value={t.name}>
                         {t.name} ({t.role === 'wali_kelas' ? `Wali ${t.classAssigned}` : t.role === 'guru_bk' ? 'Guru BK' : 'Guru'})
                       </option>
                     ))}

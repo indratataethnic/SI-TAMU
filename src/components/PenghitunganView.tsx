@@ -333,12 +333,12 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredSummaries.map((item) => {
+                filteredSummaries.map((item, idx) => {
                   const s = item.student;
                   const activePts = item.activeViolationPoints;
 
                   return (
-                    <tr key={s.id} className="hover:bg-slate-50/80 transition">
+                    <tr key={`${s.id || 's'}-${idx}`} className="hover:bg-slate-50/80 transition">
                       <td className="py-3 px-4">
                         <span className="font-bold text-slate-900 block">{s.name}</span>
                         <span className="text-[10px] text-slate-400 font-mono">NISN: {s.nisn}</span>
@@ -476,8 +476,8 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
           </div>
         ) : (
           <div className="divide-y divide-slate-100 text-xs">
-            {compensations.map((c) => (
-              <div key={c.id} className="py-3 flex items-start justify-between gap-3">
+            {compensations.map((c, idx) => (
+              <div key={`${c.id || 'c'}-${idx}`} className="py-3 flex items-start justify-between gap-3">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-slate-900">{c.studentName}</span>
@@ -714,7 +714,7 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
                           const isTop = idx === 0;
                           return (
                             <div
-                              key={cand.student.id}
+                              key={`${cand.student.id || 'cand'}-${idx}`}
                               className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-amber-50/40 transition ${
                                 isTop ? 'bg-amber-50/20' : ''
                               }`}

@@ -38,14 +38,14 @@ export const exportStudentsToExcel = (students: Student[], summaries: StudentSco
     const sum = summaryMap.get(s.id);
     return {
       'No': index + 1,
-      'NIK': s.nik || '-',
+      'NIK (16 Digit)': s.nik || '-',
       'NISN': s.nisn,
       'Nama Siswa': s.name,
       'Kelas': s.class,
-      'L/P': s.gender,
-      'Nama Orang Tua': s.parentName,
-      'No. WhatsApp Ortu': s.parentPhone,
-      'Alamat': s.parentAddress || '-',
+      'Jenis Kelamin (L/P)': s.gender,
+      'Nama Orang Tua / Wali': s.parentName || '-',
+      'No WhatsApp Orang Tua': s.parentPhone || '-',
+      'Alamat Rumah': s.parentAddress || '-',
       'Poin Pelanggaran': sum?.totalViolationPoints || 0,
       'Poin Kompensasi': sum?.totalCompensationPoints || 0,
       'Poin Aktif': sum?.activeViolationPoints || 0,
@@ -136,42 +136,98 @@ export const importStudentsFromExcel = async (file: File): Promise<Student[]> =>
         const workbook = XLSX.read(data, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
-        const rawJson: any[] = XLSX.utils.sheet_to_json(worksheet);
+        
+        // Convert worksheet to 2D array matrix to support sheets with title rows
+        const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
 
-        if (!rawJson || rawJson.length === 0) {
+        if (!rows || rows.length === 0) {
           throw new Error('File excel kosong atau format tidak sesuai.');
         }
 
-        const parsedStudents: Student[] = rawJson.map((row, index) => {
-          // Normalize column names
-          const nik = String(row['NIK (16 Digit)'] || row['NIK'] || row['nik'] || '').trim();
-          const nisn = String(row['NISN'] || row['nisn'] || row['No Induk'] || `NISN-${Date.now()}-${index}`);
-          const name = String(row['Nama Siswa'] || row['Nama'] || row['nama'] || `Siswa ${index + 1}`).trim();
-          const studentClass = String(row['Kelas'] || row['kelas'] || 'VII-A').trim();
-          const genderRaw = String(row['Jenis Kelamin (L/P)'] || row['Jenis Kelamin'] || row['L/P'] || row['gender'] || 'L').toUpperCase();
+        // Search first 10 rows to detect the actual header row
+        let headerRowIdx = -1;
+        for (let i = 0; i < Math.min(rows.length, 10); i++) {
+          const rowStr = (rows[i] || []).map(c => String(c || '').toLowerCase().trim()).join(' ');
+          if (rowStr.includes('nik') || rowStr.includes('nisn') || rowStr.includes('nama') || rowStr.includes('kelas') || rowStr.includes('rombel')) {
+            headerRowIdx = i;
+            break;
+          }
+        }
+
+        let colNik = -1, colNisn = -1, colName = -1, colClass = -1, colGender = -1, colParentName = -1, colParentPhone = -1, colParentAddress = -1, colAccessCode = -1;
+
+        if (headerRowIdx !== -1) {
+          const headers = (rows[headerRowIdx] || []).map(c => String(c || '').toLowerCase().trim());
+          headers.forEach((h, idx) => {
+            if (!h) return;
+            if (h === 'nik' || (h.includes('nik') && !h.includes('teknik'))) colNik = idx;
+            else if (h.includes('nisn') || h === 'nis' || h.includes('no induk') || h.includes('induk')) colNisn = idx;
+            else if ((h.includes('nama siswa') || h === 'nama' || h.includes('nama lengkap') || h.includes('peserta didik') || h.includes('murid')) && !h.includes('wali') && !h.includes('orang') && !h.includes('guru') && !h.includes('ortu') && !h.includes('ayah') && !h.includes('ibu')) colName = idx;
+            else if (h.includes('kelas') || h.includes('rombel') || h.includes('rombongan')) colClass = idx;
+            else if (h.includes('kelamin') || h.includes('gender') || h === 'l/p' || h === 'jk') colGender = idx;
+            else if (h.includes('orang tua') || h.includes('wali') || h.includes('ortu') || h.includes('ayah') || h.includes('ibu')) colParentName = idx;
+            else if (h.includes('hp') || h.includes('wa') || h.includes('telepon') || h.includes('whatsapp') || h.includes('kontak')) colParentPhone = idx;
+            else if (h.includes('alamat') || h.includes('domisili')) colParentAddress = idx;
+            else if (h.includes('kode') || h.includes('akses') || h.includes('pin')) colAccessCode = idx;
+          });
+        }
+
+        // Default fallbacks if no header row was explicitly detected
+        if (colNik === -1) colNik = 0;
+        if (colNisn === -1) colNisn = 1;
+        if (colName === -1) colName = 2;
+        if (colClass === -1) colClass = 3;
+        if (colGender === -1) colGender = 4;
+        if (colParentName === -1) colParentName = 5;
+        if (colParentPhone === -1) colParentPhone = 6;
+        if (colParentAddress === -1) colParentAddress = 7;
+
+        const dataRows = headerRowIdx !== -1 ? rows.slice(headerRowIdx + 1) : rows;
+        const parsedStudents: Student[] = [];
+
+        dataRows.forEach((row, index) => {
+          if (!row || row.length === 0) return;
+
+          const nikRaw = colNik !== -1 && row[colNik] !== undefined ? String(row[colNik]).replace(/^'/, '').trim() : '';
+          const nisnRaw = colNisn !== -1 && row[colNisn] !== undefined ? String(row[colNisn]).replace(/^'/, '').trim() : '';
+          const nameRaw = colName !== -1 && row[colName] !== undefined ? String(row[colName]).trim() : '';
+
+          // Skip header re-declarations or empty rows
+          if (!nisnRaw && !nameRaw && !nikRaw) return;
+          if (nameRaw.toLowerCase().includes('nama siswa') || nameRaw.toLowerCase().includes('nama lengkap')) return;
+
+          const studentClass = colClass !== -1 && row[colClass] !== undefined ? String(row[colClass]).trim() : 'Kelas 1';
+          const genderRaw = colGender !== -1 && row[colGender] !== undefined ? String(row[colGender]).trim().toUpperCase() : 'L';
           const gender = genderRaw.startsWith('P') ? 'P' : 'L';
-          const parentName = String(row['Nama Orang Tua / Wali'] || row['Nama Orang Tua'] || row['Orang Tua'] || '-').trim();
-          const parentPhone = String(row['No WhatsApp Orang Tua'] || row['No WhatsApp'] || row['No HP'] || row['Telepon'] || '').replace(/[^0-9]/g, '');
-          const parentAddress = String(row['Alamat'] || row['alamat'] || '').trim();
+          const parentName = colParentName !== -1 && row[colParentName] !== undefined ? String(row[colParentName]).trim() : '';
+          const parentPhone = colParentPhone !== -1 && row[colParentPhone] !== undefined ? String(row[colParentPhone]).replace(/[^0-9]/g, '') : '';
+          const parentAddress = colParentAddress !== -1 && row[colParentAddress] !== undefined ? String(row[colParentAddress]).trim() : '';
+          let accessCode = colAccessCode !== -1 && row[colAccessCode] !== undefined ? String(row[colAccessCode]).trim() : '';
 
-          const firstName = name.split(' ')[0] || 'SISWA';
-          const cleanClass = studentClass.replace(/[^a-zA-Z0-9]/g, '');
-          const accessCode = `${firstName.toUpperCase()}${cleanClass}`;
+          if (!accessCode && nameRaw) {
+            const firstName = nameRaw.split(' ')[0] || 'SISWA';
+            const cleanClass = studentClass.replace(/[^a-zA-Z0-9]/g, '');
+            accessCode = `${firstName.toUpperCase()}${cleanClass}`;
+          }
 
-          return {
+          parsedStudents.push({
             id: `STU-IMP-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 7)}`,
-            nisn,
-            nik: nik || undefined,
-            name,
-            class: studentClass,
+            nisn: nisnRaw || `NISN-${Date.now()}-${index}`,
+            nik: nikRaw !== '-' && nikRaw ? nikRaw : undefined,
+            name: nameRaw || `Siswa ${index + 1}`,
+            class: studentClass || 'Kelas 1',
             gender,
             parentName: parentName || '',
             parentPhone: parentPhone || '',
             parentAddress,
             accessCode,
             createdAt: new Date().toISOString().slice(0, 10)
-          };
+          });
         });
+
+        if (parsedStudents.length === 0) {
+          throw new Error('Tidak ada data siswa yang valid ditemukan dalam file Excel.');
+        }
 
         resolve(parsedStudents);
       } catch (err: any) {

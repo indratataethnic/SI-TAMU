@@ -34,7 +34,10 @@ import {
   saveSettings,
   loadUserRole,
   saveUserRole,
-  calculateSummaries
+  calculateSummaries,
+  sanitizeStudents,
+  sanitizeTeachers,
+  sanitizeRecords
 } from './utils/storage';
 import { syncFullStateToSheets, fetchFullStateFromSheets } from './utils/sheetsSync';
 
@@ -335,37 +338,37 @@ export default function App() {
     }
 
     if (imported.students && imported.students.length > 0) {
-      setStudents(imported.students);
+      setStudents(sanitizeStudents(imported.students));
     }
     if (imported.teachers && imported.teachers.length > 0) {
-      setTeachers(imported.teachers);
+      setTeachers(sanitizeTeachers(imported.teachers));
     }
     if (imported.piketSchedules && imported.piketSchedules.length > 0) {
       setPiketSchedules(imported.piketSchedules);
     }
 
-    const mergedStudents = (imported.students && imported.students.length > 0) ? imported.students : students;
+    const mergedStudents = (imported.students && imported.students.length > 0) ? sanitizeStudents(imported.students) : students;
     const sMap = new Map(mergedStudents.map(s => [s.nisn, s.id]));
 
     if (imported.violations && imported.violations.length > 0) {
-      const mappedViolations = imported.violations.map(v => ({
+      const mappedViolations = sanitizeRecords(imported.violations.map(v => ({
         ...v,
         studentId: v.studentId || sMap.get((v as any).studentNisn || '') || ''
-      }));
+      })), 'VIOL');
       setViolations(mappedViolations);
     }
     if (imported.rewards && imported.rewards.length > 0) {
-      const mappedRewards = imported.rewards.map(r => ({
+      const mappedRewards = sanitizeRecords(imported.rewards.map(r => ({
         ...r,
         studentId: r.studentId || sMap.get((r as any).studentNisn || '') || ''
-      }));
+      })), 'REW');
       setRewards(mappedRewards);
     }
     if (imported.compensations && imported.compensations.length > 0) {
-      const mappedCompensations = imported.compensations.map(c => ({
+      const mappedCompensations = sanitizeRecords(imported.compensations.map(c => ({
         ...c,
         studentId: c.studentId || sMap.get((c as any).studentNisn || '') || ''
-      }));
+      })), 'COMP');
       setCompensations(mappedCompensations);
     }
   };
@@ -402,6 +405,20 @@ export default function App() {
     });
   };
 
+  const handleDeleteAllStudents = () => {
+    setStudents([]);
+    setViolations([]);
+    setRewards([]);
+    setCompensations([]);
+
+    triggerSheetsSync({
+      students: [],
+      violations: [],
+      rewards: [],
+      compensations: []
+    });
+  };
+
   const handleImportStudents = (imported: Student[]) => {
     setStudents(imported);
     triggerSheetsSync({ students: imported });
@@ -431,6 +448,16 @@ export default function App() {
     const updated = teachers.filter(t => t.id !== id);
     setTeachers(updated);
     triggerSheetsSync({ teachers: updated });
+  };
+
+  const handleDeleteAllTeachers = () => {
+    setTeachers([]);
+    const updatedPiket = piketSchedules.map(p => ({ ...p, teacherIds: [] }));
+    setPiketSchedules(updatedPiket);
+    triggerSheetsSync({
+      teachers: [],
+      piketSchedules: updatedPiket
+    });
   };
 
   const handleImportTeachers = (imported: Teacher[]) => {
@@ -628,6 +655,7 @@ export default function App() {
               onAddStudent={handleAddStudent}
               onUpdateStudent={handleUpdateStudent}
               onDeleteStudent={handleDeleteStudent}
+              onDeleteAllStudents={handleDeleteAllStudents}
               onImportStudents={handleImportStudents}
               onQuickInputViolation={handleQuickInputViolation}
               onQuickInputReward={handleQuickInputReward}
@@ -644,6 +672,7 @@ export default function App() {
               onAddTeacher={handleAddTeacher}
               onUpdateTeacher={handleUpdateTeacher}
               onDeleteTeacher={handleDeleteTeacher}
+              onDeleteAllTeachers={handleDeleteAllTeachers}
               onUpdatePiketSchedule={handleUpdatePiketSchedule}
               onUpdateAllPiketSchedules={handleUpdateAllPiketSchedules}
               onOpenJurnalPiket={handleOpenJurnalPiket}

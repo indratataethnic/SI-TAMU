@@ -231,9 +231,9 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
               {filteredQuickStudents.length === 0 ? (
                 <span className="text-xs text-slate-400 italic">Tidak ada data siswa untuk kelas ini.</span>
               ) : (
-                filteredQuickStudents.slice(0, 10).map((s) => (
+                filteredQuickStudents.slice(0, 10).map((s, idx) => (
                   <button
-                    key={s.id}
+                    key={`${s.id || 's'}-${idx}`}
                     onClick={() => handleSelectDirect(s)}
                     className="px-3 py-1.5 bg-slate-100 hover:bg-emerald-100 hover:text-emerald-900 text-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer border border-slate-200"
                   >
@@ -344,8 +344,8 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
               </div>
             ) : (
               <div className="divide-y divide-slate-100 text-xs">
-                {studentViolations.map((v) => (
-                  <div key={v.id} className="py-3 flex items-start justify-between gap-3">
+                {studentViolations.map((v, idx) => (
+                  <div key={`${v.id || 'v'}-${idx}`} className="py-3 flex items-start justify-between gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-slate-900">{v.ruleName}</span>
@@ -383,8 +383,8 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
                 Catatan Tugas Kompensasi (Pengurangan Poin)
               </h4>
               <div className="divide-y divide-slate-100 text-xs">
-                {studentCompensations.map((c) => (
-                  <div key={c.id} className="py-3 flex items-start justify-between gap-3">
+                {studentCompensations.map((c, idx) => (
+                  <div key={`${c.id || 'c'}-${idx}`} className="py-3 flex items-start justify-between gap-3">
                     <div className="space-y-0.5">
                       <span className="font-bold text-slate-900 block">{c.taskName}</span>
                       <p className="text-[11px] text-slate-500">
@@ -413,8 +413,8 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
               </div>
             ) : (
               <div className="divide-y divide-slate-100 text-xs">
-                {studentRewards.map((r) => (
-                  <div key={r.id} className="py-3 flex items-start justify-between gap-3">
+                {studentRewards.map((r, idx) => (
+                  <div key={`${r.id || 'r'}-${idx}`} className="py-3 flex items-start justify-between gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-slate-900">{r.competitionName}</span>

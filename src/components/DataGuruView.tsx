@@ -42,6 +42,7 @@ interface DataGuruViewProps {
   onAddTeacher: (teacher: Teacher) => void;
   onUpdateTeacher: (teacher: Teacher) => void;
   onDeleteTeacher: (id: string) => void;
+  onDeleteAllTeachers?: () => void;
   onUpdatePiketSchedule?: (schedule: PiketSchedule) => void;
   onUpdateAllPiketSchedules?: (schedules: PiketSchedule[]) => void;
   onOpenJurnalPiket?: (dayName: DayOfWeek, dutyTeachers: Teacher[]) => void;
@@ -56,6 +57,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
   onAddTeacher,
   onUpdateTeacher,
   onDeleteTeacher,
+  onDeleteAllTeachers,
   onUpdatePiketSchedule,
   onUpdateAllPiketSchedules,
   onOpenJurnalPiket,
@@ -65,6 +67,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [deleteAllModalOpen, setDeleteAllModalOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
 
   // Piket Detail Modal State (editing hours & notes for a day)
@@ -459,6 +462,15 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>Ekspor Excel</span>
+          </button>
+          <button
+            onClick={() => setDeleteAllModalOpen(true)}
+            disabled={teachers.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 disabled:opacity-50 disabled:cursor-not-allowed border border-rose-200 rounded-xl text-xs font-semibold transition cursor-pointer"
+            title="Hapus Seluruh Data Guru"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Hapus Semua Data</span>
           </button>
           <button
             onClick={handleOpenAdd}
@@ -1231,6 +1243,50 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal Hapus Semua Data Guru */}
+      {deleteAllModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex justify-center items-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-rose-100 space-y-4 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-3 bg-rose-100 rounded-full shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Konfirmasi Hapus Semua Data Guru</h3>
+                <p className="text-xs text-rose-600 font-semibold">Tindakan ini tidak dapat dibatalkan</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Apakah Anda yakin ingin menghapus <strong className="text-rose-700 font-bold">{teachers.length} data guru/GTK</strong>? Jadwal piket harian yang terhubung juga akan dibersihkan.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                onClick={() => setDeleteAllModalOpen(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => {
+                  if (onDeleteAllTeachers) {
+                    onDeleteAllTeachers();
+                  } else {
+                    onImportTeachers([]);
+                  }
+                  setDeleteAllModalOpen(false);
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition shadow cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Ya, Hapus Semua Data Guru
+              </button>
+            </div>
           </div>
         </div>
       )}

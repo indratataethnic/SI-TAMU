@@ -274,8 +274,8 @@ export const InputRewardView: React.FC<InputRewardViewProps> = ({
               {filteredStudents.length === 0 ? (
                 <option value="">Tidak ada siswa di pilihan filter ini</option>
               ) : (
-                filteredStudents.map((s) => (
-                  <option key={s.id} value={s.id}>
+                filteredStudents.map((s, idx) => (
+                  <option key={`${s.id || 'stu'}-${idx}`} value={s.id}>
                     {s.name} ({s.class}) - NISN: {s.nisn}
                   </option>
                 ))
