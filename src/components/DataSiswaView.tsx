@@ -305,14 +305,19 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
               className="px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer"
             >
               <option value="ALL">Semua Kelas (Semua Siswa)</option>
-              <optgroup label="Pilihan Kelas Utama (SD)">
+              <optgroup label="Tingkat Kelas (Gabungan)">
                 {PRIMARY_SCHOOL_CLASSES.map(cls => (
+                  <option key={cls} value={cls}>{cls} (Semua Rombel)</option>
+                ))}
+              </optgroup>
+              <optgroup label="Rombongan Belajar (Rombel Spesifik)">
+                {PRIMARY_SCHOOL_PARALLEL_CLASSES.map(cls => (
                   <option key={cls} value={cls}>{cls}</option>
                 ))}
               </optgroup>
-              {classesList.filter(c => c !== 'ALL' && !PRIMARY_SCHOOL_CLASSES.includes(c)).length > 0 && (
-                <optgroup label="Kelas Lainnya / Paralel">
-                  {classesList.filter(c => c !== 'ALL' && !PRIMARY_SCHOOL_CLASSES.includes(c)).map(cls => (
+              {classesList.filter(c => c !== 'ALL' && !PRIMARY_SCHOOL_CLASSES.includes(c) && !PRIMARY_SCHOOL_PARALLEL_CLASSES.includes(c)).length > 0 && (
+                <optgroup label="Kelas Lainnya">
+                  {classesList.filter(c => c !== 'ALL' && !PRIMARY_SCHOOL_CLASSES.includes(c) && !PRIMARY_SCHOOL_PARALLEL_CLASSES.includes(c)).map(cls => (
                     <option key={cls} value={cls}>{cls}</option>
                   ))}
                 </optgroup>
@@ -321,9 +326,9 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
           </div>
         </div>
 
-        {/* Quick Class Badges (Kelas 1 s.d. Kelas 6 + ALL) */}
+        {/* Quick Class Badges (Akses Cepat Tingkat & Rombel) */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 border-t border-slate-100">
-          <span className="text-[11px] text-slate-400 font-medium shrink-0 mr-1">Akses Cepat:</span>
+          <span className="text-[11px] text-slate-400 font-medium shrink-0 mr-1">Akses Cepat Rombel:</span>
           <button
             onClick={() => setSelectedClass('ALL')}
             className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
@@ -332,24 +337,27 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                 : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
             }`}
           >
-            Semua Kelas ({students.length})
+            Semua ({students.length})
           </button>
-          {PRIMARY_SCHOOL_CLASSES.map((cls) => {
+          {classesList.filter(c => c !== 'ALL').map((cls) => {
             const count = students.filter(s => matchClassFilter(s.class, cls)).length;
             const isSelected = selectedClass === cls;
+            const isRombel = cls.includes(' ');
             return (
               <button
                 key={cls}
                 onClick={() => setSelectedClass(cls)}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 flex items-center gap-1.5 ${
                   isSelected
                     ? 'bg-emerald-900 text-amber-300 shadow-xs ring-2 ring-amber-400/50'
-                    : 'bg-emerald-50 text-emerald-900 hover:bg-emerald-100 border border-emerald-200'
+                    : isRombel
+                      ? 'bg-blue-50 text-blue-900 hover:bg-blue-100 border border-blue-200'
+                      : 'bg-emerald-50 text-emerald-900 hover:bg-emerald-100 border border-emerald-200'
                 }`}
               >
                 <span>{cls}</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
-                  isSelected ? 'bg-amber-400 text-slate-950' : 'bg-emerald-200/80 text-emerald-950'
+                  isSelected ? 'bg-amber-400 text-slate-950' : 'bg-slate-200/80 text-slate-800'
                 }`}>
                   {count}
                 </span>
@@ -562,13 +570,13 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                     }}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold text-slate-900"
                   >
-                    <optgroup label="Kelas Utama (SD)">
-                      {PRIMARY_SCHOOL_CLASSES.map(cls => (
+                    <optgroup label="Rombongan Belajar (Rombel Utama)">
+                      {PRIMARY_SCHOOL_PARALLEL_CLASSES.map(cls => (
                         <option key={cls} value={cls}>{cls}</option>
                       ))}
                     </optgroup>
-                    <optgroup label="Kelas Paralel">
-                      {PRIMARY_SCHOOL_PARALLEL_CLASSES.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c)).map(cls => (
+                    <optgroup label="Tingkat Kelas (Gabungan)">
+                      {PRIMARY_SCHOOL_CLASSES.map(cls => (
                         <option key={cls} value={cls}>{cls}</option>
                       ))}
                     </optgroup>
@@ -580,20 +588,20 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
               {/* Quick Class Selector Buttons for Add/Edit */}
               {!customClassMode && (
                 <div>
-                  <span className="text-[11px] text-slate-500 font-medium block mb-1">Pilih Cepat Kelas:</span>
-                  <div className="grid grid-cols-6 gap-1.5">
-                    {PRIMARY_SCHOOL_CLASSES.map(cls => (
+                  <span className="text-[11px] text-slate-500 font-medium block mb-1">Pilih Cepat Rombel:</span>
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-1">
+                    {PRIMARY_SCHOOL_PARALLEL_CLASSES.map(cls => (
                       <button
                         key={cls}
                         type="button"
                         onClick={() => setFormData({ ...formData, class: cls })}
-                        className={`py-1.5 text-center rounded-lg text-xs font-bold transition cursor-pointer ${
+                        className={`py-1 text-center rounded-lg text-[11px] font-bold transition cursor-pointer ${
                           formData.class === cls
-                            ? 'bg-emerald-900 text-amber-300 shadow-xs border border-emerald-950'
+                            ? 'bg-emerald-900 text-amber-300 shadow-xs border border-emerald-950 ring-1 ring-amber-400'
                             : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
                         }`}
                       >
-                        {cls.replace('Kelas ', 'Kls ')}
+                        {cls.replace('Kelas ', '')}
                       </button>
                     ))}
                   </div>

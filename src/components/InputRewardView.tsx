@@ -13,7 +13,7 @@ import {
   GraduationCap
 } from 'lucide-react';
 import { openWhatsApp, generateRewardWAMessage } from '../utils/whatsapp';
-import { PRIMARY_SCHOOL_CLASSES, getAvailableClasses, matchClassFilter } from '../data/classOptions';
+import { PRIMARY_SCHOOL_CLASSES, PRIMARY_SCHOOL_PARALLEL_CLASSES, getAvailableClasses, matchClassFilter } from '../data/classOptions';
 
 interface InputRewardViewProps {
   students: Student[];
@@ -202,14 +202,19 @@ export const InputRewardView: React.FC<InputRewardViewProps> = ({
                 className="px-2 py-1 bg-slate-100 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-none"
               >
                 <option value="ALL">Semua Kelas</option>
-                <optgroup label="Kelas SD (Utama)">
+                <optgroup label="Tingkat Kelas (Gabungan)">
                   {PRIMARY_SCHOOL_CLASSES.map(cls => (
+                    <option key={cls} value={cls}>{cls} (Semua Rombel)</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Rombongan Belajar (Rombel Spesifik)">
+                  {PRIMARY_SCHOOL_PARALLEL_CLASSES.map(cls => (
                     <option key={cls} value={cls}>{cls}</option>
                   ))}
                 </optgroup>
-                {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c)).length > 0 && (
+                {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c) && !PRIMARY_SCHOOL_PARALLEL_CLASSES.includes(c)).length > 0 && (
                   <optgroup label="Kelas Lain">
-                    {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c)).map(cls => (
+                    {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c) && !PRIMARY_SCHOOL_PARALLEL_CLASSES.includes(c)).map(cls => (
                       <option key={cls} value={cls}>{cls}</option>
                     ))}
                   </optgroup>
@@ -231,7 +236,7 @@ export const InputRewardView: React.FC<InputRewardViewProps> = ({
             >
               Semua ({students.length})
             </button>
-            {PRIMARY_SCHOOL_CLASSES.map(cls => {
+            {availableClasses.map(cls => {
               const count = students.filter(s => matchClassFilter(s.class, cls)).length;
               return (
                 <button
@@ -242,7 +247,7 @@ export const InputRewardView: React.FC<InputRewardViewProps> = ({
                     const firstMatch = students.find(s => matchClassFilter(s.class, cls));
                     if (firstMatch) setSelectedStudentId(firstMatch.id);
                   }}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold cursor-pointer transition flex items-center gap-1 ${
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold cursor-pointer transition flex items-center gap-1 shrink-0 ${
                     selectedClass === cls
                       ? 'bg-amber-500 text-emerald-950 ring-1 ring-amber-600 font-black'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'

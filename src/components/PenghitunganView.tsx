@@ -26,7 +26,7 @@ import {
 import { exportPenghitunganToExcel } from '../utils/excel';
 import { openWhatsApp, generateThresholdWAMessage } from '../utils/whatsapp';
 import { SertifikatTeladanModal } from './SertifikatTeladanModal';
-import { PRIMARY_SCHOOL_CLASSES, getAvailableClasses, matchClassFilter } from '../data/classOptions';
+import { PRIMARY_SCHOOL_CLASSES, PRIMARY_SCHOOL_PARALLEL_CLASSES, getAvailableClasses, matchClassFilter } from '../data/classOptions';
 
 interface PenghitunganViewProps {
   summaries: StudentScoreSummary[];
@@ -260,14 +260,19 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
               className="px-2.5 py-1 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold focus:outline-none"
             >
               <option value="ALL">Semua Kelas</option>
-              <optgroup label="Kelas SD (Utama)">
+              <optgroup label="Tingkat Kelas (Gabungan)">
                 {PRIMARY_SCHOOL_CLASSES.map(cls => (
+                  <option key={cls} value={cls}>{cls} (Semua Rombel)</option>
+                ))}
+              </optgroup>
+              <optgroup label="Rombongan Belajar (Rombel Spesifik)">
+                {PRIMARY_SCHOOL_PARALLEL_CLASSES.map(cls => (
                   <option key={cls} value={cls}>{cls}</option>
                 ))}
               </optgroup>
-              {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c)).length > 0 && (
+              {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c) && !PRIMARY_SCHOOL_PARALLEL_CLASSES.includes(c)).length > 0 && (
                 <optgroup label="Kelas Lain">
-                  {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c)).map(cls => (
+                  {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c) && !PRIMARY_SCHOOL_PARALLEL_CLASSES.includes(c)).map(cls => (
                     <option key={cls} value={cls}>{cls}</option>
                   ))}
                 </optgroup>
@@ -290,7 +295,7 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
         >
           Semua Kelas ({summaries.length})
         </button>
-        {PRIMARY_SCHOOL_CLASSES.map(cls => {
+        {availableClasses.map(cls => {
           const count = summaries.filter(s => matchClassFilter(s.student.class, cls)).length;
           return (
             <button

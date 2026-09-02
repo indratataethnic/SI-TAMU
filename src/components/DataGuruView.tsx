@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Teacher, PiketSchedule, ViolationRecord, RewardRecord, DayOfWeek } from '../types';
 import { initialPiketSchedules } from '../data/initialData';
-import { PRIMARY_SCHOOL_CLASSES } from '../data/classOptions';
+import { PRIMARY_SCHOOL_CLASSES, PRIMARY_SCHOOL_PARALLEL_CLASSES } from '../data/classOptions';
 import {
   GraduationCap,
   Plus,
@@ -1113,9 +1113,12 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
                     {PRIMARY_SCHOOL_CLASSES.map(cls => (
                       <option key={cls} value={cls} />
                     ))}
+                    {PRIMARY_SCHOOL_PARALLEL_CLASSES.map(cls => (
+                      <option key={cls} value={cls} />
+                    ))}
                   </datalist>
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {PRIMARY_SCHOOL_CLASSES.map(cls => (
+                  <div className="flex flex-wrap gap-1 mt-1.5 max-h-24 overflow-y-auto p-1 bg-slate-50 border border-slate-200 rounded-lg">
+                    {PRIMARY_SCHOOL_PARALLEL_CLASSES.map(cls => (
                       <button
                         key={cls}
                         type="button"
@@ -1123,7 +1126,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
                         className={`text-[10px] px-1.5 py-0.5 rounded border transition cursor-pointer ${
                           formData.classAssigned === cls
                             ? 'bg-emerald-950 text-white border-emerald-950 font-bold'
-                            : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-emerald-50'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-emerald-50'
                         }`}
                       >
                         {cls}

@@ -210,12 +210,12 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
                 >
                   Semua
                 </button>
-                {PRIMARY_SCHOOL_CLASSES.map(cls => (
+                {availableClasses.map(cls => (
                   <button
                     key={cls}
                     type="button"
                     onClick={() => setFilterClass(cls)}
-                    className={`px-2 py-1 rounded-md text-[11px] font-bold cursor-pointer transition ${
+                    className={`px-2 py-1 rounded-md text-[11px] font-bold cursor-pointer transition shrink-0 ${
                       filterClass === cls
                         ? 'bg-emerald-900 text-amber-300 ring-1 ring-amber-400'
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
