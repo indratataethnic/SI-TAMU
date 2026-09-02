@@ -304,31 +304,17 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
               onChange={(e) => setSelectedClass(e.target.value)}
               className="px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer"
             >
-              <option value="ALL">Semua Kelas (Semua Siswa)</option>
-              <optgroup label="Tingkat Kelas (Gabungan)">
-                {PRIMARY_SCHOOL_CLASSES.map(cls => (
-                  <option key={cls} value={cls}>{cls} (Semua Rombel)</option>
-                ))}
-              </optgroup>
-              <optgroup label="Rombongan Belajar (Rombel Spesifik)">
-                {PRIMARY_SCHOOL_PARALLEL_CLASSES.map(cls => (
-                  <option key={cls} value={cls}>{cls}</option>
-                ))}
-              </optgroup>
-              {classesList.filter(c => c !== 'ALL' && !PRIMARY_SCHOOL_CLASSES.includes(c) && !PRIMARY_SCHOOL_PARALLEL_CLASSES.includes(c)).length > 0 && (
-                <optgroup label="Kelas Lainnya">
-                  {classesList.filter(c => c !== 'ALL' && !PRIMARY_SCHOOL_CLASSES.includes(c) && !PRIMARY_SCHOOL_PARALLEL_CLASSES.includes(c)).map(cls => (
-                    <option key={cls} value={cls}>{cls}</option>
-                  ))}
-                </optgroup>
-              )}
+              <option value="ALL">Semua Kelas ({students.length} Siswa)</option>
+              {classesList.filter(c => c !== 'ALL').map(cls => (
+                <option key={cls} value={cls}>{cls}</option>
+              ))}
             </select>
           </div>
         </div>
 
-        {/* Quick Class Badges (Akses Cepat Tingkat & Rombel) */}
+        {/* Quick Class Badges (Akses Cepat Sesuai Database) */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 border-t border-slate-100">
-          <span className="text-[11px] text-slate-400 font-medium shrink-0 mr-1">Akses Cepat Rombel:</span>
+          <span className="text-[11px] text-slate-400 font-medium shrink-0 mr-1">Akses Cepat:</span>
           <button
             onClick={() => setSelectedClass('ALL')}
             className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
@@ -342,7 +328,6 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
           {classesList.filter(c => c !== 'ALL').map((cls) => {
             const count = students.filter(s => matchClassFilter(s.class, cls)).length;
             const isSelected = selectedClass === cls;
-            const isRombel = cls.includes(' ');
             return (
               <button
                 key={cls}
@@ -350,9 +335,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                 className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 flex items-center gap-1.5 ${
                   isSelected
                     ? 'bg-emerald-900 text-amber-300 shadow-xs ring-2 ring-amber-400/50'
-                    : isRombel
-                      ? 'bg-blue-50 text-blue-900 hover:bg-blue-100 border border-blue-200'
-                      : 'bg-emerald-50 text-emerald-900 hover:bg-emerald-100 border border-emerald-200'
+                    : 'bg-emerald-50 text-emerald-900 hover:bg-emerald-100 border border-emerald-200'
                 }`}
               >
                 <span>{cls}</span>
@@ -388,8 +371,20 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
             <tbody className="divide-y divide-slate-100">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-center py-10 text-slate-400">
-                    Tidak ditemukan data siswa yang sesuai pencarian atau filter kelas.
+                  <td colSpan={10} className="text-center py-12 text-slate-400">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                        <Users className="w-6 h-6" />
+                      </div>
+                      <p className="font-bold text-sm text-slate-700">
+                        {students.length === 0 ? 'Database Siswa Saat Ini Kosong (0 Siswa)' : 'Tidak ditemukan data siswa yang sesuai'}
+                      </p>
+                      <p className="text-xs text-slate-500 max-w-md">
+                        {students.length === 0 
+                          ? 'Spreadsheet / database Anda saat ini tidak memiliki data siswa. Tambahkan siswa baru atau isi data di Google Spreadsheet / Excel.'
+                          : 'Coba ubah kata kunci pencarian atau reset filter kelas.'}
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -570,16 +565,9 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                     }}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold text-slate-900"
                   >
-                    <optgroup label="Rombongan Belajar (Rombel Utama)">
-                      {PRIMARY_SCHOOL_PARALLEL_CLASSES.map(cls => (
-                        <option key={cls} value={cls}>{cls}</option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Tingkat Kelas (Gabungan)">
-                      {PRIMARY_SCHOOL_CLASSES.map(cls => (
-                        <option key={cls} value={cls}>{cls}</option>
-                      ))}
-                    </optgroup>
+                    {getAvailableClasses(students).map(cls => (
+                      <option key={cls} value={cls}>{cls}</option>
+                    ))}
                     <option value="CUSTOM">+ Tulis Format Kelas Lain...</option>
                   </select>
                 )}
@@ -588,20 +576,20 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
               {/* Quick Class Selector Buttons for Add/Edit */}
               {!customClassMode && (
                 <div>
-                  <span className="text-[11px] text-slate-500 font-medium block mb-1">Pilih Cepat Rombel:</span>
-                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-1">
-                    {PRIMARY_SCHOOL_PARALLEL_CLASSES.map(cls => (
+                  <span className="text-[11px] text-slate-500 font-medium block mb-1">Pilih Cepat Kelas / Rombel:</span>
+                  <div className="flex flex-wrap gap-1">
+                    {getAvailableClasses(students).map(cls => (
                       <button
                         key={cls}
                         type="button"
                         onClick={() => setFormData({ ...formData, class: cls })}
-                        className={`py-1 text-center rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                        className={`px-2 py-1 text-center rounded-lg text-xs font-bold transition cursor-pointer ${
                           formData.class === cls
                             ? 'bg-emerald-900 text-amber-300 shadow-xs border border-emerald-950 ring-1 ring-amber-400'
                             : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
                         }`}
                       >
-                        {cls.replace('Kelas ', '')}
+                        {cls}
                       </button>
                     ))}
                   </div>

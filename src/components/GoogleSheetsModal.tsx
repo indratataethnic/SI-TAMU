@@ -140,9 +140,11 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
     setImporting(false);
 
     if (res.success && res.data) {
+      const studentCount = res.data.students?.length || 0;
+      const teacherCount = res.data.teachers?.length || 0;
       setSyncStatus({
         success: true,
-        message: 'Pengaturan identitas sekolah, API keys, dan seluruh data siswa/catatan berhasil diunduh dari Google Spreadsheet ke perangkat ini!'
+        message: `Sinkronisasi berhasil! Data terbaru dari Google Spreadsheet telah diterapkan (${studentCount} Siswa, ${teacherCount} Guru / GTK).`
       });
 
       if (typeof onImportFullData === 'function') {

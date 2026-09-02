@@ -259,24 +259,10 @@ export const PenghitunganView: React.FC<PenghitunganViewProps> = ({
               onChange={(e) => setSelectedClass(e.target.value)}
               className="px-2.5 py-1 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold focus:outline-none"
             >
-              <option value="ALL">Semua Kelas</option>
-              <optgroup label="Tingkat Kelas (Gabungan)">
-                {PRIMARY_SCHOOL_CLASSES.map(cls => (
-                  <option key={cls} value={cls}>{cls} (Semua Rombel)</option>
-                ))}
-              </optgroup>
-              <optgroup label="Rombongan Belajar (Rombel Spesifik)">
-                {PRIMARY_SCHOOL_PARALLEL_CLASSES.map(cls => (
-                  <option key={cls} value={cls}>{cls}</option>
-                ))}
-              </optgroup>
-              {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c) && !PRIMARY_SCHOOL_PARALLEL_CLASSES.includes(c)).length > 0 && (
-                <optgroup label="Kelas Lain">
-                  {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c) && !PRIMARY_SCHOOL_PARALLEL_CLASSES.includes(c)).map(cls => (
-                    <option key={cls} value={cls}>{cls}</option>
-                  ))}
-                </optgroup>
-              )}
+              <option value="ALL">Semua Kelas ({summaries.length} Siswa)</option>
+              {availableClasses.map(cls => (
+                <option key={cls} value={cls}>{cls}</option>
+              ))}
             </select>
           </div>
         </div>

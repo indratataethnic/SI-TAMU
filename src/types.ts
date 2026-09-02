@@ -22,7 +22,7 @@ export interface Teacher {
   id: string;
   nip: string;
   name: string;
-  role: 'guru_mapel' | 'wali_kelas' | 'guru_bk' | 'guru_piket' | 'pembina_osis' | 'kepala_sekolah';
+  role: 'guru_mapel' | 'wali_kelas' | 'guru_bk' | 'guru_piket' | 'pembina_osis' | 'tenaga_kependidikan' | 'kepala_sekolah';
   subject?: string;
   classAssigned?: string;
   phone?: string;

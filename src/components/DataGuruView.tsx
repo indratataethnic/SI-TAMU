@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Teacher, PiketSchedule, ViolationRecord, RewardRecord, DayOfWeek } from '../types';
+import { Teacher, PiketSchedule, ViolationRecord, RewardRecord, DayOfWeek, Student } from '../types';
 import { initialPiketSchedules } from '../data/initialData';
-import { PRIMARY_SCHOOL_CLASSES, PRIMARY_SCHOOL_PARALLEL_CLASSES } from '../data/classOptions';
+import { getAvailableClasses } from '../data/classOptions';
 import {
   GraduationCap,
   Plus,
@@ -36,6 +36,7 @@ const DAYS_LIST: DayOfWeek[] = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sa
 
 interface DataGuruViewProps {
   teachers: Teacher[];
+  students?: Student[];
   piketSchedules?: PiketSchedule[];
   violations: ViolationRecord[];
   rewards: RewardRecord[];
@@ -51,6 +52,7 @@ interface DataGuruViewProps {
 
 export const DataGuruView: React.FC<DataGuruViewProps> = ({
   teachers,
+  students = [],
   piketSchedules = initialPiketSchedules,
   violations,
   rewards,
@@ -106,6 +108,10 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
   const waliKelasCount = teachers.filter(t => t.role === 'wali_kelas' || !!t.classAssigned).length;
   const guruBkCount = teachers.filter(t => t.role === 'guru_bk').length;
   const guruPiketCount = teachers.filter(t => t.role === 'guru_piket').length;
+  const tendikCount = teachers.filter(t => t.role === 'tenaga_kependidikan').length;
+
+  // Available classes dynamically sourced from student database
+  const availableClasses = useMemo(() => getAvailableClasses(students), [students]);
 
   // Piket Workload Stats
   const teacherPiketCountMap = useMemo(() => {
@@ -315,18 +321,26 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
       {
         'NIP': '198501152010011005',
         'Nama Lengkap Guru / GTK': 'Drs. H. Ahmad Fauzi, M.Pd.',
-        'Jabatan (guru_mapel / wali_kelas / guru_bk / guru_piket / pembina_osis)': 'wali_kelas',
-        'Wali Kelas (Opsional, cth: VII-A)': 'VII-A',
+        'Jabatan (guru_mapel / wali_kelas / guru_bk / guru_piket / pembina_osis / tenaga_kependidikan / kepala_sekolah)': 'wali_kelas',
+        'Wali Kelas (Opsional, cth: Kelas 1 A)': 'Kelas 1 A',
         'Mata Pelajaran (Opsional)': 'Matematika',
         'No. WhatsApp (Opsional)': '081234567890'
       },
       {
         'NIP': '199003202014022003',
         'Nama Lengkap Guru / GTK': 'Nurul Hidayah, S.Pd.',
-        'Jabatan (guru_mapel / wali_kelas / guru_bk / guru_piket / pembina_osis)': 'guru_bk',
-        'Wali Kelas (Opsional, cth: VII-A)': '',
+        'Jabatan (guru_mapel / wali_kelas / guru_bk / guru_piket / pembina_osis / tenaga_kependidikan / kepala_sekolah)': 'guru_bk',
+        'Wali Kelas (Opsional, cth: Kelas 1 A)': '',
         'Mata Pelajaran (Opsional)': 'Bimbingan Konseling',
         'No. WhatsApp (Opsional)': '085298765432'
+      },
+      {
+        'NIP': '199205122019031008',
+        'Nama Lengkap Guru / GTK': 'Bambang Irawan, S.AP.',
+        'Jabatan (guru_mapel / wali_kelas / guru_bk / guru_piket / pembina_osis / tenaga_kependidikan / kepala_sekolah)': 'tenaga_kependidikan',
+        'Wali Kelas (Opsional, cth: Kelas 1 A)': '',
+        'Mata Pelajaran (Opsional)': 'Tata Usaha / Administrasi',
+        'No. WhatsApp (Opsional)': '081399887766'
       }
     ];
 
@@ -358,17 +372,25 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
         const imported: Teacher[] = rawData.map((row, index) => {
           const nip = String(row['NIP'] || row['nip'] || `GUR-${Date.now()}-${index}`).trim();
           const name = String(row['Nama Lengkap Guru / GTK'] || row['Nama'] || row['name'] || '').trim();
-          let role = String(row['Jabatan (guru_mapel / wali_kelas / guru_bk / guru_piket / pembina_osis)'] || row['Jabatan'] || row['role'] || 'guru_mapel').toLowerCase().trim();
+          let role = String(
+            row['Jabatan (guru_mapel / wali_kelas / guru_bk / guru_piket / pembina_osis / tenaga_kependidikan / kepala_sekolah)'] ||
+            row['Jabatan (guru_mapel / wali_kelas / guru_bk / guru_piket / pembina_osis)'] ||
+            row['Jabatan'] ||
+            row['role'] ||
+            'guru_mapel'
+          ).toLowerCase().trim();
 
-          if (!['wali_kelas', 'guru_bk', 'guru_piket', 'pembina_osis', 'guru_mapel', 'kepala_sekolah'].includes(role)) {
+          if (!['wali_kelas', 'guru_bk', 'guru_piket', 'pembina_osis', 'guru_mapel', 'tenaga_kependidikan', 'kepala_sekolah'].includes(role)) {
             if (role.includes('wali')) role = 'wali_kelas';
             else if (role.includes('bk') || role.includes('konseling')) role = 'guru_bk';
             else if (role.includes('piket')) role = 'guru_piket';
             else if (role.includes('osis')) role = 'pembina_osis';
+            else if (role.includes('kepala') || role.includes('ks') || role.includes('kepsek')) role = 'kepala_sekolah';
+            else if (role.includes('tendik') || role.includes('kependidikan') || role.includes('tu') || role.includes('staff') || role.includes('staf') || role.includes('administrasi') || role.includes('tata usaha') || role.includes('perpustakaan') || role.includes('laboran')) role = 'tenaga_kependidikan';
             else role = 'guru_mapel';
           }
 
-          const classAssigned = String(row['Wali Kelas (Opsional, cth: VII-A)'] || row['Wali Kelas'] || row['classAssigned'] || '').trim();
+          const classAssigned = String(row['Wali Kelas (Opsional, cth: Kelas 1 A)'] || row['Wali Kelas (Opsional, cth: VII-A)'] || row['Wali Kelas'] || row['classAssigned'] || '').trim();
           const subject = String(row['Mata Pelajaran (Opsional)'] || row['Mata Pelajaran'] || row['subject'] || '').trim();
           const phone = String(row['No. WhatsApp (Opsional)'] || row['No. WhatsApp / HP'] || row['phone'] || '').trim();
 
@@ -400,6 +422,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
       case 'guru_bk': return 'Guru BK / Konselor';
       case 'guru_piket': return 'Guru Piket';
       case 'pembina_osis': return 'Pembina OSIS / Kesiswaan';
+      case 'tenaga_kependidikan': return 'Tenaga Kependidikan';
       case 'kepala_sekolah': return 'Kepala Sekolah';
       default: return 'Guru Mata Pelajaran';
     }
@@ -411,6 +434,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
       case 'guru_bk': return 'bg-purple-100 text-purple-800 border-purple-300';
       case 'guru_piket': return 'bg-amber-100 text-amber-800 border-amber-300';
       case 'pembina_osis': return 'bg-sky-100 text-sky-800 border-sky-300';
+      case 'tenaga_kependidikan': return 'bg-indigo-100 text-indigo-800 border-indigo-300';
       case 'kepala_sekolah': return 'bg-rose-100 text-rose-800 border-rose-300';
       default: return 'bg-slate-100 text-slate-700 border-slate-300';
     }
@@ -590,6 +614,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
                 <option value="guru_bk">Guru BK / Konselor</option>
                 <option value="guru_piket">Guru Piket</option>
                 <option value="pembina_osis">Pembina OSIS</option>
+                <option value="tenaga_kependidikan">Tenaga Kependidikan</option>
                 <option value="guru_mapel">Guru Mata Pelajaran</option>
                 <option value="kepala_sekolah">Kepala Sekolah</option>
               </select>
@@ -1091,6 +1116,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
                     <option value="guru_bk">Guru BK / Konselor</option>
                     <option value="guru_piket">Guru Piket</option>
                     <option value="pembina_osis">Pembina OSIS / Kesiswaan</option>
+                    <option value="tenaga_kependidikan">Tenaga Kependidikan</option>
                     <option value="kepala_sekolah">Kepala Sekolah</option>
                   </select>
                 </div>
@@ -1099,31 +1125,28 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Wali Kelas (Jika Ada)
+                    Wali Kelas (Jika Ada - Sesuai Database Siswa)
                   </label>
                   <input
                     type="text"
                     list="classListGuru"
-                    placeholder="Pilih atau ketik: Kelas 1 - Kelas 6"
+                    placeholder="Pilih atau ketik kelas..."
                     value={formData.classAssigned}
                     onChange={(e) => setFormData({ ...formData, classAssigned: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                   />
                   <datalist id="classListGuru">
-                    {PRIMARY_SCHOOL_CLASSES.map(cls => (
-                      <option key={cls} value={cls} />
-                    ))}
-                    {PRIMARY_SCHOOL_PARALLEL_CLASSES.map(cls => (
+                    {availableClasses.map(cls => (
                       <option key={cls} value={cls} />
                     ))}
                   </datalist>
                   <div className="flex flex-wrap gap-1 mt-1.5 max-h-24 overflow-y-auto p-1 bg-slate-50 border border-slate-200 rounded-lg">
-                    {PRIMARY_SCHOOL_PARALLEL_CLASSES.map(cls => (
+                    {availableClasses.map(cls => (
                       <button
                         key={cls}
                         type="button"
                         onClick={() => setFormData({ ...formData, classAssigned: cls })}
-                        className={`text-[10px] px-1.5 py-0.5 rounded border transition cursor-pointer ${
+                        className={`text-[10px] px-2 py-1 rounded border transition cursor-pointer font-semibold ${
                           formData.classAssigned === cls
                             ? 'bg-emerald-950 text-white border-emerald-950 font-bold'
                             : 'bg-white text-slate-600 border-slate-200 hover:bg-emerald-50'

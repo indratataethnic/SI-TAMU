@@ -208,18 +208,53 @@ export default function App() {
       .catch(err => console.log('Error loading global configuration:', err));
   }, []);
 
-  // Automatic non-blocking background fetch from Google Sheets on startup (only if valid webhook exists)
+  // Automatic background fetch and real-time synchronization from Google Sheets
   useEffect(() => {
     const webhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '').trim();
     if (!webhook) return;
 
-    fetchFullStateFromSheets(webhook, 5000)
-      .then(res => {
-        if (res.success && res.data) {
+    let isSubscribed = true;
+
+    const performSyncFromSheets = async (showSpinner = false) => {
+      if (showSpinner) setIsReloading(true);
+      try {
+        const res = await fetchFullStateFromSheets(webhook, 6000);
+        if (isSubscribed && res.success && res.data) {
           handleImportFullData(res.data);
         }
-      })
-      .catch(err => console.log('Background sheets fetch notice:', err));
+      } catch (err) {
+        console.log('Background sheets sync notice:', err);
+      } finally {
+        if (isSubscribed && showSpinner) setIsReloading(false);
+      }
+    };
+
+    // 1. Initial fetch on load / webhook change
+    performSyncFromSheets();
+
+    // 2. Auto-fetch when user returns to this tab / window focuses (e.g. after editing spreadsheet)
+    const handleFocusOrVisible = () => {
+      if (document.visibilityState === 'visible') {
+        performSyncFromSheets();
+      }
+    };
+
+    window.addEventListener('focus', handleFocusOrVisible);
+    document.addEventListener('visibilitychange', handleFocusOrVisible);
+
+    // 3. Periodic interval (every 30 seconds)
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        performSyncFromSheets();
+      }
+    }, 30000);
+
+    return () => {
+      isSubscribed = false;
+      window.removeEventListener('focus', handleFocusOrVisible);
+      document.removeEventListener('visibilitychange', handleFocusOrVisible);
+      clearInterval(interval);
+    };
   }, [settings.googleSheetsWebhook, settings.googleSheetsWebhookUrl]);
 
   // Instant Manual Reload Handler
@@ -259,7 +294,7 @@ export default function App() {
       // 3. If Google Sheets configured, fetch with strict timeout
       const webhook = (locSettings.googleSheetsWebhook || locSettings.googleSheetsWebhookUrl || '').trim();
       if (webhook) {
-        const sheetsRes = await fetchFullStateFromSheets(webhook, 4000);
+        const sheetsRes = await fetchFullStateFromSheets(webhook, 6000);
         if (sheetsRes.success && sheetsRes.data) {
           handleImportFullData(sheetsRes.data);
         }
@@ -316,7 +351,7 @@ export default function App() {
     if (imported.settings) {
       setSettings(prev => {
         const fetched = (imported.settings || {}) as any;
-        return {
+        const updated = {
           ...prev,
           schoolName: fetched.schoolName ? String(fetched.schoolName) : prev.schoolName,
           schoolSubtitle: fetched.schoolSubtitle ? String(fetched.schoolSubtitle) : prev.schoolSubtitle,
@@ -334,42 +369,52 @@ export default function App() {
           waGatewayApiKey: fetched.waGatewayApiKey ? String(fetched.waGatewayApiKey) : prev.waGatewayApiKey,
           waGatewayDevice: fetched.waGatewayDevice ? String(fetched.waGatewayDevice) : prev.waGatewayDevice
         };
+        saveSettings(updated);
+        return updated;
       });
     }
 
-    if (imported.students && imported.students.length > 0) {
-      setStudents(sanitizeStudents(imported.students));
+    if (Array.isArray(imported.students)) {
+      const sanitized = sanitizeStudents(imported.students);
+      setStudents(sanitized);
+      saveStudents(sanitized);
     }
-    if (imported.teachers && imported.teachers.length > 0) {
-      setTeachers(sanitizeTeachers(imported.teachers));
+    if (Array.isArray(imported.teachers)) {
+      const sanitized = sanitizeTeachers(imported.teachers);
+      setTeachers(sanitized);
+      saveTeachers(sanitized);
     }
-    if (imported.piketSchedules && imported.piketSchedules.length > 0) {
+    if (Array.isArray(imported.piketSchedules)) {
       setPiketSchedules(imported.piketSchedules);
+      savePiketSchedules(imported.piketSchedules);
     }
 
-    const mergedStudents = (imported.students && imported.students.length > 0) ? sanitizeStudents(imported.students) : students;
+    const mergedStudents = Array.isArray(imported.students) ? sanitizeStudents(imported.students) : students;
     const sMap = new Map(mergedStudents.map(s => [s.nisn, s.id]));
 
-    if (imported.violations && imported.violations.length > 0) {
-      const mappedViolations = sanitizeRecords(imported.violations.map(v => ({
+    if (Array.isArray(imported.violations)) {
+      const mappedViolations = sanitizeRecords<ViolationRecord>(imported.violations.map(v => ({
         ...v,
-        studentId: v.studentId || sMap.get((v as any).studentNisn || '') || ''
+        studentId: String(v.studentId || sMap.get((v as any).studentNisn || '') || '')
       })), 'VIOL');
       setViolations(mappedViolations);
+      saveViolations(mappedViolations);
     }
-    if (imported.rewards && imported.rewards.length > 0) {
-      const mappedRewards = sanitizeRecords(imported.rewards.map(r => ({
+    if (Array.isArray(imported.rewards)) {
+      const mappedRewards = sanitizeRecords<RewardRecord>(imported.rewards.map(r => ({
         ...r,
-        studentId: r.studentId || sMap.get((r as any).studentNisn || '') || ''
+        studentId: String(r.studentId || sMap.get((r as any).studentNisn || '') || '')
       })), 'REW');
       setRewards(mappedRewards);
+      saveRewards(mappedRewards);
     }
-    if (imported.compensations && imported.compensations.length > 0) {
-      const mappedCompensations = sanitizeRecords(imported.compensations.map(c => ({
+    if (Array.isArray(imported.compensations)) {
+      const mappedCompensations = sanitizeRecords<CompensationRecord>(imported.compensations.map(c => ({
         ...c,
-        studentId: c.studentId || sMap.get((c as any).studentNisn || '') || ''
+        studentId: String(c.studentId || sMap.get((c as any).studentNisn || '') || '')
       })), 'COMP');
       setCompensations(mappedCompensations);
+      saveCompensations(mappedCompensations);
     }
   };
 
@@ -666,6 +711,7 @@ export default function App() {
           {currentTab === 'data_guru' && (
             <DataGuruView
               teachers={teachers}
+              students={students}
               piketSchedules={piketSchedules}
               violations={violations}
               rewards={rewards}

@@ -45,16 +45,17 @@ export const sortClassNames = (a: string, b: string): number => {
 };
 
 /**
- * Gets unique sorted class options combining preset classes (Kelas 1 - Kelas 6), standard rombels (1A, 1B...), and existing student data
+ * Gets unique sorted class options matching the actual student database / spreadsheet.
+ * If students exist, returns ONLY the distinct classes present in the database.
+ * If no student data exists yet, returns the default PRIMARY_SCHOOL_CLASSES.
  */
 export const getAvailableClasses = (students: Student[] = []): string[] => {
-  const existingClasses = students.map(s => s.class).filter(Boolean);
-  const set = new Set<string>([
-    ...PRIMARY_SCHOOL_CLASSES,
-    ...PRIMARY_SCHOOL_PARALLEL_CLASSES,
-    ...existingClasses
-  ]);
-  return Array.from(set).sort(sortClassNames);
+  const existingClasses = students.map(s => s.class?.trim()).filter(Boolean);
+  if (existingClasses.length > 0) {
+    const set = new Set<string>(existingClasses);
+    return Array.from(set).sort(sortClassNames);
+  }
+  return [...PRIMARY_SCHOOL_CLASSES];
 };
 
 /**

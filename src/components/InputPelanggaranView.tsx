@@ -204,24 +204,10 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
                 }}
                 className="px-2 py-1 bg-slate-100 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-none"
               >
-                <option value="ALL">Semua Kelas</option>
-                <optgroup label="Tingkat Kelas (Gabungan)">
-                  {PRIMARY_SCHOOL_CLASSES.map(cls => (
-                    <option key={cls} value={cls}>{cls} (Semua Rombel)</option>
-                  ))}
-                </optgroup>
-                <optgroup label="Rombongan Belajar (Rombel Spesifik)">
-                  {PRIMARY_SCHOOL_PARALLEL_CLASSES.map(cls => (
-                    <option key={cls} value={cls}>{cls}</option>
-                  ))}
-                </optgroup>
-                {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c) && !PRIMARY_SCHOOL_PARALLEL_CLASSES.includes(c)).length > 0 && (
-                  <optgroup label="Kelas Lain">
-                    {availableClasses.filter(c => !PRIMARY_SCHOOL_CLASSES.includes(c) && !PRIMARY_SCHOOL_PARALLEL_CLASSES.includes(c)).map(cls => (
-                      <option key={cls} value={cls}>{cls}</option>
-                    ))}
-                  </optgroup>
-                )}
+                <option value="ALL">Semua Kelas ({students.length} Siswa)</option>
+                {availableClasses.map(cls => (
+                  <option key={cls} value={cls}>{cls}</option>
+                ))}
               </select>
             </div>
           </div>
