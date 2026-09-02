@@ -33,11 +33,41 @@ export const sanitizeStudents = (students: Student[]): Student[] => {
   const seenIds = new Set<string>();
   return (students || []).map((s, idx) => {
     let cleanId = s.id ? String(s.id).trim() : '';
+    const rawNisn = String(s.nisn || '').replace(/^'/, '').trim();
+    const rawName = String(s.name || '').trim();
+    const rawNik = s.nik ? String(s.nik).replace(/^'/, '').trim() : '';
+    const rawClass = String(s.class || 'Kelas 1').trim();
+    
+    // Normalize gender
+    const gUpper = String(s.gender || 'L').trim().toUpperCase();
+    const cleanGender: 'L' | 'P' = gUpper.startsWith('P') || gUpper.includes('PEREMPUAN') || gUpper.includes('WANITA') ? 'P' : 'L';
+
     if (!cleanId || seenIds.has(cleanId) || /^(\+?62|08)\d+$/.test(cleanId)) {
-      cleanId = `STU-${s.nisn || 'NO_NISN'}-${idx}-${Math.random().toString(36).substring(2, 6)}`;
+      cleanId = `STU-${rawNisn || 'NO_NISN'}-${idx}-${Math.random().toString(36).substring(2, 6)}`;
     }
     seenIds.add(cleanId);
-    return { ...s, id: cleanId };
+
+    let cleanAccess = s.accessCode ? String(s.accessCode).replace(/^'/, '').trim().toUpperCase() : '';
+    if (!cleanAccess && rawName) {
+      const firstName = rawName.split(' ')[0] || 'SISWA';
+      const cleanCls = rawClass.replace(/[^a-zA-Z0-9]/g, '');
+      cleanAccess = (firstName + cleanCls).toUpperCase();
+    }
+
+    return {
+      ...s,
+      id: cleanId,
+      nik: rawNik && rawNik !== '-' ? rawNik : undefined,
+      nisn: rawNisn || `00${idx + 10000000}`,
+      name: rawName || `Siswa ${idx + 1}`,
+      class: rawClass || 'Kelas 1',
+      gender: cleanGender,
+      parentName: String(s.parentName || '').trim(),
+      parentPhone: String(s.parentPhone || '').replace(/^'/, '').replace(/[^0-9+]/g, '').trim(),
+      parentAddress: String(s.parentAddress || '').trim(),
+      accessCode: cleanAccess || `SISWA${idx + 1}`,
+      createdAt: s.createdAt || new Date().toISOString()
+    };
   });
 };
 

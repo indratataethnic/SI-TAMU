@@ -128,6 +128,7 @@ export default function App() {
   const isInitialLoadingRef = useRef(true);
   const [isReloading, setIsReloading] = useState(false);
   const serverSaveTimeoutRef = useRef<any>(null);
+  const lastLocalActionRef = useRef<number>(0);
 
   // Auto-save listeners
   useEffect(() => { saveStudents(students); }, [students]);
@@ -208,54 +209,11 @@ export default function App() {
       .catch(err => console.log('Error loading global configuration:', err));
   }, []);
 
-  // Automatic background fetch and real-time synchronization from Google Sheets
+  // Google Sheets integration is manual-trigger only to prevent unsolicited background overwrites
+  // User can click "Muat Ulang Data" or trigger sync from the Google Sheets modal whenever needed.
   useEffect(() => {
-    const webhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '').trim();
-    if (!webhook) return;
-
-    let isSubscribed = true;
-
-    const performSyncFromSheets = async (showSpinner = false) => {
-      if (showSpinner) setIsReloading(true);
-      try {
-        const res = await fetchFullStateFromSheets(webhook, 6000);
-        if (isSubscribed && res.success && res.data) {
-          handleImportFullData(res.data);
-        }
-      } catch (err) {
-        console.log('Background sheets sync notice:', err);
-      } finally {
-        if (isSubscribed && showSpinner) setIsReloading(false);
-      }
-    };
-
-    // 1. Initial fetch on load / webhook change
-    performSyncFromSheets();
-
-    // 2. Auto-fetch when user returns to this tab / window focuses (e.g. after editing spreadsheet)
-    const handleFocusOrVisible = () => {
-      if (document.visibilityState === 'visible') {
-        performSyncFromSheets();
-      }
-    };
-
-    window.addEventListener('focus', handleFocusOrVisible);
-    document.addEventListener('visibilitychange', handleFocusOrVisible);
-
-    // 3. Periodic interval (every 30 seconds)
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        performSyncFromSheets();
-      }
-    }, 30000);
-
-    return () => {
-      isSubscribed = false;
-      window.removeEventListener('focus', handleFocusOrVisible);
-      document.removeEventListener('visibilitychange', handleFocusOrVisible);
-      clearInterval(interval);
-    };
-  }, [settings.googleSheetsWebhook, settings.googleSheetsWebhookUrl]);
+    // No automatic periodic polling to protect local user data from unverified cloud overwrites
+  }, []);
 
   // Instant Manual Reload Handler
   const handleReloadData = async () => {
@@ -420,18 +378,24 @@ export default function App() {
 
   // Handlers for Students
   const handleAddStudent = (student: Student) => {
-    const updated = [student, ...students];
-    setStudents(updated);
-    triggerSheetsSync({ students: updated });
+    lastLocalActionRef.current = Date.now();
+    const sanitized = sanitizeStudents([student, ...students]);
+    setStudents(sanitized);
+    saveStudents(sanitized);
+    triggerSheetsSync({ students: sanitized });
   };
 
   const handleUpdateStudent = (student: Student) => {
+    lastLocalActionRef.current = Date.now();
     const updated = students.map(s => s.id === student.id ? student : s);
-    setStudents(updated);
-    triggerSheetsSync({ students: updated });
+    const sanitized = sanitizeStudents(updated);
+    setStudents(sanitized);
+    saveStudents(sanitized);
+    triggerSheetsSync({ students: sanitized });
   };
 
   const handleDeleteStudent = (id: string) => {
+    lastLocalActionRef.current = Date.now();
     const updatedStudents = students.filter(s => s.id !== id);
     const updatedViolations = violations.filter(v => v.studentId !== id);
     const updatedRewards = rewards.filter(r => r.studentId !== id);
@@ -442,6 +406,11 @@ export default function App() {
     setRewards(updatedRewards);
     setCompensations(updatedCompensations);
 
+    saveStudents(updatedStudents);
+    saveViolations(updatedViolations);
+    saveRewards(updatedRewards);
+    saveCompensations(updatedCompensations);
+
     triggerSheetsSync({
       students: updatedStudents,
       violations: updatedViolations,
@@ -451,10 +420,16 @@ export default function App() {
   };
 
   const handleDeleteAllStudents = () => {
+    lastLocalActionRef.current = Date.now();
     setStudents([]);
     setViolations([]);
     setRewards([]);
     setCompensations([]);
+
+    saveStudents([]);
+    saveViolations([]);
+    saveRewards([]);
+    saveCompensations([]);
 
     triggerSheetsSync({
       students: [],
@@ -465,15 +440,22 @@ export default function App() {
   };
 
   const handleImportStudents = (imported: Student[]) => {
-    setStudents(imported);
-    triggerSheetsSync({ students: imported });
+    lastLocalActionRef.current = Date.now();
+    const sanitized = sanitizeStudents(imported);
+    setStudents(sanitized);
+    saveStudents(sanitized);
+    triggerSheetsSync({ students: sanitized });
   };
 
   const handlePromoteYear = (promotedStudents: Student[], nextYear: string) => {
-    setStudents(promotedStudents);
+    lastLocalActionRef.current = Date.now();
+    const sanitized = sanitizeStudents(promotedStudents);
+    setStudents(sanitized);
+    saveStudents(sanitized);
     const updatedSettings = { ...settings, academicYear: nextYear };
     setSettings(updatedSettings);
-    triggerSheetsSync({ students: promotedStudents });
+    saveSettings(updatedSettings);
+    triggerSheetsSync({ students: sanitized });
   };
 
   // Handlers for Teachers

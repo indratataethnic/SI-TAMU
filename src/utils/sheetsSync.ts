@@ -426,7 +426,7 @@ function fetchAllData(ss) {
       var headerRowIdx = 0;
       for (var r = 0; r < Math.min(values.length, 10); r++) {
         var rowStr = values[r].map(function(c) { return String(c || "").toLowerCase().trim(); }).join(" ");
-        if (rowStr.indexOf("nisn") !== -1 || rowStr.indexOf("nik") !== -1 || rowStr.indexOf("nama siswa") !== -1 || rowStr.indexOf("kelas") !== -1 || rowStr.indexOf("rombel") !== -1) {
+        if (rowStr.indexOf("nisn") !== -1 || rowStr.indexOf("nik") !== -1 || rowStr.indexOf("nama siswa") !== -1 || rowStr.indexOf("kelas") !== -1 || rowStr.indexOf("rombel") !== -1 || rowStr.indexOf("siswa") !== -1) {
           headerRowIdx = r;
           break;
         }
@@ -434,35 +434,56 @@ function fetchAllData(ss) {
 
       var headers = values[headerRowIdx].map(function(h) { return String(h || "").toLowerCase().trim(); });
 
-      var colNik = -1, colNisn = -1, colName = -1, colClass = -1, colGender = -1, colParentName = -1, colParentPhone = -1, colParentAddress = -1, colAccessCode = -1, colNotes = -1, colId = -1;
+      var colNo = -1, colNik = -1, colNisn = -1, colName = -1, colClass = -1, colGender = -1, colParentName = -1, colParentPhone = -1, colParentAddress = -1, colAccessCode = -1, colNotes = -1, colId = -1;
 
       headers.forEach(function(h, idx) {
         if (!h) return;
-        if (h === "nik" || (h.indexOf("nik") !== -1 && h.indexOf("teknik") === -1)) colNik = idx;
+        if (h === "no" || h === "no." || h === "nomor" || h === "no urut") colNo = idx;
+        else if (h === "nik" || h.indexOf("16 digit") !== -1 || (h.indexOf("nik") !== -1 && h.indexOf("teknik") === -1)) colNik = idx;
         else if (h.indexOf("nisn") !== -1 || h === "nis" || h.indexOf("no induk") !== -1 || h.indexOf("induk") !== -1) colNisn = idx;
         else if ((h.indexOf("nama siswa") !== -1 || h === "nama" || h.indexOf("nama lengkap") !== -1 || h.indexOf("peserta didik") !== -1 || h.indexOf("murid") !== -1) && h.indexOf("wali") === -1 && h.indexOf("orang") === -1 && h.indexOf("guru") === -1 && h.indexOf("ortu") === -1 && h.indexOf("ayah") === -1 && h.indexOf("ibu") === -1) colName = idx;
-        else if (h.indexOf("kelas") !== -1 || h.indexOf("rombel") !== -1 || h.indexOf("rombongan") !== -1) colClass = idx;
-        else if (h.indexOf("kelamin") !== -1 || h.indexOf("gender") !== -1 || h === "l/p" || h === "jk") colGender = idx;
+        else if (h.indexOf("kelas") !== -1 || h.indexOf("rombel") !== -1 || h.indexOf("rombongan") !== -1 || h.indexOf("tingkat") !== -1) colClass = idx;
+        else if (h.indexOf("kelamin") !== -1 || h.indexOf("gender") !== -1 || h === "l/p" || h === "jk" || h === "sex") colGender = idx;
         else if (h.indexOf("orang tua") !== -1 || h.indexOf("wali") !== -1 || h.indexOf("ortu") !== -1 || h.indexOf("ayah") !== -1 || h.indexOf("ibu") !== -1) colParentName = idx;
-        else if (h.indexOf("hp") !== -1 || h.indexOf("wa") !== -1 || h.indexOf("telepon") !== -1 || h.indexOf("whatsapp") !== -1 || h.indexOf("kontak") !== -1) colParentPhone = idx;
-        else if (h.indexOf("alamat") !== -1 || h.indexOf("domisili") !== -1) colParentAddress = idx;
+        else if (h.indexOf("hp") !== -1 || h.indexOf("wa") !== -1 || h.indexOf("telepon") !== -1 || h.indexOf("whatsapp") !== -1 || h.indexOf("kontak") !== -1 || h.indexOf("ponsel") !== -1) colParentPhone = idx;
+        else if (h.indexOf("alamat") !== -1 || h.indexOf("domisili") !== -1 || h.indexOf("tempat tinggal") !== -1) colParentAddress = idx;
         else if (h.indexOf("kode") !== -1 || h.indexOf("akses") !== -1 || h.indexOf("pin") !== -1) colAccessCode = idx;
         else if (h.indexOf("catatan") !== -1 || h.indexOf("keterangan") !== -1) colNotes = idx;
         else if (h.indexOf("id sistem") !== -1 || h === "id" || h.indexOf("id_siswa") !== -1) colId = idx;
       });
 
-      // Standard 11-column template fallback indices (NIK=0, NISN=1, Nama=2, Kelas=3, Gender=4, Ortu=5, WA=6, Alamat=7, Kode=8, Catatan=9, ID=10)
-      if (colNik === -1) colNik = 0;
-      if (colNisn === -1) colNisn = 1;
-      if (colName === -1) colName = 2;
-      if (colClass === -1) colClass = 3;
-      if (colGender === -1) colGender = 4;
-      if (colParentName === -1) colParentName = 5;
-      if (colParentPhone === -1) colParentPhone = 6;
-      if (colParentAddress === -1) colParentAddress = 7;
-      if (colAccessCode === -1) colAccessCode = 8;
-      if (colNotes === -1) colNotes = 9;
-      if (colId === -1) colId = 10;
+      // Smart Heuristic Fallback if columns are not explicitly labeled
+      var sampleRows = values.slice(headerRowIdx + 1, Math.min(values.length, headerRowIdx + 6));
+      if (sampleRows.length > 0) {
+        var numCols = sampleRows[0].length;
+        for (var c = 0; c < numCols; c++) {
+          if (c === colNo) continue;
+          var sampleVals = sampleRows.map(function(r) { return String(r[c] || "").trim(); }).filter(Boolean);
+          if (sampleVals.length === 0) continue;
+
+          if (colNik === -1 && sampleVals.every(function(v) { return /^\d{16}$/.test(v.replace(/[^0-9]/g, '')); })) {
+            colNik = c;
+          } else if (colNisn === -1 && sampleVals.every(function(v) { return /^\d{8,10}$/.test(v.replace(/[^0-9]/g, '')); })) {
+            colNisn = c;
+          } else if (colGender === -1 && sampleVals.every(function(v) { return /^(l|p|laki|perempuan|pria|wanita)$/i.test(v); })) {
+            colGender = c;
+          } else if (colParentPhone === -1 && sampleVals.some(function(v) { return /^(\+?62|08)\d{8,13}$/.test(v.replace(/[^0-9+]/g, '')); })) {
+            colParentPhone = c;
+          } else if (colClass === -1 && sampleVals.some(function(v) { return /(kelas|rombel|[1-6]\s*[a-fA-F]?|[ivxIVX]+)/i.test(v); })) {
+            colClass = c;
+          }
+        }
+      }
+
+      // Safe Name Fallback (find first text column that isn't NIK/NISN/No/Class/Phone)
+      if (colName === -1) {
+        for (var c = 0; c < 6; c++) {
+          if (c !== colNo && c !== colNik && c !== colNisn && c !== colClass && c !== colGender && c !== colParentPhone) {
+            colName = c;
+            break;
+          }
+        }
+      }
 
       for (var i = headerRowIdx + 1; i < values.length; i++) {
         var row = values[i];

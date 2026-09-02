@@ -356,22 +356,23 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-emerald-950 text-emerald-100 border-b border-emerald-900">
-                <th className="py-3 px-4 font-semibold">No</th>
-                <th className="py-3 px-4 font-semibold">NISN</th>
-                <th className="py-3 px-4 font-semibold">Nama Siswa</th>
-                <th className="py-3 px-4 font-semibold">Kelas</th>
-                <th className="py-3 px-4 font-semibold">L/P</th>
-                <th className="py-3 px-4 font-semibold">Orang Tua / Kontak</th>
-                <th className="py-3 px-4 font-semibold text-center">Poin Pelanggaran</th>
-                <th className="py-3 px-4 font-semibold text-center">Poin Reward</th>
-                <th className="py-3 px-4 font-semibold text-center">Status</th>
-                <th className="py-3 px-4 font-semibold text-center">Aksi</th>
+                <th className="py-3.5 px-3.5 font-semibold text-center w-12">No</th>
+                <th className="py-3.5 px-4 font-semibold">Identitas (NISN / NIK)</th>
+                <th className="py-3.5 px-4 font-semibold">Nama Lengkap Siswa</th>
+                <th className="py-3.5 px-3 font-semibold text-center">Kelas</th>
+                <th className="py-3.5 px-3 font-semibold text-center">L/P</th>
+                <th className="py-3.5 px-4 font-semibold">Wali Murid & Kontak WA</th>
+                <th className="py-3.5 px-4 font-semibold">Alamat Rumah</th>
+                <th className="py-3.5 px-3 font-semibold text-center">Poin Pelanggaran</th>
+                <th className="py-3.5 px-3 font-semibold text-center">Poin Reward</th>
+                <th className="py-3.5 px-3 font-semibold text-center">Status</th>
+                <th className="py-3.5 px-4 font-semibold text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-center py-12 text-slate-400">
+                  <td colSpan={11} className="text-center py-12 text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
                         <Users className="w-6 h-6" />
@@ -395,52 +396,85 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
 
                   return (
                     <tr key={`${student.id || 'stu'}-${idx}`} className="hover:bg-slate-50/80 transition">
-                      <td className="py-3 px-4 text-slate-500 font-mono">{idx + 1}</td>
-                      <td className="py-3 px-4 font-mono font-medium text-slate-700">
-                        <div>{student.nisn}</div>
-                        {student.nik && <div className="text-[10px] text-slate-400 font-mono">NIK: {student.nik}</div>}
+                      <td className="py-3 px-3.5 text-slate-500 font-mono text-center font-bold">{idx + 1}</td>
+                      <td className="py-3 px-4 font-mono">
+                        <div className="font-bold text-slate-900 text-[11px]">{student.nisn || '-'}</div>
+                        {student.nik && student.nik !== '-' ? (
+                          <div className="text-[10px] text-slate-500 font-mono">NIK: {student.nik}</div>
+                        ) : (
+                          <div className="text-[9px] text-slate-300 italic">NIK: -</div>
+                        )}
                       </td>
                       <td className="py-3 px-4">
-                        <span className="font-bold text-slate-900 block">{student.name}</span>
-                        <span className="text-[10px] text-slate-400 font-mono">Kode Akses: {student.accessCode || '-'}</span>
+                        <span className="font-bold text-slate-900 block text-xs">{student.name}</span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] text-slate-500 font-mono bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                            PIN: {student.accessCode || '-'}
+                          </span>
+                        </div>
                       </td>
-                      <td className="py-3 px-4">
-                        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-950 border border-emerald-200 rounded-lg font-bold text-[11px]">
+                      <td className="py-3 px-3 text-center">
+                        <span className="px-2.5 py-1 bg-emerald-50 text-emerald-950 border border-emerald-200 rounded-lg font-bold text-[11px] inline-block whitespace-nowrap">
                           {student.class}
                         </span>
                       </td>
-                      <td className="py-3 px-4 font-semibold text-slate-600">{student.gender}</td>
-                      <td className="py-3 px-4">
-                        <span className="font-medium text-slate-800 block">{student.parentName}</span>
-                        <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                          <Phone className="w-3 h-3 text-slate-400" />
-                          {student.parentPhone}
+                      <td className="py-3 px-3 text-center">
+                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                          student.gender === 'P' || String(student.gender).toUpperCase().includes('P')
+                            ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                            : 'bg-blue-100 text-blue-800 border border-blue-200'
+                        }`}>
+                          {student.gender === 'P' ? 'Perempuan (P)' : 'Laki-laki (L)'}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-3 px-4">
+                        <span className="font-semibold text-slate-800 block text-xs">
+                          {student.parentName || '-'}
+                        </span>
+                        {student.parentPhone ? (
+                          <a
+                            href={`https://wa.me/${student.parentPhone.replace(/^0/, '62').replace(/[^0-9]/g, '')}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-emerald-700 hover:text-emerald-900 hover:underline flex items-center gap-1 font-mono mt-0.5"
+                            title="Kirim pesan WhatsApp"
+                          >
+                            <Phone className="w-3 h-3 text-emerald-600" />
+                            {student.parentPhone}
+                          </a>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic">No WhatsApp: -</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 max-w-[180px]">
+                        <span className="text-slate-600 text-[11px] line-clamp-2" title={student.parentAddress || '-'}>
+                          {student.parentAddress || '-'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
                         <span
                           className={`font-black text-xs px-2 py-0.5 rounded-full ${
                             activePts >= 100
-                              ? 'bg-rose-100 text-rose-800'
+                              ? 'bg-rose-100 text-rose-800 border border-rose-200'
                               : activePts > 0
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-slate-100 text-slate-600'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                              : 'bg-slate-100 text-slate-600 border border-slate-200'
                           }`}
                         >
                           {activePts} Poin
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
                         <span className="font-black text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
                           +{rewardPts} Poin
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${sum?.statusColor}`}>
                           {sum?.statusBadge || '🟢 Normal'}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => setDetailStudent(student)}
