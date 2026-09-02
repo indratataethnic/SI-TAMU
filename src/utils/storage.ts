@@ -222,11 +222,11 @@ export const getStoredSettings = (): SchoolSettings => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     const parsed = raw ? JSON.parse(raw) : initialSettings;
-    const defaultWebhook = 'https://script.google.com/macros/s/AKfycbwOnSs6tO0me32w9R7x_ip6B2Eodj0Rt6WznSS_AlNDhIEhsLbNzHfl0MuWiHMAVkU/exec';
-    if (!parsed.googleSheetsWebhook) {
+    const defaultWebhook = 'https://script.google.com/macros/s/AKfycbyc9XP8BPzTKcGNlcna12L31mYhotfGnJLFXhA8EhYtG2wG7lO9AQq9Aet3hu7WMjo/exec';
+    if (!parsed.googleSheetsWebhook || parsed.googleSheetsWebhook.includes('AKfycbwOnSs6tO0me32w9R7x')) {
       parsed.googleSheetsWebhook = defaultWebhook;
     }
-    if (!parsed.googleSheetsWebhookUrl) {
+    if (!parsed.googleSheetsWebhookUrl || parsed.googleSheetsWebhookUrl.includes('AKfycbwOnSs6tO0me32w9R7x')) {
       parsed.googleSheetsWebhookUrl = defaultWebhook;
     }
     return parsed;

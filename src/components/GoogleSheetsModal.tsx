@@ -50,10 +50,36 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
 
   const scriptCode = getGoogleAppsScriptTemplate(settings.schoolName);
 
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(scriptCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 3000);
+  const handleCopyCode = async () => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(scriptCode);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 3000);
+        return;
+      }
+    } catch (err) {
+      console.warn('Navigator clipboard error, falling back to textarea:', err);
+    }
+
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = scriptCode;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      textArea.style.top = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      if (successful) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 3000);
+      }
+    } catch (fallbackErr) {
+      console.error('Copy fallback failed:', fallbackErr);
+    }
   };
 
   const handleSave = () => {
