@@ -14,20 +14,6 @@ const STORAGE_KEYS = {
   USER_ROLE: 'sitamu_user_role'
 };
 
-// Clear legacy initial data once if present & ensure default role is public
-try {
-  if (!localStorage.getItem('sitamu_data_emptied_v3')) {
-    localStorage.removeItem(STORAGE_KEYS.STUDENTS);
-    localStorage.removeItem(STORAGE_KEYS.TEACHERS);
-    localStorage.removeItem(STORAGE_KEYS.PIKET_SCHEDULES);
-    localStorage.removeItem(STORAGE_KEYS.VIOLATIONS);
-    localStorage.removeItem(STORAGE_KEYS.REWARDS);
-    localStorage.removeItem(STORAGE_KEYS.COMPENSATIONS);
-    localStorage.setItem(STORAGE_KEYS.USER_ROLE, 'public');
-    localStorage.setItem('sitamu_data_emptied_v3', 'true');
-  }
-} catch (e) {}
-
 // Sanitization helpers to prevent duplicate React keys or invalid phone-number IDs
 export const sanitizeStudents = (students: Student[]): Student[] => {
   const seenIds = new Set<string>();
@@ -107,10 +93,12 @@ export const sanitizeRecords = <T extends { id: string }>(records: T[], prefix: 
 export const getStoredStudents = (): Student[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.STUDENTS);
-    return raw ? sanitizeStudents(JSON.parse(raw)) : [];
+    if (!raw) return sanitizeStudents(initialStudents);
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? sanitizeStudents(parsed) : sanitizeStudents(initialStudents);
   } catch (e) {
     console.error('Failed reading students from storage', e);
-    return [];
+    return sanitizeStudents(initialStudents);
   }
 };
 
@@ -231,14 +219,12 @@ export const getStoredSettings = (): SchoolSettings => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     const parsed = raw ? JSON.parse(raw) : initialSettings;
-    const defaultWebhook = 'https://script.google.com/macros/s/AKfycbyc9XP8BPzTKcGNlcna12L31mYhotfGnJLFXhA8EhYtG2wG7lO9AQq9Aet3hu7WMjo/exec';
-    if (!parsed.googleSheetsWebhook || parsed.googleSheetsWebhook.includes('AKfycbwOnSs6tO0me32w9R7x')) {
-      parsed.googleSheetsWebhook = defaultWebhook;
-    }
-    if (!parsed.googleSheetsWebhookUrl || parsed.googleSheetsWebhookUrl.includes('AKfycbwOnSs6tO0me32w9R7x')) {
-      parsed.googleSheetsWebhookUrl = defaultWebhook;
-    }
-    return parsed;
+    return {
+      ...initialSettings,
+      ...parsed,
+      googleSheetsWebhook: parsed.googleSheetsWebhook || parsed.googleSheetsWebhookUrl || initialSettings.googleSheetsWebhook || '',
+      googleSheetsWebhookUrl: parsed.googleSheetsWebhook || parsed.googleSheetsWebhookUrl || initialSettings.googleSheetsWebhookUrl || ''
+    };
   } catch (e) {
     return initialSettings;
   }

@@ -1,4 +1,7 @@
 import { ViolationRule, RewardRule, Student, Teacher, PiketSchedule, ViolationRecord, RewardRecord, CompensationRecord, SchoolSettings } from '../types';
+import { initialStudents as loadedStudents } from './initialStudents';
+
+export const initialStudents: Student[] = loadedStudents || [];
 
 export const initialTeachers: Teacher[] = [];
 
@@ -239,8 +242,6 @@ export const initialRewardRules: RewardRule[] = [
     description: 'Mewakili sekolah dalam ajang perlombaan resmi (apresiasi piagam partisipasi).'
   }
 ];
-
-export const initialStudents: Student[] = [];
 
 export const initialViolations: ViolationRecord[] = [];
 

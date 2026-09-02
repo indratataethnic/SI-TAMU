@@ -170,12 +170,8 @@ export default function App() {
     fetch('/api/data')
       .then(res => res.json())
       .then(json => {
-        if (json?.data) {
-          const locStudents = loadStudents();
-          // If browser storage is empty or server has data, populate seamlessly
-          if (locStudents.length === 0 && (json.data.students?.length > 0 || json.data.teachers?.length > 0)) {
-            handleImportFullData(json.data);
-          }
+        if (json?.data && (json.data.students?.length > 0 || json.data.teachers?.length > 0 || json.data.violations?.length > 0)) {
+          handleImportFullData(json.data);
         }
       })
       .catch(() => {})
