@@ -126,7 +126,6 @@ export default function App() {
   }, [summaries]);
 
   const isInitialLoadingRef = useRef(true);
-  const [isReloading, setIsReloading] = useState(false);
   const serverSaveTimeoutRef = useRef<any>(null);
   const lastLocalActionRef = useRef<number>(0);
 
@@ -215,55 +214,6 @@ export default function App() {
     // No automatic periodic polling to protect local user data from unverified cloud overwrites
   }, []);
 
-  // Instant Manual Reload Handler
-  const handleReloadData = async () => {
-    setIsReloading(true);
-    try {
-      // 1. Load instantly from localStorage
-      const locStudents = loadStudents();
-      const locTeachers = loadTeachers();
-      const locPikets = loadPiketSchedules();
-      const locViolationRules = loadViolationRules();
-      const locRewardRules = loadRewardRules();
-      const locViolations = loadViolations();
-      const locRewards = loadRewards();
-      const locCompensations = loadCompensations();
-      const locSettings = loadSettings();
-
-      setStudents(locStudents);
-      setTeachers(locTeachers);
-      setPiketSchedules(locPikets);
-      setViolationRules(locViolationRules);
-      setRewardRules(locRewardRules);
-      setViolations(locViolations);
-      setRewards(locRewards);
-      setCompensations(locCompensations);
-      setSettings(locSettings);
-
-      // 2. Refresh from local server cache in milliseconds
-      const srvRes = await fetch('/api/data').catch(() => null);
-      if (srvRes && srvRes.ok) {
-        const srvJson = await srvRes.json();
-        if (srvJson?.data) {
-          handleImportFullData(srvJson.data);
-        }
-      }
-
-      // 3. If Google Sheets configured, fetch with strict timeout
-      const webhook = (locSettings.googleSheetsWebhook || locSettings.googleSheetsWebhookUrl || '').trim();
-      if (webhook) {
-        const sheetsRes = await fetchFullStateFromSheets(webhook, 6000);
-        if (sheetsRes.success && sheetsRes.data) {
-          handleImportFullData(sheetsRes.data);
-        }
-      }
-    } catch (e) {
-      console.log('Reload error:', e);
-    } finally {
-      setIsReloading(false);
-    }
-  };
-
   // Background Google Sheets Sync Helper with direct state support
   const triggerSheetsSync = (override?: {
     students?: Student[];
@@ -332,23 +282,73 @@ export default function App() {
       });
     }
 
-    if (Array.isArray(imported.students)) {
-      const sanitized = sanitizeStudents(imported.students);
+    let finalStudents: Student[] = students;
+
+    if (Array.isArray(imported.students) && imported.students.length > 0) {
+      const existingStudents = loadStudents();
+      const prevMapByNisn = new Map<string, Student>();
+      const prevMapById = new Map<string, Student>();
+      const prevMapByName = new Map<string, Student>();
+
+      // Index both current state and localStorage
+      [...students, ...existingStudents].forEach(s => {
+        if (s.nisn) prevMapByNisn.set(String(s.nisn).trim().toLowerCase(), s);
+        if (s.id) prevMapById.set(String(s.id).trim(), s);
+        if (s.name) prevMapByName.set(String(s.name).trim().toLowerCase(), s);
+      });
+
+      const mergedStudents = imported.students.map(s => {
+        const sNisn = String(s.nisn || '').trim().toLowerCase();
+        const sId = String(s.id || '').trim();
+        const sName = String(s.name || '').trim().toLowerCase();
+
+        const match = (sNisn ? prevMapByNisn.get(sNisn) : null) ||
+                      (sId ? prevMapById.get(sId) : null) ||
+                      (sName ? prevMapByName.get(sName) : null);
+
+        if (!match) return s;
+
+        const incomingParentName = String(s.parentName || '').trim();
+        const incomingParentPhone = String(s.parentPhone || '').replace(/^'/, '').trim();
+        const incomingAddress = String(s.parentAddress || (s as any).address || '').trim();
+        const incomingNik = String(s.nik || '').replace(/^'/, '').trim();
+
+        return {
+          ...match,
+          ...s,
+          parentName: (incomingParentName && incomingParentName !== '-' && incomingParentName !== 'undefined')
+            ? incomingParentName
+            : (match.parentName || ''),
+          parentPhone: (incomingParentPhone && incomingParentPhone !== '-' && incomingParentPhone !== 'undefined')
+            ? incomingParentPhone
+            : (match.parentPhone || ''),
+          parentAddress: (incomingAddress && incomingAddress !== '-' && incomingAddress !== 'undefined')
+            ? incomingAddress
+            : (match.parentAddress || ''),
+          nik: (incomingNik && incomingNik !== '-' && incomingNik !== 'undefined')
+            ? incomingNik
+            : (match.nik || undefined),
+          accessCode: (s.accessCode && String(s.accessCode).trim() !== '') ? s.accessCode : (match.accessCode || '')
+        };
+      });
+
+      const sanitized = sanitizeStudents(mergedStudents);
+      finalStudents = sanitized;
       setStudents(sanitized);
       saveStudents(sanitized);
     }
-    if (Array.isArray(imported.teachers)) {
+
+    if (Array.isArray(imported.teachers) && imported.teachers.length > 0) {
       const sanitized = sanitizeTeachers(imported.teachers);
       setTeachers(sanitized);
       saveTeachers(sanitized);
     }
-    if (Array.isArray(imported.piketSchedules)) {
+    if (Array.isArray(imported.piketSchedules) && imported.piketSchedules.length > 0) {
       setPiketSchedules(imported.piketSchedules);
       savePiketSchedules(imported.piketSchedules);
     }
 
-    const mergedStudents = Array.isArray(imported.students) ? sanitizeStudents(imported.students) : students;
-    const sMap = new Map(mergedStudents.map(s => [s.nisn, s.id]));
+    const sMap = new Map(finalStudents.map(s => [s.nisn, s.id]));
 
     if (Array.isArray(imported.violations)) {
       const mappedViolations = sanitizeRecords<ViolationRecord>(imported.violations.map(v => ({
@@ -628,8 +628,6 @@ export default function App() {
         onOpenSettingsModal={() => setSettingsModalOpen(true)}
         onToggleMobileSidebar={() => setMobileSidebarOpen(prev => !prev)}
         urgentAlertCount={urgentAlertCount}
-        onReloadData={handleReloadData}
-        isReloading={isReloading}
       />
 
       {/* Main Body Layout */}

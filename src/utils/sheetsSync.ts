@@ -504,6 +504,16 @@ function fetchAllData(ss) {
         }
       }
 
+      // Safe Parent Name Fallback
+      if (colParentName === -1 && colAyah === -1 && colIbu === -1 && colWali === -1) {
+        for (var c = 0; c < 10; c++) {
+          if (c !== colNo && c !== colNik && c !== colNisn && c !== colName && c !== colClass && c !== colGender && c !== colParentPhone && c !== colParentAddress && c !== colAccessCode && c !== colId) {
+            colParentName = c;
+            break;
+          }
+        }
+      }
+
       for (var i = headerRowIdx + 1; i < values.length; i++) {
         var row = values[i];
         if (!row || row.length === 0) continue;
@@ -529,7 +539,14 @@ function fetchAllData(ss) {
         } else if (colWali !== -1 && row[colWali] !== undefined && String(row[colWali]).trim() && String(row[colWali]).trim() !== "-") {
           rawParentName = String(row[colWali]).trim();
         }
-        var rawParentPhone = colParentPhone !== -1 && row[colParentPhone] !== undefined ? String(row[colParentPhone]).replace(/^'/, '').replace(/[^0-9+]/g, '') : "";
+        var rawParentPhone = colParentPhone !== -1 && row[colParentPhone] !== undefined ? String(row[colParentPhone]).replace(/^'/, '').replace(/[^0-9+]/g, '').trim() : "";
+        if (rawParentPhone.indexOf("8") === 0 && rawParentPhone.length >= 9 && rawParentPhone.length <= 13) {
+          rawParentPhone = "0" + rawParentPhone;
+        } else if (rawParentPhone.indexOf("628") === 0) {
+          rawParentPhone = "0" + rawParentPhone.substring(2);
+        } else if (rawParentPhone.indexOf("+628") === 0) {
+          rawParentPhone = "0" + rawParentPhone.substring(3);
+        }
         var rawParentAddress = colParentAddress !== -1 && row[colParentAddress] !== undefined ? String(row[colParentAddress]).trim() : "";
         var rawAccessCode = colAccessCode !== -1 && row[colAccessCode] !== undefined ? String(row[colAccessCode]).replace(/^'/, '').trim() : "";
         var rawIdCandidate = colId !== -1 && row[colId] ? String(row[colId]).trim() : "";

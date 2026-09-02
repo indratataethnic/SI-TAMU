@@ -54,6 +54,15 @@ export const sanitizeStudents = (students: Student[]): Student[] => {
       cleanAccess = (firstName + cleanCls).toUpperCase();
     }
 
+    let rawParentPhone = String(s.parentPhone || '').replace(/^'/, '').replace(/[^0-9+]/g, '').trim();
+    if (rawParentPhone.startsWith('8') && rawParentPhone.length >= 9 && rawParentPhone.length <= 13) {
+      rawParentPhone = '0' + rawParentPhone;
+    } else if (rawParentPhone.startsWith('628')) {
+      rawParentPhone = '0' + rawParentPhone.substring(2);
+    } else if (rawParentPhone.startsWith('+628')) {
+      rawParentPhone = '0' + rawParentPhone.substring(3);
+    }
+
     return {
       ...s,
       id: cleanId,
@@ -63,7 +72,7 @@ export const sanitizeStudents = (students: Student[]): Student[] => {
       class: rawClass || 'Kelas 1',
       gender: cleanGender,
       parentName: String(s.parentName || '').trim(),
-      parentPhone: String(s.parentPhone || '').replace(/^'/, '').replace(/[^0-9+]/g, '').trim(),
+      parentPhone: rawParentPhone,
       parentAddress: String(s.parentAddress || '').trim(),
       accessCode: cleanAccess || `SISWA${idx + 1}`,
       createdAt: s.createdAt || new Date().toISOString()

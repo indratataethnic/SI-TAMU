@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserRole, SchoolSettings } from '../types';
-import { ShieldCheck, User, Settings, Table, Lock, Unlock, Menu, ShieldAlert, Sparkles, GraduationCap, RefreshCw } from 'lucide-react';
+import { ShieldCheck, User, Settings, Table, Lock, Unlock, Menu, ShieldAlert, Sparkles, GraduationCap } from 'lucide-react';
 
 interface NavbarProps {
   role: UserRole;
@@ -10,8 +10,6 @@ interface NavbarProps {
   onOpenSettingsModal: () => void;
   onToggleMobileSidebar: () => void;
   urgentAlertCount: number;
-  onReloadData?: () => void;
-  isReloading?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -21,9 +19,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSheetsModal,
   onOpenSettingsModal,
   onToggleMobileSidebar,
-  urgentAlertCount,
-  onReloadData,
-  isReloading = false
+  urgentAlertCount
 }) => {
   const currentDate = new Intl.DateTimeFormat('id-ID', {
     weekday: 'long',
@@ -66,25 +62,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* Right: Date, Refresh Data, Sheets Sync, Role Switcher, Settings */}
+          {/* Right: Date, Sheets Sync, Role Switcher, Settings */}
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Live date badge */}
             <div className="hidden md:flex items-center text-xs text-emerald-300 bg-emerald-900/60 px-3 py-1.5 rounded-lg border border-emerald-800">
               <span>{currentDate}</span>
             </div>
-
-            {/* Quick Fast Data Refresh Button */}
-            {onReloadData && (
-              <button
-                onClick={onReloadData}
-                disabled={isReloading}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-900/90 hover:bg-emerald-800 text-emerald-200 hover:text-white rounded-lg text-xs font-semibold border border-emerald-700/60 transition shadow-sm cursor-pointer disabled:opacity-50"
-                title="Muat Ulang & Sinkronkan Data Cepat"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${isReloading ? 'animate-spin' : ''}`} />
-                <span className="hidden md:inline">{isReloading ? 'Memuat...' : 'Muat Ulang'}</span>
-              </button>
-            )}
 
             {/* Google Sheets Sync Button */}
             {role === 'staff' && (
