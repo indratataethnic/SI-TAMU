@@ -434,22 +434,41 @@ function fetchAllData(ss) {
 
       var headers = values[headerRowIdx].map(function(h) { return String(h || "").toLowerCase().trim(); });
 
-      var colNo = -1, colNik = -1, colNisn = -1, colName = -1, colClass = -1, colGender = -1, colParentName = -1, colParentPhone = -1, colParentAddress = -1, colAccessCode = -1, colNotes = -1, colId = -1;
+      var colNo = -1, colNik = -1, colNisn = -1, colName = -1, colClass = -1, colGender = -1, colParentName = -1, colAyah = -1, colIbu = -1, colWali = -1, colParentPhone = -1, colParentAddress = -1, colAccessCode = -1, colNotes = -1, colId = -1;
 
       headers.forEach(function(h, idx) {
         if (!h) return;
-        if (h === "no" || h === "no." || h === "nomor" || h === "no urut") colNo = idx;
-        else if (h === "nik" || h.indexOf("16 digit") !== -1 || (h.indexOf("nik") !== -1 && h.indexOf("teknik") === -1)) colNik = idx;
-        else if (h.indexOf("nisn") !== -1 || h === "nis" || h.indexOf("no induk") !== -1 || h.indexOf("induk") !== -1) colNisn = idx;
-        else if ((h.indexOf("nama siswa") !== -1 || h === "nama" || h.indexOf("nama lengkap") !== -1 || h.indexOf("peserta didik") !== -1 || h.indexOf("murid") !== -1) && h.indexOf("wali") === -1 && h.indexOf("orang") === -1 && h.indexOf("guru") === -1 && h.indexOf("ortu") === -1 && h.indexOf("ayah") === -1 && h.indexOf("ibu") === -1) colName = idx;
-        else if (h.indexOf("kelas") !== -1 || h.indexOf("rombel") !== -1 || h.indexOf("rombongan") !== -1 || h.indexOf("tingkat") !== -1) colClass = idx;
-        else if (h.indexOf("kelamin") !== -1 || h.indexOf("gender") !== -1 || h === "l/p" || h === "jk" || h === "sex") colGender = idx;
-        else if (h.indexOf("orang tua") !== -1 || h.indexOf("wali") !== -1 || h.indexOf("ortu") !== -1 || h.indexOf("ayah") !== -1 || h.indexOf("ibu") !== -1) colParentName = idx;
-        else if (h.indexOf("hp") !== -1 || h.indexOf("wa") !== -1 || h.indexOf("telepon") !== -1 || h.indexOf("whatsapp") !== -1 || h.indexOf("kontak") !== -1 || h.indexOf("ponsel") !== -1) colParentPhone = idx;
-        else if (h.indexOf("alamat") !== -1 || h.indexOf("domisili") !== -1 || h.indexOf("tempat tinggal") !== -1) colParentAddress = idx;
-        else if (h.indexOf("kode") !== -1 || h.indexOf("akses") !== -1 || h.indexOf("pin") !== -1) colAccessCode = idx;
-        else if (h.indexOf("catatan") !== -1 || h.indexOf("keterangan") !== -1) colNotes = idx;
-        else if (h.indexOf("id sistem") !== -1 || h === "id" || h.indexOf("id_siswa") !== -1) colId = idx;
+        if (h === "no" || h === "no." || h === "nomor" || h === "no urut" || h === "#") {
+          colNo = idx;
+        } else if (h.indexOf("hp") !== -1 || h.indexOf("wa") !== -1 || h.indexOf("telepon") !== -1 || h.indexOf("telp") !== -1 || h.indexOf("whatsapp") !== -1 || h.indexOf("kontak") !== -1 || h.indexOf("ponsel") !== -1 || h.indexOf("handphone") !== -1 || h.indexOf("phone") !== -1) {
+          colParentPhone = idx;
+        } else if (h === "nik" || h.indexOf("16 digit") !== -1 || (h.indexOf("nik") !== -1 && h.indexOf("teknik") === -1)) {
+          colNik = idx;
+        } else if (h.indexOf("nisn") !== -1 || h === "nis" || h.indexOf("no induk") !== -1 || h.indexOf("induk") !== -1) {
+          colNisn = idx;
+        } else if (h.indexOf("kelas") !== -1 || h.indexOf("rombel") !== -1 || h.indexOf("rombongan") !== -1 || h.indexOf("tingkat") !== -1) {
+          colClass = idx;
+        } else if (h.indexOf("kelamin") !== -1 || h.indexOf("gender") !== -1 || h === "l/p" || h === "jk" || h === "sex") {
+          colGender = idx;
+        } else if ((h.indexOf("nama siswa") !== -1 || h === "nama" || h.indexOf("nama lengkap") !== -1 || h.indexOf("peserta didik") !== -1 || h.indexOf("murid") !== -1) && h.indexOf("wali") === -1 && h.indexOf("orang") === -1 && h.indexOf("guru") === -1 && h.indexOf("ortu") === -1 && h.indexOf("ayah") === -1 && h.indexOf("ibu") === -1) {
+          colName = idx;
+        } else if (h.indexOf("nama ayah") !== -1 || h === "ayah" || h === "bapak") {
+          colAyah = idx;
+        } else if (h.indexOf("nama ibu") !== -1 || h.indexOf("ibu kandung") !== -1 || h === "ibu") {
+          colIbu = idx;
+        } else if (h.indexOf("nama wali") !== -1 || h === "wali" || h.indexOf("wali murid") !== -1) {
+          colWali = idx;
+        } else if (h.indexOf("orang tua") !== -1 || h.indexOf("orangtua") !== -1 || h.indexOf("ortu") !== -1 || h.indexOf("parent") !== -1) {
+          colParentName = idx;
+        } else if (h.indexOf("alamat") !== -1 || h.indexOf("domisili") !== -1 || h.indexOf("tempat tinggal") !== -1) {
+          colParentAddress = idx;
+        } else if (h.indexOf("kode") !== -1 || h.indexOf("akses") !== -1 || h.indexOf("pin") !== -1) {
+          colAccessCode = idx;
+        } else if (h.indexOf("catatan") !== -1 || h.indexOf("keterangan") !== -1) {
+          colNotes = idx;
+        } else if (h.indexOf("id sistem") !== -1 || h === "id" || h.indexOf("id_siswa") !== -1) {
+          colId = idx;
+        }
       });
 
       // Smart Heuristic Fallback if columns are not explicitly labeled
@@ -500,7 +519,16 @@ function fetchAllData(ss) {
         var rawClass = colClass !== -1 && row[colClass] !== undefined ? String(row[colClass]).trim() : "Kelas 1";
         var rawGender = colGender !== -1 && row[colGender] !== undefined ? String(row[colGender]).trim().toUpperCase() : "L";
         var parsedGender = rawGender.indexOf("P") !== -1 || rawGender.indexOf("PEREMPUAN") !== -1 ? "P" : "L";
-        var rawParentName = colParentName !== -1 && row[colParentName] !== undefined ? String(row[colParentName]).trim() : "";
+        var rawParentName = "";
+        if (colParentName !== -1 && row[colParentName] !== undefined && String(row[colParentName]).trim()) {
+          rawParentName = String(row[colParentName]).trim();
+        } else if (colAyah !== -1 && row[colAyah] !== undefined && String(row[colAyah]).trim() && String(row[colAyah]).trim() !== "-") {
+          rawParentName = String(row[colAyah]).trim();
+        } else if (colIbu !== -1 && row[colIbu] !== undefined && String(row[colIbu]).trim() && String(row[colIbu]).trim() !== "-") {
+          rawParentName = String(row[colIbu]).trim();
+        } else if (colWali !== -1 && row[colWali] !== undefined && String(row[colWali]).trim() && String(row[colWali]).trim() !== "-") {
+          rawParentName = String(row[colWali]).trim();
+        }
         var rawParentPhone = colParentPhone !== -1 && row[colParentPhone] !== undefined ? String(row[colParentPhone]).replace(/^'/, '').replace(/[^0-9+]/g, '') : "";
         var rawParentAddress = colParentAddress !== -1 && row[colParentAddress] !== undefined ? String(row[colParentAddress]).trim() : "";
         var rawAccessCode = colAccessCode !== -1 && row[colAccessCode] !== undefined ? String(row[colAccessCode]).replace(/^'/, '').trim() : "";
