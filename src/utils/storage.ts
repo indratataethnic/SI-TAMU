@@ -111,10 +111,12 @@ export const saveStudents = (students: Student[]): void => {
 export const getStoredTeachers = (): Teacher[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.TEACHERS);
-    return raw ? sanitizeTeachers(JSON.parse(raw)) : [];
+    if (!raw) return sanitizeTeachers(initialTeachers);
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? sanitizeTeachers(parsed) : sanitizeTeachers(initialTeachers);
   } catch (e) {
     console.error('Failed reading teachers from storage', e);
-    return [];
+    return sanitizeTeachers(initialTeachers);
   }
 };
 
@@ -127,10 +129,12 @@ export const saveTeachers = (teachers: Teacher[]): void => {
 export const getStoredPiketSchedules = (): PiketSchedule[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.PIKET_SCHEDULES);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return initialPiketSchedules;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : initialPiketSchedules;
   } catch (e) {
     console.error('Failed reading piket schedules from storage', e);
-    return [];
+    return initialPiketSchedules;
   }
 };
 

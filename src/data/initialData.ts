@@ -3,9 +3,62 @@ import { initialStudents as loadedStudents } from './initialStudents';
 
 export const initialStudents: Student[] = loadedStudents || [];
 
-export const initialTeachers: Teacher[] = [];
+export const initialTeachers: Teacher[] = [
+  {
+    id: 'TCH-199005302019031004-1',
+    nip: '199005302019031004',
+    name: 'Indartha Meiputra, S.Pd.',
+    role: 'kepala_sekolah',
+    subject: 'Kepala Sekolah',
+    classAssigned: '-',
+    phone: '081234567890'
+  },
+  {
+    id: 'TCH-198207152008012007-2',
+    nip: '19820715 200801 2 007',
+    name: 'Ratna Dewi Kusuma, S.Psi., M.Pd.',
+    role: 'guru_bk',
+    subject: 'Bimbingan Konseling (BK)',
+    classAssigned: '-',
+    phone: '081234567891'
+  },
+  {
+    id: 'TCH-197003151994032001-3',
+    nip: '197003151994032001',
+    name: 'Dra. Hj. Siti Zubaidah, M.Pd.',
+    role: 'guru_piket',
+    subject: 'Matematika / Kebangsaan',
+    classAssigned: 'KELAS 6 A',
+    phone: '081234567892'
+  },
+  {
+    id: 'TCH-198804122015021002-4',
+    nip: '198804122015021002',
+    name: 'Ahmad Budi Santoso, S.Pd.',
+    role: 'guru_piket',
+    subject: 'PJOK / Olahraga',
+    classAssigned: '-',
+    phone: '081234567893'
+  },
+  {
+    id: 'TCH-199308252020122015-5',
+    nip: '199308252020122015',
+    name: 'Dwi Rahmawati, S.Pd.',
+    role: 'wali_kelas',
+    subject: 'Tematik Kelas 1',
+    classAssigned: 'KELAS 1 A',
+    phone: '081234567894'
+  }
+];
 
-export const initialPiketSchedules: PiketSchedule[] = [];
+export const initialPiketSchedules: PiketSchedule[] = [
+  { day: 'Senin', teacherIds: ['TCH-197003151994032001-3', 'TCH-198804122015021002-4'], dutyHours: '06.30 - 15.00 WIB', notes: 'Pengawalan kedisiplinan dan kerapian seragam upacara' },
+  { day: 'Selasa', teacherIds: ['TCH-198207152008012007-2', 'TCH-199308252020122015-5'], dutyHours: '06.30 - 15.00 WIB', notes: 'Penyambutan siswa di gerbang dan ketertiban KBM' },
+  { day: 'Rabu', teacherIds: ['TCH-198804122015021002-4', 'TCH-197003151994032001-3'], dutyHours: '06.30 - 15.00 WIB', notes: 'Pemeriksaan atribut dan kerapian rambut' },
+  { day: 'Kamis', teacherIds: ['TCH-198207152008012007-2', 'TCH-199308252020122015-5'], dutyHours: '06.30 - 15.00 WIB', notes: 'Pengawasan area kantin dan area bermain' },
+  { day: 'Jumat', teacherIds: ['TCH-197003151994032001-3', 'TCH-198804122015021002-4'], dutyHours: '06.30 - 14.00 WIB', notes: 'Kedisiplinan ibadah dan kegiatan ekstrakurikuler' },
+  { day: 'Sabtu', teacherIds: ['TCH-199308252020122015-5', 'TCH-198207152008012007-2'], dutyHours: '06.30 - 13.00 WIB', notes: 'Pemeriksaan akhir pekan dan kepulangan' }
+];
 
 export const initialViolationRules: ViolationRule[] = [
   // Pelanggaran Berat (20 Poin)
