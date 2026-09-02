@@ -12,21 +12,38 @@ const CONFIG_DIR = path.join(process.cwd(), "data");
 const CONFIG_FILE = path.join(CONFIG_DIR, "global-config.json");
 const DB_FILE = path.join(CONFIG_DIR, "app-db.json");
 
+const DEFAULT_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyc9XP8BPzTKcGNlcna12L31mYhotfGnJLFXhA8EhYtG2wG7lO9AQq9Aet3hu7WMjo/exec";
+
 // Ensure data folder exists
 if (!fs.existsSync(CONFIG_DIR)) {
   fs.mkdirSync(CONFIG_DIR, { recursive: true });
 }
 
 // In-memory caches for sub-millisecond response
-let cachedConfig: any = null;
+let cachedConfig: any = {
+  googleSheetsWebhook: DEFAULT_WEBHOOK_URL,
+  googleSheetsUrl: "",
+  settings: null
+};
 let cachedDb: any = null;
 
 try {
   if (fs.existsSync(CONFIG_FILE)) {
-    cachedConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+    const loaded = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+    cachedConfig = {
+      ...cachedConfig,
+      ...loaded,
+      googleSheetsWebhook: loaded.googleSheetsWebhook || DEFAULT_WEBHOOK_URL
+    };
+  } else {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(cachedConfig, null, 2), "utf-8");
   }
 } catch (e) {
-  cachedConfig = null;
+  cachedConfig = {
+    googleSheetsWebhook: DEFAULT_WEBHOOK_URL,
+    googleSheetsUrl: "",
+    settings: null
+  };
 }
 
 try {
@@ -43,7 +60,7 @@ app.get("/api/global-config", (req, res) => {
     return res.json(cachedConfig);
   }
   return res.json({
-    googleSheetsWebhook: "",
+    googleSheetsWebhook: DEFAULT_WEBHOOK_URL,
     googleSheetsUrl: "",
     settings: null
   });
@@ -54,7 +71,7 @@ app.post("/api/global-config", (req, res) => {
   try {
     const { googleSheetsWebhook, googleSheetsUrl, settings } = req.body;
     const config = {
-      googleSheetsWebhook: googleSheetsWebhook || "",
+      googleSheetsWebhook: googleSheetsWebhook || DEFAULT_WEBHOOK_URL,
       googleSheetsUrl: googleSheetsUrl || "",
       settings: settings || null
     };

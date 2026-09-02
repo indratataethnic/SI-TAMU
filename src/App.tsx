@@ -597,6 +597,25 @@ export default function App() {
     setCurrentTab('input_reward');
   };
 
+  // Settings save handler with server persistence
+  const handleSaveSettings = (newSettings: SchoolSettings) => {
+    setSettings(newSettings);
+    saveSettings(newSettings);
+
+    const webhook = (newSettings.googleSheetsWebhook || newSettings.googleSheetsWebhookUrl || '').trim();
+    const sheetUrl = (newSettings.googleSheetsUrl || '').trim();
+
+    fetch('/api/global-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        googleSheetsWebhook: webhook,
+        googleSheetsUrl: sheetUrl,
+        settings: newSettings
+      })
+    }).catch(err => console.log('Error updating server global config:', err));
+  };
+
   // Open Surat Modal
   const handleOpenSuratModal = (
     summary: StudentScoreSummary,
@@ -832,7 +851,7 @@ export default function App() {
           rewards={rewards}
           compensations={compensations}
           summaries={summaries}
-          onSaveSettings={(newSettings) => setSettings(newSettings)}
+          onSaveSettings={handleSaveSettings}
           onImportFullData={handleImportFullData}
         />
       )}
@@ -880,7 +899,7 @@ export default function App() {
           isOpen={settingsModalOpen}
           onClose={() => setSettingsModalOpen(false)}
           settings={settings}
-          onSaveSettings={(newSettings) => setSettings(newSettings)}
+          onSaveSettings={handleSaveSettings}
         />
       )}
     </div>
