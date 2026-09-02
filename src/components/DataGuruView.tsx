@@ -638,7 +638,37 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredTeachers.length === 0 ? (
+                  {teachers.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-slate-500">
+                        <div className="flex flex-col items-center justify-center max-w-md mx-auto space-y-3">
+                          <div className="p-3 bg-emerald-50 text-emerald-800 rounded-full">
+                            <GraduationCap className="w-8 h-8" />
+                          </div>
+                          <h3 className="font-bold text-slate-800 text-sm">Belum Ada Data Guru / GTK</h3>
+                          <p className="text-xs text-slate-500 leading-relaxed">
+                            Silakan sinkronkan dari Google Spreadsheet, impor dari file Excel, atau tambahkan data guru secara manual.
+                          </p>
+                          <div className="flex items-center gap-2 pt-2">
+                            <button
+                              onClick={() => fileInputRef.current?.click()}
+                              className="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                              <span>Impor Excel</span>
+                            </button>
+                            <button
+                              onClick={handleOpenAdd}
+                              className="px-3 py-1.5 bg-emerald-900 hover:bg-emerald-800 text-white rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Tambah Manual</span>
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filteredTeachers.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-8 text-center text-slate-400">
                         Tidak ada data guru yang sesuai dengan pencarian.

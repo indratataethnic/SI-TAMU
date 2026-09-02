@@ -580,12 +580,23 @@ function fetchAllData(ss) {
   }
 
   // 3. Teachers / GTK
-  var teacherSheet = ss.getSheetByName("Data_Guru") || ss.getSheetByName("Data Guru") || ss.getSheetByName("Guru") || ss.getSheetByName("GTK") || ss.getSheetByName("Data_GTK");
+  var teacherSheet = ss.getSheetByName("Data_Guru") || ss.getSheetByName("Data Guru") || ss.getSheetByName("Guru") || ss.getSheetByName("GTK") || ss.getSheetByName("Data_GTK") || ss.getSheetByName("Data Pendidik") || ss.getSheetByName("Daftar Guru") || ss.getSheetByName("GURU");
+  if (!teacherSheet) {
+    var allSheets = ss.getSheets();
+    for (var s = 0; s < allSheets.length; s++) {
+      var sName = allSheets[s].getName().toLowerCase();
+      if (sName.indexOf("guru") !== -1 || sName.indexOf("gtk") !== -1 || sName.indexOf("tendik") !== -1 || sName.indexOf("pengajar") !== -1 || sName.indexOf("pendidik") !== -1 || sName.indexOf("staf") !== -1 || sName.indexOf("staff") !== -1 || sName.indexOf("pegawai") !== -1) {
+        teacherSheet = allSheets[s];
+        break;
+      }
+    }
+  }
+
   if (teacherSheet) {
     var values = teacherSheet.getDataRange().getValues();
     if (values && values.length > 1) {
       var headerRowIdx = 0;
-      for (var r = 0; r < Math.min(values.length, 5); r++) {
+      for (var r = 0; r < Math.min(values.length, 10); r++) {
         var rStr = values[r].join(" ").toLowerCase();
         if (rStr.indexOf("nama") !== -1 || rStr.indexOf("nip") !== -1 || rStr.indexOf("guru") !== -1 || rStr.indexOf("jabatan") !== -1 || rStr.indexOf("gtk") !== -1) {
           headerRowIdx = r;
@@ -597,12 +608,12 @@ function fetchAllData(ss) {
       for (var h = 0; h < headerRow.length; h++) {
         var hName = String(headerRow[h] || "").toLowerCase().trim();
         if (hName.indexOf("nip") !== -1 || hName.indexOf("nik") !== -1 || hName.indexOf("nuptk") !== -1) colNip = h;
-        else if (hName.indexOf("nama") !== -1 || hName.indexOf("gtk") !== -1 || hName.indexOf("pengajar") !== -1) colName = h;
-        else if (hName.indexOf("jabatan") !== -1 || hName.indexOf("peran") !== -1 || hName.indexOf("tugas") !== -1 || hName.indexOf("posisi") !== -1) colRole = h;
-        else if (hName.indexOf("mapel") !== -1 || hName.indexOf("mata pelajaran") !== -1 || hName.indexOf("mengajar") !== -1) colSubject = h;
-        else if (hName.indexOf("kelas") !== -1 || hName.indexOf("rombel") !== -1 || hName.indexOf("wali") !== -1) colClass = h;
-        else if (hName.indexOf("hp") !== -1 || hName.indexOf("telepon") !== -1 || hName.indexOf("wa") !== -1 || hName.indexOf("whatsapp") !== -1 || hName.indexOf("kontak") !== -1) colPhone = h;
-        else if (hName.indexOf("id") !== -1) colId = h;
+        else if (hName.indexOf("nama") !== -1 || hName.indexOf("gtk") !== -1 || hName.indexOf("pengajar") !== -1 || hName.indexOf("pegawai") !== -1) colName = h;
+        else if (hName.indexOf("jabatan") !== -1 || hName.indexOf("peran") !== -1 || hName.indexOf("tugas") !== -1 || hName.indexOf("posisi") !== -1 || hName.indexOf("status") !== -1) colRole = h;
+        else if (hName.indexOf("mapel") !== -1 || hName.indexOf("mata pelajaran") !== -1 || hName.indexOf("mengajar") !== -1 || hName.indexOf("subjek") !== -1) colSubject = h;
+        else if (hName.indexOf("kelas") !== -1 || hName.indexOf("rombel") !== -1) colClass = h;
+        else if (hName.indexOf("hp") !== -1 || hName.indexOf("telepon") !== -1 || hName.indexOf("wa") !== -1 || hName.indexOf("whatsapp") !== -1 || hName.indexOf("kontak") !== -1 || hName.indexOf("phone") !== -1) colPhone = h;
+        else if (hName === "id" || hName.indexOf("id guru") !== -1) colId = h;
       }
 
       if (colName === -1) colName = 1;
@@ -611,38 +622,37 @@ function fetchAllData(ss) {
       if (colSubject === -1) colSubject = 3;
       if (colClass === -1) colClass = 4;
       if (colPhone === -1) colPhone = 5;
-      if (colId === -1) colId = 6;
 
       for (var i = headerRowIdx + 1; i < values.length; i++) {
         var row = values[i];
         if (!row || row.length === 0) continue;
         var nameVal = colName < row.length ? String(row[colName] || "").trim() : "";
-        if (!nameVal && colNip < row.length) {
-          var possibleName = String(row[0] || "").trim();
-          if (possibleName && isNaN(Number(possibleName.replace(/\s+/g, '')))) {
-            nameVal = possibleName;
-          }
+        var nipVal = colNip < row.length ? String(row[colNip] || "").trim() : "";
+
+        if ((!nameVal || !isNaN(Number(nameVal.replace(/\s+/g, '')))) && nipVal && isNaN(Number(nipVal.replace(/\s+/g, '')))) {
+          var temp = nameVal;
+          nameVal = nipVal;
+          nipVal = temp;
         }
 
-        if (nameVal && nameVal !== "-" && nameVal.toLowerCase().indexOf("nama") === -1 && nameVal.toLowerCase().indexOf("guru") === -1 && nameVal.toLowerCase().indexOf("gtk") === -1) {
-          var nipVal = colNip < row.length ? String(row[colNip] || "").trim() : "";
+        if (nameVal && nameVal !== "-" && nameVal.toLowerCase().indexOf("nama") === -1 && nameVal.toLowerCase().indexOf("guru") === -1 && nameVal.toLowerCase().indexOf("gtk") === -1 && nameVal.toLowerCase().indexOf("nip") === -1) {
           var roleVal = colRole < row.length ? String(row[colRole] || "").trim() : "";
           var subjectVal = colSubject < row.length ? String(row[colSubject] || "").trim() : "";
           var classVal = colClass < row.length ? String(row[colClass] || "").trim() : "";
           var phoneVal = colPhone < row.length ? String(row[colPhone] || "").trim() : "";
-          var idVal = colId < row.length ? String(row[colId] || "").trim() : "";
+          var idVal = colId !== -1 && colId < row.length ? String(row[colId] || "").trim() : "";
 
           var roleCode = "guru_mapel";
           var roleLower = roleVal.toLowerCase();
-          if (roleLower.indexOf("kepala") !== -1) roleCode = "kepala_sekolah";
+          if (roleLower.indexOf("kepala") !== -1 || roleLower.indexOf("ks") !== -1) roleCode = "kepala_sekolah";
           else if (roleLower.indexOf("wali") !== -1) roleCode = "wali_kelas";
           else if (roleLower.indexOf("bk") !== -1 || roleLower.indexOf("konseling") !== -1) roleCode = "guru_bk";
           else if (roleLower.indexOf("piket") !== -1) roleCode = "guru_piket";
           else if (roleLower.indexOf("osis") !== -1 || roleLower.indexOf("kesiswaan") !== -1) roleCode = "pembina_osis";
-          else if (roleLower.indexOf("tendik") !== -1 || roleLower.indexOf("tu") !== -1 || roleLower.indexOf("administrasi") !== -1 || roleLower.indexOf("kependidikan") !== -1) roleCode = "tenaga_kependidikan";
+          else if (roleLower.indexOf("tendik") !== -1 || roleLower.indexOf("tu") !== -1 || roleLower.indexOf("administrasi") !== -1 || roleLower.indexOf("kependidikan") !== -1 || roleLower.indexOf("staf") !== -1 || roleLower.indexOf("staff") !== -1) roleCode = "tenaga_kependidikan";
 
           data.teachers.push({
-            id: idVal ? idVal : ("TCH-" + (nipVal || i) + "-" + Math.random().toString(36).substring(2, 6)),
+            id: idVal ? idVal : ("TCH-" + (nipVal ? nipVal.replace(/\s+/g, '') : i) + "-" + Math.random().toString(36).substring(2, 6)),
             nip: nipVal.replace(/^'/, ''),
             name: nameVal,
             role: roleCode,

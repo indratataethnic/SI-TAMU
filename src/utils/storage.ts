@@ -111,12 +111,17 @@ export const saveStudents = (students: Student[]): void => {
 export const getStoredTeachers = (): Teacher[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.TEACHERS);
-    if (!raw) return sanitizeTeachers(initialTeachers);
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? sanitizeTeachers(parsed) : sanitizeTeachers(initialTeachers);
+    if (!Array.isArray(parsed)) return [];
+    // Filter out residual dummy teachers if any exist from older sessions
+    const dummyNames = ['Indartha Meiputra, S.Pd.', 'Ratna Dewi Kusuma, S.Psi., M.Pd.', 'Dra. Hj. Siti Zubaidah, M.Pd.', 'Ahmad Budi Santoso, S.Pd.', 'Dwi Rahmawati, S.Pd.'];
+    const dummyIds = ['TCH-199005302019031004-1', 'TCH-198207152008012007-2', 'TCH-197003151994032001-3', 'TCH-198804122015021002-4', 'TCH-199308252020122015-5'];
+    const cleanTeachers = parsed.filter(t => !dummyIds.includes(t.id) && !dummyNames.includes(t.name));
+    return sanitizeTeachers(cleanTeachers);
   } catch (e) {
     console.error('Failed reading teachers from storage', e);
-    return sanitizeTeachers(initialTeachers);
+    return [];
   }
 };
 

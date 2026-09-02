@@ -334,12 +334,12 @@ export default function App() {
       saveStudents(sanitized);
     }
 
-    if (Array.isArray(imported.teachers) && imported.teachers.length > 0) {
+    if (Array.isArray(imported.teachers)) {
       const sanitized = sanitizeTeachers(imported.teachers);
       setTeachers(sanitized);
       saveTeachers(sanitized);
     }
-    if (Array.isArray(imported.piketSchedules) && imported.piketSchedules.length > 0) {
+    if (Array.isArray(imported.piketSchedules)) {
       setPiketSchedules(imported.piketSchedules);
       savePiketSchedules(imported.piketSchedules);
     }
