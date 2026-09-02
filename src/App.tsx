@@ -170,7 +170,13 @@ export default function App() {
     fetch('/api/data')
       .then(res => res.json())
       .then(json => {
-        if (json?.data && (json.data.students?.length > 0 || json.data.teachers?.length > 0 || json.data.violations?.length > 0)) {
+        if (json?.data && (
+          (json.data.students && json.data.students.length > 0) ||
+          (json.data.teachers && json.data.teachers.length > 0) ||
+          (json.data.piketSchedules && json.data.piketSchedules.length > 0) ||
+          (json.data.violations && json.data.violations.length > 0) ||
+          (json.data.rewards && json.data.rewards.length > 0)
+        )) {
           handleImportFullData(json.data);
         }
       })

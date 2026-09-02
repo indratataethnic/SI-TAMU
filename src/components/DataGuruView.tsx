@@ -114,12 +114,23 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
   const availableClasses = useMemo(() => getAvailableClasses(students), [students]);
 
   // Piket Workload Stats
+  const isTeacherAssignedToSched = (t: Teacher, teacherIds: string[]) => {
+    if (!teacherIds || teacherIds.length === 0) return false;
+    return teacherIds.some(id => 
+      id === t.id || 
+      (t.nip && (id === t.nip || id.replace(/\s+/g, '') === t.nip.replace(/\s+/g, ''))) || 
+      id.trim().toLowerCase() === t.name.trim().toLowerCase()
+    );
+  };
+
   const teacherPiketCountMap = useMemo(() => {
     const counts: Record<string, number> = {};
     teachers.forEach(t => { counts[t.id] = 0; });
     piketSchedules.forEach(sched => {
-      sched.teacherIds.forEach(id => {
-        counts[id] = (counts[id] || 0) + 1;
+      teachers.forEach(t => {
+        if (isTeacherAssignedToSched(t, sched.teacherIds)) {
+          counts[t.id] = (counts[t.id] || 0) + 1;
+        }
       });
     });
     return counts;
@@ -874,8 +885,8 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
                   dutyHours: day === 'Jumat' ? '06.30 - 14.00 WIB' : day === 'Sabtu' ? '06.30 - 13.00 WIB' : '06.30 - 15.00 WIB',
                   notes: ''
                 };
-                const dayDutyTeachers = teachers.filter(t => sched.teacherIds.includes(t.id));
-                const availableToAdd = teachers.filter(t => !sched.teacherIds.includes(t.id));
+                const dayDutyTeachers = teachers.filter(t => isTeacherAssignedToSched(t, sched.teacherIds));
+                const availableToAdd = teachers.filter(t => !isTeacherAssignedToSched(t, sched.teacherIds));
 
                 return (
                   <div key={day} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between hover:border-emerald-300 transition">
@@ -1032,7 +1043,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
                         </td>
                         {DAYS_LIST.map(day => {
                           const sched = piketSchedules.find(p => p.day === day);
-                          const isAssigned = sched?.teacherIds.includes(t.id) || false;
+                          const isAssigned = sched ? isTeacherAssignedToSched(t, sched.teacherIds) : false;
 
                           return (
                             <td key={day} className="py-3 px-3 text-center">

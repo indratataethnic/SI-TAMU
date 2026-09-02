@@ -220,8 +220,8 @@ function writeTeachersSheet(ss, teachers) {
 }
 
 function writePiketSheet(ss, piketSchedules, teachers) {
-  var sheet = ss.getSheetByName("Jadwal_Piket") || ss.insertSheet("Jadwal_Piket");
-  var headers = ["Hari", "Jam Bertugas", "Jumlah Guru", "Daftar Nama Guru Piket", "Catatan / Instruksi Khusus"];
+  var sheet = ss.getSheetByName("Jadwal_Piket") || ss.getSheetByName("Jadwal Piket") || ss.insertSheet("Jadwal_Piket");
+  var headers = ["Hari", "Jam Bertugas", "Jumlah Guru", "Daftar Nama Guru Piket", "Catatan / Instruksi Khusus", "IDs_Guru"];
   formatHeaderRow(sheet, headers, "#4338CA");
 
   if (!piketSchedules || piketSchedules.length === 0) return;
@@ -236,12 +236,15 @@ function writePiketSheet(ss, piketSchedules, teachers) {
       return teacherMap[id] || id;
     }).join(", ");
 
+    var ids = (p.teacherIds || []).join(",");
+
     return [
       p.day || "",
       p.dutyHours || "06.30 - 15.00 WIB",
       (p.teacherIds || []).length,
       names || "Belum ada guru piket",
-      p.notes || "-"
+      p.notes || "-",
+      ids || ""
     ];
   });
 
@@ -396,6 +399,7 @@ function fetchAllData(ss) {
     settings: {},
     students: [],
     teachers: [],
+    piketSchedules: [],
     violations: [],
     rewards: [],
     compensations: []
@@ -652,13 +656,64 @@ function fetchAllData(ss) {
           else if (roleLower.indexOf("tendik") !== -1 || roleLower.indexOf("tu") !== -1 || roleLower.indexOf("administrasi") !== -1 || roleLower.indexOf("kependidikan") !== -1 || roleLower.indexOf("staf") !== -1 || roleLower.indexOf("staff") !== -1) roleCode = "tenaga_kependidikan";
 
           data.teachers.push({
-            id: idVal ? idVal : ("TCH-" + (nipVal ? nipVal.replace(/\s+/g, '') : i) + "-" + Math.random().toString(36).substring(2, 6)),
+            id: idVal ? idVal : ("TCH-" + (nipVal ? nipVal.replace(/\s+/g, '') : nameVal.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())),
             nip: nipVal.replace(/^'/, ''),
             name: nameVal,
             role: roleCode,
             subject: subjectVal,
             classAssigned: classVal,
             phone: phoneVal.replace(/^'/, '').replace(/[^0-9+]/g, '')
+          });
+        }
+      }
+    }
+  }
+
+  // 3.5. Piket Schedules (Jadwal_Piket)
+  var piketSheet = ss.getSheetByName("Jadwal_Piket") || ss.getSheetByName("Jadwal Piket") || ss.getSheetByName("Piket") || ss.getSheetByName("Jadwal_Piket_Guru");
+  if (piketSheet) {
+    var values = piketSheet.getDataRange().getValues();
+    if (values && values.length > 1) {
+      for (var i = 1; i < values.length; i++) {
+        var row = values[i];
+        if (!row || row.length === 0) continue;
+        var dayVal = String(row[0] || "").trim();
+        var dayLower = dayVal.toLowerCase();
+        if (dayVal && dayLower.indexOf("hari") === -1 && (dayLower.indexOf("senin") !== -1 || dayLower.indexOf("selasa") !== -1 || dayLower.indexOf("rabu") !== -1 || dayLower.indexOf("kamis") !== -1 || dayLower.indexOf("jumat") !== -1 || dayLower.indexOf("sabtu") !== -1 || dayLower.indexOf("minggu") !== -1)) {
+          var dutyHoursVal = row[1] ? String(row[1]).trim() : "06.30 - 15.00 WIB";
+          var namesStr = row[3] ? String(row[3]).trim() : "";
+          var notesVal = row[4] ? String(row[4]).trim() : "";
+          var idsStr = row[5] ? String(row[5]).trim() : "";
+
+          var teacherIds = [];
+          if (idsStr) {
+            teacherIds = idsStr.split(",").map(function(s) { return s.trim(); }).filter(Boolean);
+          } else if (namesStr && namesStr !== "Belum ada guru piket" && namesStr !== "-") {
+            var rawNames = namesStr.split(/[,;]/);
+            for (var k = 0; k < rawNames.length; k++) {
+              var cleanN = rawNames[k].trim().toLowerCase();
+              if (!cleanN) continue;
+              var matched = false;
+              for (var tIdx = 0; tIdx < data.teachers.length; tIdx++) {
+                var t = data.teachers[tIdx];
+                var tName = (t.name || "").toLowerCase();
+                if (tName === cleanN || tName.indexOf(cleanN) !== -1 || cleanN.indexOf(tName) !== -1 || t.nip === rawNames[k].trim() || t.id === rawNames[k].trim()) {
+                  if (teacherIds.indexOf(t.id) === -1) teacherIds.push(t.id);
+                  matched = true;
+                  break;
+                }
+              }
+              if (!matched) {
+                teacherIds.push(rawNames[k].trim());
+              }
+            }
+          }
+
+          data.piketSchedules.push({
+            day: dayVal,
+            dutyHours: dutyHoursVal,
+            teacherIds: teacherIds,
+            notes: notesVal === "-" ? "" : notesVal
           });
         }
       }
