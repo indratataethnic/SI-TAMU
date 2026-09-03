@@ -188,7 +188,7 @@ function writeStudentsSheet(ss, students) {
 }
 
 function writeTeachersSheet(ss, teachers) {
-  var sheet = ss.getSheetByName("Data_Guru") || ss.insertSheet("Data_Guru");
+  var sheet = ss.getSheetByName("Data_Guru") || ss.getSheetByName("Data Guru") || ss.getSheetByName("Guru") || ss.getSheetByName("GTK") || ss.getSheetByName("Data_GTK") || ss.insertSheet("Data_Guru");
   var headers = ["NIP / NUPTK", "Nama Guru & Gelar", "Jabatan / Tugas", "Mata Pelajaran", "Penugasan Kelas / Wali", "No HP / WhatsApp", "ID Guru"];
   formatHeaderRow(sheet, headers, "#134E4A");
 
@@ -200,7 +200,8 @@ function writeTeachersSheet(ss, teachers) {
     "guru_bk": "Guru Bimbingan Konseling (BK)",
     "guru_piket": "Guru Tim Piket",
     "pembina_osis": "Pembina OSIS / Kesiswaan",
-    "kepala_sekolah": "Kepala Sekolah"
+    "kepala_sekolah": "Kepala Sekolah",
+    "tenaga_kependidikan": "Tenaga Kependidikan / TU"
   };
 
   var rows = teachers.map(function(t) {
@@ -639,7 +640,10 @@ function fetchAllData(ss) {
           nipVal = temp;
         }
 
-        if (nameVal && nameVal !== "-" && nameVal.toLowerCase().indexOf("nama") === -1 && nameVal.toLowerCase().indexOf("guru") === -1 && nameVal.toLowerCase().indexOf("gtk") === -1 && nameVal.toLowerCase().indexOf("nip") === -1) {
+        var nameLower = nameVal.toLowerCase();
+        var isHeaderRow = nameLower === "nama" || nameLower === "nama guru" || nameLower === "nama lengkap" || nameLower === "nama guru & gelar" || nameLower === "daftar guru" || nameLower.indexOf("nama &") === 0 || nameLower.indexOf("nip /") === 0;
+
+        if (nameVal && nameVal !== "-" && !isHeaderRow) {
           var roleVal = colRole < row.length ? String(row[colRole] || "").trim() : "";
           var subjectVal = colSubject < row.length ? String(row[colSubject] || "").trim() : "";
           var classVal = colClass < row.length ? String(row[colClass] || "").trim() : "";
@@ -648,12 +652,23 @@ function fetchAllData(ss) {
 
           var roleCode = "guru_mapel";
           var roleLower = roleVal.toLowerCase();
-          if (roleLower.indexOf("kepala") !== -1 || roleLower.indexOf("ks") !== -1) roleCode = "kepala_sekolah";
-          else if (roleLower.indexOf("wali") !== -1) roleCode = "wali_kelas";
-          else if (roleLower.indexOf("bk") !== -1 || roleLower.indexOf("konseling") !== -1) roleCode = "guru_bk";
-          else if (roleLower.indexOf("piket") !== -1) roleCode = "guru_piket";
-          else if (roleLower.indexOf("osis") !== -1 || roleLower.indexOf("kesiswaan") !== -1) roleCode = "pembina_osis";
-          else if (roleLower.indexOf("tendik") !== -1 || roleLower.indexOf("tu") !== -1 || roleLower.indexOf("administrasi") !== -1 || roleLower.indexOf("kependidikan") !== -1 || roleLower.indexOf("staf") !== -1 || roleLower.indexOf("staff") !== -1) roleCode = "tenaga_kependidikan";
+          if (roleLower.indexOf("kepala") !== -1 || roleLower.indexOf("ks") !== -1) {
+            roleCode = "kepala_sekolah";
+          } else if (roleLower.indexOf("wali") !== -1 || roleLower.indexOf("guru kelas") !== -1 || roleLower.indexOf("tematik") !== -1 || classVal.toLowerCase().indexOf("kelas") !== -1) {
+            roleCode = "wali_kelas";
+          } else if (roleLower.indexOf("bk") !== -1 || roleLower.indexOf("konseling") !== -1 || roleLower.indexOf("bimbingan") !== -1) {
+            roleCode = "guru_bk";
+          } else if (roleLower.indexOf("piket") !== -1) {
+            roleCode = "guru_piket";
+          } else if (roleLower.indexOf("osis") !== -1 || roleLower.indexOf("kesiswaan") !== -1) {
+            roleCode = "pembina_osis";
+          } else if (roleLower.indexOf("tendik") !== -1 || roleLower.indexOf("tu") !== -1 || roleLower.indexOf("administrasi") !== -1 || roleLower.indexOf("kependidikan") !== -1 || roleLower.indexOf("staf") !== -1 || roleLower.indexOf("staff") !== -1 || roleLower.indexOf("operator") !== -1) {
+            roleCode = "tenaga_kependidikan";
+          }
+
+          if (roleCode === "wali_kelas" && (!subjectVal || subjectVal === "-")) {
+            subjectVal = "Guru Kelas / Tematik";
+          }
 
           data.teachers.push({
             id: idVal ? idVal : ("TCH-" + (nipVal ? nipVal.replace(/\s+/g, '') : nameVal.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())),

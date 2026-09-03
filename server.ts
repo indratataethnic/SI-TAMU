@@ -105,6 +105,73 @@ app.post("/api/data", (req, res) => {
   }
 });
 
+// POST API: Fetch data from Google Spreadsheet webhook via server proxy (no CORS issues, follows redirects)
+app.post("/api/sheets/fetch", async (req, res) => {
+  try {
+    const webhookUrl = (req.body?.webhookUrl || cachedConfig.googleSheetsWebhook || DEFAULT_WEBHOOK_URL).trim();
+    if (!webhookUrl) {
+      return res.status(400).json({ success: false, message: "URL Webhook Google Sheets belum dikonfigurasi." });
+    }
+
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "FETCH_ALL", sentAt: new Date().toISOString() }),
+      redirect: "follow"
+    });
+
+    if (!response.ok) {
+      return res.status(502).json({ success: false, message: `HTTP status dari Google: ${response.status}` });
+    }
+
+    const json: any = await response.json();
+    if (json.status === "success" && json.data) {
+      return res.json({
+        success: true,
+        message: json.message || "Data berhasil dimuat dari Google Spreadsheet",
+        data: json.data
+      });
+    } else {
+      return res.json({
+        success: false,
+        message: json.message || "Format data dari Google Sheets tidak dikenali.",
+        data: null
+      });
+    }
+  } catch (err: any) {
+    console.error("Error in /api/sheets/fetch:", err);
+    return res.status(500).json({ success: false, message: err.message || "Gagal menghubungi Google Apps Script." });
+  }
+});
+
+// POST API: Push data to Google Spreadsheet webhook via server proxy
+app.post("/api/sheets/sync", async (req, res) => {
+  try {
+    const webhookUrl = (req.body?.webhookUrl || cachedConfig.googleSheetsWebhook || DEFAULT_WEBHOOK_URL).trim();
+    if (!webhookUrl) {
+      return res.status(400).json({ success: false, message: "URL Webhook Google Sheets belum dikonfigurasi." });
+    }
+
+    const payload = req.body?.payload || req.body;
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        ...payload,
+        action: payload.action || "SYNC_ALL",
+        sentAt: new Date().toISOString()
+      }),
+      redirect: "follow"
+    });
+
+    const json: any = await response.json().catch(() => ({ status: "success", message: "Data terkirim ke Google Sheets" }));
+    return res.json({ success: true, message: json.message || "Data berhasil disinkronkan ke Google Spreadsheet", data: json });
+  } catch (err: any) {
+    console.error("Error in /api/sheets/sync:", err);
+    return res.status(500).json({ success: false, message: err.message || "Gagal mengirim data ke Google Apps Script." });
+  }
+});
+
 // Vite server integration
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SchoolSettings } from '../types';
-import { Settings, Save, RotateCcw, X, Building, Phone, Mail, UserCheck, Key, MessageSquare, AlertTriangle, Shield, Table, ExternalLink } from 'lucide-react';
+import { Settings, Save, RotateCcw, X, Building, Phone, Mail, UserCheck, Key, MessageSquare, AlertTriangle, Shield, Table, ExternalLink, CheckCircle2, AlertCircle, Link2 } from 'lucide-react';
 import { resetAllToDefault } from '../utils/storage';
 import { validateWebhookUrl } from '../utils/sheetsSync';
+import { OFFICIAL_WEBHOOK_URL } from '../data/initialData';
 
 interface PengaturanModalProps {
   settings: SchoolSettings;
@@ -36,6 +37,28 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
     googleSheetsUrl: settings.googleSheetsUrl || ''
   });
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  useEffect(() => {
+    setForm({
+      ...settings,
+      schoolName: settings.schoolName || '',
+      schoolSubtitle: settings.schoolSubtitle || '',
+      schoolAddress: settings.schoolAddress || '',
+      schoolPhone: settings.schoolPhone || '',
+      schoolEmail: settings.schoolEmail || '',
+      academicYear: settings.academicYear || '',
+      principalName: settings.principalName || '',
+      principalNip: settings.principalNip || '',
+      bkCoordinatorName: settings.bkCoordinatorName || '',
+      bkCoordinatorNip: settings.bkCoordinatorNip || '',
+      letterNumberPrefix: settings.letterNumberPrefix || '',
+      staffPin: settings.staffPin || '',
+      waGatewayApiKey: settings.waGatewayApiKey || '',
+      googleSheetsWebhook: settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || OFFICIAL_WEBHOOK_URL,
+      googleSheetsWebhookUrl: settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || OFFICIAL_WEBHOOK_URL,
+      googleSheetsUrl: settings.googleSheetsUrl || ''
+    });
+  }, [settings]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -264,6 +287,32 @@ export const PengaturanModal: React.FC<PengaturanModalProps> = ({
                 <p className="text-[11px] text-slate-500 mt-1">
                   Didapat dari menu Ekstensi &gt; Apps Script &gt; Terapkan sebagai Aplikasi Web (Akses: <strong>Siapa saja / Anyone</strong>).
                 </p>
+
+                {(form.googleSheetsWebhook || '').trim() === OFFICIAL_WEBHOOK_URL ? (
+                  <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px]">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Menggunakan <strong>Webhook Resmi Sekolah UPT SDN Karanganyar</strong>.</span>
+                  </div>
+                ) : (
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span className="text-[11px]">URL berbeda dari Webhook Resmi Sekolah.</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setForm({
+                        ...form,
+                        googleSheetsWebhook: OFFICIAL_WEBHOOK_URL,
+                        googleSheetsWebhookUrl: OFFICIAL_WEBHOOK_URL
+                      })}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[11px] font-semibold transition cursor-pointer shadow-xs"
+                    >
+                      <Link2 className="w-3 h-3" />
+                      Gunakan Webhook Resmi
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div>

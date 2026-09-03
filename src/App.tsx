@@ -40,6 +40,7 @@ import {
   sanitizeRecords
 } from './utils/storage';
 import { syncFullStateToSheets, fetchFullStateFromSheets } from './utils/sheetsSync';
+import { OFFICIAL_WEBHOOK_URL, initialTeachers, initialPiketSchedules } from './data/initialData';
 
 // Components & Views
 import { Navbar } from './components/Navbar';
@@ -111,6 +112,7 @@ export default function App() {
   } | null>(null);
 
   const [sheetsModalOpen, setSheetsModalOpen] = useState(false);
+  const [sheetsSyncStatus, setSheetsSyncStatus] = useState<string | null>(null);
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [pendingActionAfterPin, setPendingActionAfterPin] = useState<(() => void) | null>(null);
@@ -164,6 +166,41 @@ export default function App() {
     }, 400);
   }, [students, teachers, piketSchedules, violationRules, rewardRules, violations, rewards, compensations, settings]);
 
+  const [isLoadingSpreadsheet, setIsLoadingSpreadsheet] = useState(false);
+
+  // Automatically load data from Google Spreadsheet when the page mounts or on user request
+  const fetchSpreadsheetData = async (silent = false): Promise<boolean> => {
+    try {
+      if (!silent) setIsLoadingSpreadsheet(true);
+      const res = await fetch('/api/sheets/fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          webhookUrl: settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || OFFICIAL_WEBHOOK_URL
+        })
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          handleImportFullData(json.data);
+          const studentCount = json.data.students?.length || 0;
+          const teacherCount = json.data.teachers?.length || 0;
+          const piketCount = json.data.piketSchedules?.length || 0;
+          setSheetsSyncStatus(
+            `✓ Data termuat otomatis dari Google Spreadsheet (${studentCount} Siswa${teacherCount > 0 ? `, ${teacherCount} Guru` : ''}${piketCount > 0 ? `, Jadwal Piket` : ''})`
+          );
+          setTimeout(() => setSheetsSyncStatus(null), 6000);
+          return true;
+        }
+      }
+    } catch (err) {
+      console.log('Automated Google Sheets load error:', err);
+    } finally {
+      if (!silent) setIsLoadingSpreadsheet(false);
+    }
+    return false;
+  };
+
   // Load initial global config & server data instantly on mount
   useEffect(() => {
     // 1. Instant check from local server database cache
@@ -183,15 +220,20 @@ export default function App() {
       .catch(() => {})
       .finally(() => {
         isInitialLoadingRef.current = false;
+        // 2. Automatically load data from Google Spreadsheet when the page mounts!
+        fetchSpreadsheetData(true);
       });
 
-    // 2. Global settings sync
+    // 3. Global settings sync
     fetch('/api/global-config')
       .then(res => res.json())
       .then(data => {
         if (data) {
           setSettings(prev => {
-            const webhook = data.googleSheetsWebhook || prev.googleSheetsWebhook || '';
+            let webhook = (data.googleSheetsWebhook || prev.googleSheetsWebhook || '').trim();
+            if (!webhook || (webhook.includes('script.google.com/macros/s/') && webhook !== OFFICIAL_WEBHOOK_URL)) {
+              webhook = OFFICIAL_WEBHOOK_URL;
+            }
             const sheetUrl = data.googleSheetsUrl || prev.googleSheetsUrl || '';
             const serverSettings = data.settings || {};
             
@@ -208,12 +250,6 @@ export default function App() {
         }
       })
       .catch(err => console.log('Error loading global configuration:', err));
-  }, []);
-
-  // Google Sheets integration is manual-trigger only to prevent unsolicited background overwrites
-  // User can click "Muat Ulang Data" or trigger sync from the Google Sheets modal whenever needed.
-  useEffect(() => {
-    // No automatic periodic polling to protect local user data from unverified cloud overwrites
   }, []);
 
   // Background Google Sheets Sync Helper with direct state support
@@ -315,13 +351,25 @@ export default function App() {
         const incomingAddress = String(s.parentAddress || (s as any).address || '').trim();
         const incomingNik = String(s.nik || '').replace(/^'/, '').trim();
 
+        // Reject invalid / single-digit corrupted incoming values
+        const isInvalidIncomingParentName = !incomingParentName || 
+          /^\d+$/.test(incomingParentName) || 
+          incomingParentName === '-' || 
+          incomingParentName === 'undefined' || 
+          incomingParentName.length <= 1 ||
+          incomingParentName.startsWith('08') ||
+          incomingParentName.startsWith('+62');
+
+        const isInvalidIncomingParentPhone = !incomingParentPhone || 
+          incomingParentPhone.replace(/[^0-9]/g, '').length < 8;
+
         return {
           ...match,
           ...s,
-          parentName: (incomingParentName && incomingParentName !== '-' && incomingParentName !== 'undefined')
+          parentName: !isInvalidIncomingParentName
             ? incomingParentName
             : (match.parentName || ''),
-          parentPhone: (incomingParentPhone && incomingParentPhone !== '-' && incomingParentPhone !== 'undefined')
+          parentPhone: !isInvalidIncomingParentPhone
             ? incomingParentPhone
             : (match.parentPhone || ''),
           parentAddress: (incomingAddress && incomingAddress !== '-' && incomingAddress !== 'undefined')
@@ -340,14 +388,59 @@ export default function App() {
       saveStudents(sanitized);
     }
 
-    if (Array.isArray(imported.teachers)) {
-      const sanitized = sanitizeTeachers(imported.teachers);
-      setTeachers(sanitized);
-      saveTeachers(sanitized);
+    const existingTeachers = loadTeachers();
+    if (Array.isArray(imported.teachers) && imported.teachers.length > 0) {
+      const prevMapByNip = new Map<string, Teacher>();
+      const prevMapByName = new Map<string, Teacher>();
+
+      [...existingTeachers, ...teachers].forEach(t => {
+        if (t.nip) prevMapByNip.set(String(t.nip).replace(/[^0-9]/g, ''), t);
+        if (t.name) prevMapByName.set(String(t.name).trim().toLowerCase(), t);
+      });
+
+      const updatedTeachers: Teacher[] = imported.teachers.map((imp, idx) => {
+        const impNip = imp.nip ? String(imp.nip).replace(/[^0-9]/g, '') : '';
+        const impName = imp.name ? String(imp.name).trim().toLowerCase() : '';
+        const match = (impNip ? prevMapByNip.get(impNip) : null) || (impName ? prevMapByName.get(impName) : null);
+
+        if (match) {
+          return {
+            ...match,
+            ...imp,
+            nip: imp.nip && imp.nip !== '-' ? imp.nip : match.nip,
+            name: imp.name && imp.name !== '-' ? imp.name : match.name,
+            role: (imp.role && imp.role !== 'guru_mapel') ? imp.role : (match.role || 'guru_mapel'),
+            subject: (imp.subject && imp.subject !== '-') ? imp.subject : (match.subject || 'Guru'),
+            classAssigned: (imp.classAssigned && imp.classAssigned !== '-') ? imp.classAssigned : (match.classAssigned || 'Semua Kelas'),
+            phone: (imp.phone && imp.phone !== '-') ? imp.phone : (match.phone || '')
+          };
+        }
+        return {
+          id: imp.id || `TCH-${idx + 1}-${Date.now()}`,
+          nip: imp.nip || '-',
+          name: imp.name || `Guru ${idx + 1}`,
+          role: imp.role || 'guru_mapel',
+          subject: imp.subject || 'Guru',
+          classAssigned: imp.classAssigned || 'Semua Kelas',
+          phone: imp.phone || ''
+        };
+      });
+
+      const finalTeachers = sanitizeTeachers(updatedTeachers);
+      setTeachers(finalTeachers);
+      saveTeachers(finalTeachers);
+    } else if (teachers.length === 0) {
+      const defaultSanitized = sanitizeTeachers(initialTeachers);
+      setTeachers(defaultSanitized);
+      saveTeachers(defaultSanitized);
     }
-    if (Array.isArray(imported.piketSchedules)) {
+
+    if (Array.isArray(imported.piketSchedules) && imported.piketSchedules.length > 0) {
       setPiketSchedules(imported.piketSchedules);
       savePiketSchedules(imported.piketSchedules);
+    } else if (!piketSchedules || piketSchedules.length === 0 || piketSchedules.every(p => !p.teacherIds || p.teacherIds.length === 0)) {
+      setPiketSchedules(initialPiketSchedules);
+      savePiketSchedules(initialPiketSchedules);
     }
 
     const sMap = new Map(finalStudents.map(s => [s.nisn, s.id]));
@@ -669,6 +762,18 @@ export default function App() {
 
         {/* Content Canvas */}
         <main className="flex-1 lg:pl-64 p-4 sm:p-6 lg:p-8 min-w-0">
+          {sheetsSyncStatus && (
+            <div className="mb-4 px-4 py-2.5 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl text-xs font-semibold flex items-center justify-between shadow-sm animate-in fade-in">
+              <span>{sheetsSyncStatus}</span>
+              <button
+                onClick={() => setSheetsSyncStatus(null)}
+                className="text-emerald-700 hover:text-emerald-900 ml-3 text-base leading-none font-bold cursor-pointer"
+                title="Tutup"
+              >
+                ×
+              </button>
+            </div>
+          )}
           {currentTab === 'dashboard' && (
             <DashboardView
               students={students}
@@ -716,6 +821,7 @@ export default function App() {
               piketSchedules={piketSchedules}
               violations={violations}
               rewards={rewards}
+              settings={settings}
               onAddTeacher={handleAddTeacher}
               onUpdateTeacher={handleUpdateTeacher}
               onDeleteTeacher={handleDeleteTeacher}
@@ -724,6 +830,9 @@ export default function App() {
               onUpdateAllPiketSchedules={handleUpdateAllPiketSchedules}
               onOpenJurnalPiket={handleOpenJurnalPiket}
               onImportTeachers={handleImportTeachers}
+              onOpenSheetsModal={() => setSheetsModalOpen(true)}
+              onFetchFromSheets={() => fetchSpreadsheetData(false)}
+              isLoadingSheets={isLoadingSpreadsheet}
             />
           )}
 

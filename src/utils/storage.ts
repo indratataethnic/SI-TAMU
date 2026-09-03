@@ -1,5 +1,5 @@
 import { Student, Teacher, PiketSchedule, ViolationRule, RewardRule, ViolationRecord, RewardRecord, CompensationRecord, SchoolSettings, StudentScoreSummary } from '../types';
-import { initialStudents, initialTeachers, initialPiketSchedules, initialViolationRules, initialRewardRules, initialViolations, initialRewards, initialCompensations, initialSettings } from '../data/initialData';
+import { initialStudents, initialTeachers, initialPiketSchedules, initialViolationRules, initialRewardRules, initialViolations, initialRewards, initialCompensations, initialSettings, OFFICIAL_WEBHOOK_URL } from '../data/initialData';
 
 const STORAGE_KEYS = {
   STUDENTS: 'sitamu_students',
@@ -13,6 +13,17 @@ const STORAGE_KEYS = {
   SETTINGS: 'sitamu_settings',
   USER_ROLE: 'sitamu_user_role'
 };
+
+// Map for healing corrupted or single-digit parent/contact data from authentic initial student records
+const initialStudentsByNisn = new Map<string, Student>();
+const initialStudentsByNik = new Map<string, Student>();
+const initialStudentsByName = new Map<string, Student>();
+
+(initialStudents || []).forEach(s => {
+  if (s.nisn) initialStudentsByNisn.set(String(s.nisn).trim().toLowerCase(), s);
+  if (s.nik) initialStudentsByNik.set(String(s.nik).replace(/^'/, '').trim(), s);
+  if (s.name) initialStudentsByName.set(String(s.name).trim().toLowerCase(), s);
+});
 
 // Sanitization helpers to prevent duplicate React keys or invalid phone-number IDs
 export const sanitizeStudents = (students: Student[]): Student[] => {
@@ -40,7 +51,31 @@ export const sanitizeStudents = (students: Student[]): Student[] => {
       cleanAccess = (firstName + cleanCls).toUpperCase();
     }
 
+    // Match with authentic record if available
+    const authRecord = (rawNisn ? initialStudentsByNisn.get(rawNisn.toLowerCase()) : null) ||
+                       (rawNik ? initialStudentsByNik.get(rawNik) : null) ||
+                       (rawName ? initialStudentsByName.get(rawName.toLowerCase()) : null);
+
+    // Validate parent name: if purely numeric (e.g. "1", "3", "5"), phone number, or invalid
+    let cleanParentName = String(s.parentName || '').trim();
+    const isInvalidParentName = !cleanParentName || 
+      /^\d+$/.test(cleanParentName) || 
+      cleanParentName === '-' || 
+      cleanParentName === 'undefined' || 
+      cleanParentName.length <= 1 ||
+      cleanParentName.startsWith('08') ||
+      cleanParentName.startsWith('+62');
+
+    if (isInvalidParentName) {
+      cleanParentName = authRecord?.parentName || '';
+    }
+
+    // Validate parent phone: must have at least 8 digits
     let rawParentPhone = String(s.parentPhone || '').replace(/^'/, '').replace(/[^0-9+]/g, '').trim();
+    if (rawParentPhone.replace(/[^0-9]/g, '').length < 8) {
+      rawParentPhone = authRecord?.parentPhone ? String(authRecord.parentPhone).replace(/^'/, '').replace(/[^0-9+]/g, '').trim() : '';
+    }
+
     if (rawParentPhone.startsWith('8') && rawParentPhone.length >= 9 && rawParentPhone.length <= 13) {
       rawParentPhone = '0' + rawParentPhone;
     } else if (rawParentPhone.startsWith('628')) {
@@ -49,19 +84,24 @@ export const sanitizeStudents = (students: Student[]): Student[] => {
       rawParentPhone = '0' + rawParentPhone.substring(3);
     }
 
+    let cleanAddress = String(s.parentAddress || '').trim();
+    if ((!cleanAddress || cleanAddress === '-' || cleanAddress === 'undefined') && authRecord?.parentAddress) {
+      cleanAddress = authRecord.parentAddress;
+    }
+
     return {
       ...s,
       id: cleanId,
-      nik: rawNik && rawNik !== '-' ? rawNik : undefined,
-      nisn: rawNisn || `00${idx + 10000000}`,
-      name: rawName || `Siswa ${idx + 1}`,
-      class: rawClass || 'Kelas 1',
+      nik: rawNik && rawNik !== '-' ? rawNik : (authRecord?.nik || undefined),
+      nisn: rawNisn || authRecord?.nisn || `00${idx + 10000000}`,
+      name: rawName || authRecord?.name || `Siswa ${idx + 1}`,
+      class: rawClass || authRecord?.class || 'Kelas 1',
       gender: cleanGender,
-      parentName: String(s.parentName || '').trim(),
+      parentName: cleanParentName,
       parentPhone: rawParentPhone,
-      parentAddress: String(s.parentAddress || '').trim(),
-      accessCode: cleanAccess || `SISWA${idx + 1}`,
-      createdAt: s.createdAt || new Date().toISOString()
+      parentAddress: cleanAddress,
+      accessCode: cleanAccess || authRecord?.accessCode || `SISWA${idx + 1}`,
+      createdAt: s.createdAt || authRecord?.createdAt || new Date().toISOString()
     };
   });
 };
@@ -108,20 +148,44 @@ export const saveStudents = (students: Student[]): void => {
   localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(sanitizeStudents(students)));
 };
 
+const DUMMY_TEACHER_NAMES = new Set([
+  'Rini Astuti, S.Pd.SD',
+  'Siti Aminah, S.Pd.',
+  'Lilik Ernawati, S.Pd.SD',
+  'Tri Handayani, S.Pd.',
+  'Fitriyah, S.Pd.SD',
+  'Agus Prasetyo, S.Pd.',
+  'Bambang Setiawan, S.Pd.',
+  'Sri Wahyuni, S.Pd.',
+  'Dwi Rahmawati, S.Pd.',
+  'Nurul Hidayati, S.Pd.',
+  'Dra. Hj. Siti Zubaidah, M.Pd.',
+  'Ahmad Budi Santoso, S.Pd.',
+  'M. Fathur Rohman, S.Pd.I',
+  'Eko Wahyudi, S.Pd.',
+  'Yuliana Safitri, S.E.'
+]);
+
+const DUMMY_TEACHER_IDS = new Set([
+  'TCH-199404162022032014', 'TCH-199508192023022017', 'TCH-199105122019022006',
+  'TCH-198709232014032004', 'TCH-199203102020122011', 'TCH-198507142010011012',
+  'TCH-198411052009021003', 'TCH-198901202019032008', 'TCH-199308252020122015',
+  'TCH-198602182011012009', 'TCH-197003151994032001', 'TCH-198804122015021002',
+  'TCH-198912042016011005', 'TCH-199108152019031010', 'TCH-TU-01'
+]);
+
 export const getStoredTeachers = (): Teacher[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.TEACHERS);
-    if (!raw) return [];
+    if (!raw) return sanitizeTeachers(initialTeachers);
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    // Filter out residual dummy teachers if any exist from older sessions
-    const dummyNames = ['Indartha Meiputra, S.Pd.', 'Ratna Dewi Kusuma, S.Psi., M.Pd.', 'Dra. Hj. Siti Zubaidah, M.Pd.', 'Ahmad Budi Santoso, S.Pd.', 'Dwi Rahmawati, S.Pd.'];
-    const dummyIds = ['TCH-199005302019031004-1', 'TCH-198207152008012007-2', 'TCH-197003151994032001-3', 'TCH-198804122015021002-4', 'TCH-199308252020122015-5'];
-    const cleanTeachers = parsed.filter(t => !dummyIds.includes(t.id) && !dummyNames.includes(t.name));
-    return sanitizeTeachers(cleanTeachers);
+    if (!Array.isArray(parsed) || parsed.length === 0) return sanitizeTeachers(initialTeachers);
+    const filtered = parsed.filter(t => !DUMMY_TEACHER_NAMES.has(t.name) && !DUMMY_TEACHER_IDS.has(t.id));
+    if (filtered.length === 0) return sanitizeTeachers(initialTeachers);
+    return sanitizeTeachers(filtered);
   } catch (e) {
     console.error('Failed reading teachers from storage', e);
-    return [];
+    return sanitizeTeachers(initialTeachers);
   }
 };
 
@@ -136,7 +200,16 @@ export const getStoredPiketSchedules = (): PiketSchedule[] => {
     const raw = localStorage.getItem(STORAGE_KEYS.PIKET_SCHEDULES);
     if (!raw) return initialPiketSchedules;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : initialPiketSchedules;
+    if (!Array.isArray(parsed) || parsed.length === 0) return initialPiketSchedules;
+    const cleaned = parsed.map(p => ({
+      ...p,
+      teacherIds: (p.teacherIds || []).filter((id: string) => !DUMMY_TEACHER_IDS.has(id))
+    }));
+    const totalAssignments = cleaned.reduce((sum, p) => sum + (p.teacherIds ? p.teacherIds.length : 0), 0);
+    if (totalAssignments === 0 && initialPiketSchedules.length > 0) {
+      return initialPiketSchedules;
+    }
+    return cleaned;
   } catch (e) {
     console.error('Failed reading piket schedules from storage', e);
     return initialPiketSchedules;
@@ -228,12 +301,28 @@ export const getStoredSettings = (): SchoolSettings => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     const parsed = raw ? JSON.parse(raw) : initialSettings;
-    return {
+
+    let webhook = (parsed.googleSheetsWebhook || parsed.googleSheetsWebhookUrl || '').trim();
+    // Auto-migrate if empty or if device stored an outdated/different Google Apps Script webhook
+    if (!webhook || (webhook.includes('script.google.com/macros/s/') && webhook !== OFFICIAL_WEBHOOK_URL)) {
+      webhook = OFFICIAL_WEBHOOK_URL;
+    }
+
+    const merged: SchoolSettings = {
       ...initialSettings,
       ...parsed,
-      googleSheetsWebhook: parsed.googleSheetsWebhook || parsed.googleSheetsWebhookUrl || initialSettings.googleSheetsWebhook || '',
-      googleSheetsWebhookUrl: parsed.googleSheetsWebhook || parsed.googleSheetsWebhookUrl || initialSettings.googleSheetsWebhookUrl || ''
+      googleSheetsWebhook: webhook,
+      googleSheetsWebhookUrl: webhook
     };
+
+    // If local storage was holding a stale webhook, update it immediately
+    if (parsed && (parsed.googleSheetsWebhook !== webhook || parsed.googleSheetsWebhookUrl !== webhook)) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(merged));
+      } catch (_) {}
+    }
+
+    return merged;
   } catch (e) {
     return initialSettings;
   }

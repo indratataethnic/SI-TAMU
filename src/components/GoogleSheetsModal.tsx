@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SchoolSettings, Student, Teacher, PiketSchedule, ViolationRecord, RewardRecord, CompensationRecord } from '../types';
-import { Table, Copy, Check, ExternalLink, RefreshCw, AlertCircle, Sparkles, CheckCircle2, X, HelpCircle, ShieldAlert, ArrowRight, Download } from 'lucide-react';
+import { Table, Copy, Check, ExternalLink, RefreshCw, AlertCircle, Sparkles, CheckCircle2, X, HelpCircle, ShieldAlert, ArrowRight, Download, Link2 } from 'lucide-react';
 import { getGoogleAppsScriptTemplate, syncAllToGoogleSheets, testGoogleSheetsWebhook, validateWebhookUrl, fetchFullStateFromSheets } from '../utils/sheetsSync';
+import { OFFICIAL_WEBHOOK_URL } from '../data/initialData';
 
 interface GoogleSheetsModalProps {
   settings: SchoolSettings;
@@ -20,6 +21,7 @@ interface GoogleSheetsModalProps {
     settings?: SchoolSettings;
     students?: Student[];
     teachers?: Teacher[];
+    piketSchedules?: PiketSchedule[];
     violations?: ViolationRecord[];
     rewards?: RewardRecord[];
     compensations?: CompensationRecord[];
@@ -47,6 +49,16 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
   const [importing, setImporting] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{ success?: boolean; message?: string } | null>(null);
   const [showTroubleshoot, setShowTroubleshoot] = useState(false);
+
+  useEffect(() => {
+    const currentWebhook = settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || OFFICIAL_WEBHOOK_URL;
+    if (currentWebhook) {
+      setWebhookUrl(currentWebhook);
+    }
+    if (settings.googleSheetsUrl) {
+      setSheetUrl(settings.googleSheetsUrl);
+    }
+  }, [settings.googleSheetsWebhook, settings.googleSheetsWebhookUrl, settings.googleSheetsUrl]);
 
   const scriptCode = getGoogleAppsScriptTemplate(settings.schoolName);
 
@@ -131,16 +143,52 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
     // Save first
     handleSave();
 
-    const res = await syncAllToGoogleSheets(clean, {
-      students,
-      teachers,
-      piketSchedules,
-      violations,
-      rewards,
-      compensations,
-      summaries,
-      sheetUrl: sheetUrl.trim()
-    });
+    let res: { success?: boolean; message?: string };
+    try {
+      const serverRes = await fetch('/api/sheets/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          webhookUrl: clean,
+          data: {
+            students,
+            teachers,
+            piketSchedules,
+            violations,
+            rewards,
+            compensations,
+            summaries,
+            sheetUrl: sheetUrl.trim()
+          }
+        })
+      });
+      const serverJson = await serverRes.json();
+      if (serverJson.success) {
+        res = { success: true, message: serverJson.message || 'Sinkronisasi ke Google Spreadsheet berhasil!' };
+      } else {
+        res = await syncAllToGoogleSheets(clean, {
+          students,
+          teachers,
+          piketSchedules,
+          violations,
+          rewards,
+          compensations,
+          summaries,
+          sheetUrl: sheetUrl.trim()
+        });
+      }
+    } catch (e) {
+      res = await syncAllToGoogleSheets(clean, {
+        students,
+        teachers,
+        piketSchedules,
+        violations,
+        rewards,
+        compensations,
+        summaries,
+        sheetUrl: sheetUrl.trim()
+      });
+    }
 
     setSyncing(false);
     setSyncStatus(res);
@@ -162,15 +210,33 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
     // Save webhook address first
     handleSave();
 
-    const res = await fetchFullStateFromSheets(clean);
+    let res: { success?: boolean; message?: string; data?: any };
+    try {
+      const serverRes = await fetch('/api/sheets/fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ webhookUrl: clean })
+      });
+      const serverJson = await serverRes.json();
+      if (serverJson.success && serverJson.data) {
+        res = { success: true, message: 'Data Google Spreadsheet berhasil dimuat.', data: serverJson.data };
+      } else {
+        res = await fetchFullStateFromSheets(clean);
+      }
+    } catch (e) {
+      res = await fetchFullStateFromSheets(clean);
+    }
     setImporting(false);
 
     if (res.success && res.data) {
       const studentCount = res.data.students?.length || 0;
       const teacherCount = res.data.teachers?.length || 0;
+      const teacherInfo = teacherCount > 0 
+        ? `${teacherCount} Guru / GTK` 
+        : `data guru aplikasi tetap aman & terjaga (${teachers.length} Guru)`;
       setSyncStatus({
         success: true,
-        message: `Sinkronisasi berhasil! Data terbaru dari Google Spreadsheet telah diterapkan (${studentCount} Siswa, ${teacherCount} Guru / GTK).`
+        message: `Sinkronisasi berhasil! Data dari Google Spreadsheet telah dimuat (${studentCount} Siswa, ${teacherInfo}).`
       });
 
       if (typeof onImportFullData === 'function') {
@@ -281,6 +347,28 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
                 <p className="text-[11px] text-slate-500 mt-1">
                   Didapat dari hasil <strong>Penerapan Baru (Deploy as Web App)</strong> di Google Apps Script (berakhiran <code className="text-emerald-800 font-bold bg-emerald-100 px-1 rounded">/exec</code>).
                 </p>
+              )}
+
+              {webhookUrl.trim() === OFFICIAL_WEBHOOK_URL ? (
+                <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px]">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Menggunakan <strong>Webhook Resmi Sekolah UPT SDN Karanganyar</strong> (Sinkron lintas perangkat).</span>
+                </div>
+              ) : (
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span className="text-[11px]">URL berbeda dari Webhook Resmi Sekolah.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setWebhookUrl(OFFICIAL_WEBHOOK_URL)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[11px] font-semibold transition cursor-pointer shadow-xs"
+                  >
+                    <Link2 className="w-3 h-3" />
+                    Gunakan Webhook Resmi
+                  </button>
+                </div>
               )}
             </div>
 

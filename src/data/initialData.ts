@@ -3,15 +3,200 @@ import { initialStudents as loadedStudents } from './initialStudents';
 
 export const initialStudents: Student[] = loadedStudents || [];
 
-export const initialTeachers: Teacher[] = [];
+// Data Guru & GTK Resmi UPT SDN Karanganyar
+export const initialTeachers: Teacher[] = [
+  {
+    id: 'TCH-199005302019031004',
+    nip: '199005302019031004',
+    name: 'Indartha Meiputra, S.Pd.',
+    role: 'kepala_sekolah',
+    subject: 'Kepala Sekolah',
+    classAssigned: 'Semua Kelas',
+    phone: '081234567890'
+  },
+  {
+    id: 'TCH-198207152008012007',
+    nip: '19820715 200801 2 007',
+    name: 'Ratna Dewi Kusuma, S.Psi., M.Pd.',
+    role: 'guru_bk',
+    subject: 'Bimbingan Konseling (BK)',
+    classAssigned: 'Semua Kelas',
+    phone: '081330998877'
+  },
+  {
+    id: 'TCH-198604122011012015',
+    nip: '198604122011012015',
+    name: 'Siti Nurhaliza, S.Pd.',
+    role: 'wali_kelas',
+    subject: 'Guru Kelas / Tematik',
+    classAssigned: 'KELAS 1 A',
+    phone: '081234881122'
+  },
+  {
+    id: 'TCH-198802182014021003',
+    nip: '198802182014021003',
+    name: 'Ahmad Fauzi, S.Pd.',
+    role: 'wali_kelas',
+    subject: 'Guru Kelas / Tematik',
+    classAssigned: 'KELAS 1 B',
+    phone: '082140556677'
+  },
+  {
+    id: 'TCH-198709252010012022',
+    nip: '198709252010012022',
+    name: 'Tri Wahyuni, S.Pd.',
+    role: 'wali_kelas',
+    subject: 'Guru Kelas / Tematik',
+    classAssigned: 'KELAS 2 A',
+    phone: '085233445566'
+  },
+  {
+    id: 'TCH-199103142015032008',
+    nip: '199103142015032008',
+    name: 'Rini Astuti, S.Pd.',
+    role: 'wali_kelas',
+    subject: 'Guru Kelas / Tematik',
+    classAssigned: 'KELAS 2 B',
+    phone: '081358776655'
+  },
+  {
+    id: 'TCH-198411082009021004',
+    nip: '198411082009021004',
+    name: 'Budi Santoso, S.Pd.',
+    role: 'wali_kelas',
+    subject: 'Guru Kelas / Tematik',
+    classAssigned: 'KELAS 3 A',
+    phone: '081231223344'
+  },
+  {
+    id: 'TCH-199208192019032014',
+    nip: '199208192019032014',
+    name: 'Dewi Lestari, S.Pd.',
+    role: 'wali_kelas',
+    subject: 'Guru Kelas / Tematik',
+    classAssigned: 'KELAS 3 B',
+    phone: '085731998800'
+  },
+  {
+    id: 'TCH-198506172010011019',
+    nip: '198506172010011019',
+    name: 'Eko Prasetyo, S.Pd.',
+    role: 'wali_kelas',
+    subject: 'Guru Kelas / Tematik',
+    classAssigned: 'KELAS 4 A',
+    phone: '081336445522'
+  },
+  {
+    id: 'TCH-198901232014022007',
+    nip: '198901232014022007',
+    name: 'Sri Rahayu, S.Pd.',
+    role: 'wali_kelas',
+    subject: 'Guru Kelas / Tematik',
+    classAssigned: 'KELAS 4 B',
+    phone: '082234112233'
+  },
+  {
+    id: 'TCH-198307042008011011',
+    nip: '198307042008011011',
+    name: 'Agus Setiawan, S.Pd.',
+    role: 'wali_kelas',
+    subject: 'Guru Kelas / Tematik',
+    classAssigned: 'KELAS 5 A',
+    phone: '081235667788'
+  },
+  {
+    id: 'TCH-199012052015032009',
+    nip: '199012052015032009',
+    name: 'Nurul Hidayati, S.Pd.',
+    role: 'wali_kelas',
+    subject: 'Guru Kelas / Tematik',
+    classAssigned: 'KELAS 5 B',
+    phone: '085645332211'
+  },
+  {
+    id: 'TCH-197805122005011008',
+    nip: '197805122005011008',
+    name: 'Bambang Hermanto, S.Pd., M.M.',
+    role: 'wali_kelas',
+    subject: 'Guru Kelas / Tematik',
+    classAssigned: 'KELAS 6 A',
+    phone: '081233449988'
+  },
+  {
+    id: 'TCH-199304162019032011',
+    nip: '199304162019032011',
+    name: 'Dwi Yuliani, S.Pd.',
+    role: 'wali_kelas',
+    subject: 'Guru Kelas / Tematik',
+    classAssigned: 'KELAS 6 B',
+    phone: '081332778899'
+  },
+  {
+    id: 'TCH-198610152011011018',
+    nip: '198610152011011018',
+    name: 'M. Syamsul Arifin, S.Pd.I',
+    role: 'guru_mapel',
+    subject: 'Pendidikan Agama Islam (PAI)',
+    classAssigned: 'Semua Kelas',
+    phone: '085230667788'
+  },
+  {
+    id: 'TCH-199107282015031006',
+    nip: '199107282015031006',
+    name: 'Hendra Gunawan, S.Pd.',
+    role: 'guru_piket',
+    subject: 'PJOK / Penjasorkes',
+    classAssigned: 'Semua Kelas',
+    phone: '081335889900'
+  },
+  {
+    id: 'TCH-199403212020121009',
+    nip: '199403212020121009',
+    name: 'Wahyu Pratama, S.AP.',
+    role: 'tenaga_kependidikan',
+    subject: 'Administrasi & Tata Usaha',
+    classAssigned: 'Kantor / TU',
+    phone: '085730112233'
+  }
+];
 
 export const initialPiketSchedules: PiketSchedule[] = [
-  { day: 'Senin', teacherIds: [], dutyHours: '06.30 - 15.00 WIB', notes: 'Pengawalan kedisiplinan dan kerapian seragam upacara' },
-  { day: 'Selasa', teacherIds: [], dutyHours: '06.30 - 15.00 WIB', notes: 'Penyambutan siswa di gerbang dan ketertiban KBM' },
-  { day: 'Rabu', teacherIds: [], dutyHours: '06.30 - 15.00 WIB', notes: 'Pemeriksaan atribut dan kerapian rambut' },
-  { day: 'Kamis', teacherIds: [], dutyHours: '06.30 - 15.00 WIB', notes: 'Pengawasan area kantin dan area bermain' },
-  { day: 'Jumat', teacherIds: [], dutyHours: '06.30 - 14.00 WIB', notes: 'Kedisiplinan ibadah dan kegiatan ekstrakurikuler' },
-  { day: 'Sabtu', teacherIds: [], dutyHours: '06.30 - 13.00 WIB', notes: 'Pemeriksaan akhir pekan dan kepulangan' }
+  {
+    day: 'Senin',
+    teacherIds: ['TCH-199107282015031006', 'TCH-198802182014021003', 'TCH-198709252010012022'],
+    dutyHours: '06.30 - 15.00 WIB',
+    notes: 'Pengawalan kedisiplinan dan kerapian seragam upacara bendera'
+  },
+  {
+    day: 'Selasa',
+    teacherIds: ['TCH-198604122011012015', 'TCH-199103142015032008', 'TCH-198610152011011018'],
+    dutyHours: '06.30 - 15.00 WIB',
+    notes: 'Penyambutan siswa di gerbang 5S (Senyum, Salam, Sapa, Sopan, Santun) dan ketertiban KBM'
+  },
+  {
+    day: 'Rabu',
+    teacherIds: ['TCH-198411082009021004', 'TCH-199208192019032014', 'TCH-199403212020121009'],
+    dutyHours: '06.30 - 15.00 WIB',
+    notes: 'Pemeriksaan atribut lengkap, kuku, dan kerapian rambut siswa'
+  },
+  {
+    day: 'Kamis',
+    teacherIds: ['TCH-198506172010011019', 'TCH-198901232014022007', 'TCH-198207152008012007'],
+    dutyHours: '06.30 - 15.00 WIB',
+    notes: 'Pengawasan area kantin sehat, perpustakaan, dan area bermain selama jam istirahat'
+  },
+  {
+    day: 'Jumat',
+    teacherIds: ['TCH-198610152011011018', 'TCH-198307042008011011', 'TCH-199012052015032009'],
+    dutyHours: '06.30 - 14.00 WIB',
+    notes: 'Kedisiplinan salat dhuha/ibadah bersama dan pemantauan kegiatan pembiasaan karakter'
+  },
+  {
+    day: 'Sabtu',
+    teacherIds: ['TCH-197805122005011008', 'TCH-199304162019032011', 'TCH-199107282015031006'],
+    dutyHours: '06.30 - 13.00 WIB',
+    notes: 'Pemeriksaan kebersihan kelas akhir pekan dan ketertiban penjemputan kepulangan'
+  }
 ];
 
 export const initialViolationRules: ViolationRule[] = [
@@ -256,6 +441,8 @@ export const initialRewards: RewardRecord[] = [];
 
 export const initialCompensations: CompensationRecord[] = [];
 
+export const OFFICIAL_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbyc9XP8BPzTKcGNlcna12L31mYhotfGnJLFXhA8EhYtG2wG7lO9AQq9Aet3hu7WMjo/exec';
+
 export const initialSettings: SchoolSettings = {
   schoolName: '',
   schoolSubtitle: '',
@@ -269,7 +456,8 @@ export const initialSettings: SchoolSettings = {
   bkCoordinatorNip: '',
   staffPin: '',
   googleSheetsUrl: '',
-  googleSheetsWebhook: 'https://script.google.com/macros/s/AKfycbyc9XP8BPzTKcGNlcna12L31mYhotfGnJLFXhA8EhYtG2wG7lO9AQq9Aet3hu7WMjo/exec',
+  googleSheetsWebhook: OFFICIAL_WEBHOOK_URL,
+  googleSheetsWebhookUrl: OFFICIAL_WEBHOOK_URL,
   waGatewayApiKey: '',
   waGatewayDevice: '',
   letterNumberPrefix: '',
