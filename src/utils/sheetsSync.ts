@@ -600,14 +600,26 @@ function fetchAllData(ss) {
   if (teacherSheet) {
     var values = teacherSheet.getDataRange().getValues();
     if (values && values.length > 1) {
-      var headerRowIdx = 0;
+      var headerRowIdx = -1;
       for (var r = 0; r < Math.min(values.length, 10); r++) {
         var rStr = values[r].join(" ").toLowerCase();
-        if (rStr.indexOf("nama") !== -1 || rStr.indexOf("nip") !== -1 || rStr.indexOf("guru") !== -1 || rStr.indexOf("jabatan") !== -1 || rStr.indexOf("gtk") !== -1) {
+        if ((rStr.indexOf("nama") !== -1 || rStr.indexOf("pendidik") !== -1 || rStr.indexOf("pegawai") !== -1) && 
+            (rStr.indexOf("nip") !== -1 || rStr.indexOf("jabatan") !== -1 || rStr.indexOf("tugas") !== -1 || rStr.indexOf("mapel") !== -1 || rStr.indexOf("nuptk") !== -1 || rStr.indexOf("hp") !== -1 || rStr.indexOf("wa") !== -1)) {
           headerRowIdx = r;
           break;
         }
       }
+      if (headerRowIdx === -1) {
+        for (var r = 0; r < Math.min(values.length, 10); r++) {
+          var rStr = values[r].join(" ").toLowerCase();
+          if (rStr.indexOf("nama") !== -1 || rStr.indexOf("nip") !== -1) {
+            headerRowIdx = r;
+            break;
+          }
+        }
+      }
+      if (headerRowIdx === -1) headerRowIdx = 0;
+
       var headerRow = values[headerRowIdx];
       var colNip = -1, colName = -1, colRole = -1, colSubject = -1, colClass = -1, colPhone = -1, colId = -1;
       for (var h = 0; h < headerRow.length; h++) {
@@ -671,7 +683,7 @@ function fetchAllData(ss) {
           }
 
           data.teachers.push({
-            id: idVal ? idVal : ("TCH-" + (nipVal ? nipVal.replace(/\s+/g, '') : nameVal.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())),
+            id: idVal ? idVal : ("TCH-" + (i - headerRowIdx) + "-" + (nipVal ? nipVal.replace(/\s+/g, '') : nameVal.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())),
             nip: nipVal.replace(/^'/, ''),
             name: nameVal,
             role: roleCode,
@@ -694,7 +706,7 @@ function fetchAllData(ss) {
         if (!row || row.length === 0) continue;
         var dayVal = String(row[0] || "").trim();
         var dayLower = dayVal.toLowerCase();
-        if (dayVal && dayLower.indexOf("hari") === -1 && (dayLower.indexOf("senin") !== -1 || dayLower.indexOf("selasa") !== -1 || dayLower.indexOf("rabu") !== -1 || dayLower.indexOf("kamis") !== -1 || dayLower.indexOf("jumat") !== -1 || dayLower.indexOf("sabtu") !== -1 || dayLower.indexOf("minggu") !== -1)) {
+        if (dayVal && dayLower !== "hari" && dayLower !== "day" && dayLower !== "hari bertugas" && dayLower.indexOf("jumlah") === -1) {
           var dutyHoursVal = row[1] ? String(row[1]).trim() : "06.30 - 15.00 WIB";
           var namesStr = row[3] ? String(row[3]).trim() : "";
           var notesVal = row[4] ? String(row[4]).trim() : "";
@@ -724,11 +736,16 @@ function fetchAllData(ss) {
             }
           }
 
+          var cleanDay = dayVal;
+          if (cleanDay.toLowerCase().indexOf("hari ") === 0) {
+            cleanDay = cleanDay.substring(5).trim();
+          }
+
           data.piketSchedules.push({
-            day: dayVal,
+            day: cleanDay,
             dutyHours: dutyHoursVal,
             teacherIds: teacherIds,
-            notes: notesVal === "-" ? "" : notesVal
+            notes: (notesVal === "-" || notesVal === "undefined") ? "" : notesVal
           });
         }
       }

@@ -148,41 +148,13 @@ export const saveStudents = (students: Student[]): void => {
   localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(sanitizeStudents(students)));
 };
 
-const DUMMY_TEACHER_NAMES = new Set([
-  'Rini Astuti, S.Pd.SD',
-  'Siti Aminah, S.Pd.',
-  'Lilik Ernawati, S.Pd.SD',
-  'Tri Handayani, S.Pd.',
-  'Fitriyah, S.Pd.SD',
-  'Agus Prasetyo, S.Pd.',
-  'Bambang Setiawan, S.Pd.',
-  'Sri Wahyuni, S.Pd.',
-  'Dwi Rahmawati, S.Pd.',
-  'Nurul Hidayati, S.Pd.',
-  'Dra. Hj. Siti Zubaidah, M.Pd.',
-  'Ahmad Budi Santoso, S.Pd.',
-  'M. Fathur Rohman, S.Pd.I',
-  'Eko Wahyudi, S.Pd.',
-  'Yuliana Safitri, S.E.'
-]);
-
-const DUMMY_TEACHER_IDS = new Set([
-  'TCH-199404162022032014', 'TCH-199508192023022017', 'TCH-199105122019022006',
-  'TCH-198709232014032004', 'TCH-199203102020122011', 'TCH-198507142010011012',
-  'TCH-198411052009021003', 'TCH-198901202019032008', 'TCH-199308252020122015',
-  'TCH-198602182011012009', 'TCH-197003151994032001', 'TCH-198804122015021002',
-  'TCH-198912042016011005', 'TCH-199108152019031010', 'TCH-TU-01'
-]);
-
 export const getStoredTeachers = (): Teacher[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.TEACHERS);
     if (!raw) return sanitizeTeachers(initialTeachers);
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) return sanitizeTeachers(initialTeachers);
-    const filtered = parsed.filter(t => !DUMMY_TEACHER_NAMES.has(t.name) && !DUMMY_TEACHER_IDS.has(t.id));
-    if (filtered.length === 0) return sanitizeTeachers(initialTeachers);
-    return sanitizeTeachers(filtered);
+    return sanitizeTeachers(parsed);
   } catch (e) {
     console.error('Failed reading teachers from storage', e);
     return sanitizeTeachers(initialTeachers);
@@ -201,15 +173,7 @@ export const getStoredPiketSchedules = (): PiketSchedule[] => {
     if (!raw) return initialPiketSchedules;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) return initialPiketSchedules;
-    const cleaned = parsed.map(p => ({
-      ...p,
-      teacherIds: (p.teacherIds || []).filter((id: string) => !DUMMY_TEACHER_IDS.has(id))
-    }));
-    const totalAssignments = cleaned.reduce((sum, p) => sum + (p.teacherIds ? p.teacherIds.length : 0), 0);
-    if (totalAssignments === 0 && initialPiketSchedules.length > 0) {
-      return initialPiketSchedules;
-    }
-    return cleaned;
+    return parsed;
   } catch (e) {
     console.error('Failed reading piket schedules from storage', e);
     return initialPiketSchedules;

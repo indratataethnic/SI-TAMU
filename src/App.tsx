@@ -403,26 +403,14 @@ export default function App() {
         const impName = imp.name ? String(imp.name).trim().toLowerCase() : '';
         const match = (impNip ? prevMapByNip.get(impNip) : null) || (impName ? prevMapByName.get(impName) : null);
 
-        if (match) {
-          return {
-            ...match,
-            ...imp,
-            nip: imp.nip && imp.nip !== '-' ? imp.nip : match.nip,
-            name: imp.name && imp.name !== '-' ? imp.name : match.name,
-            role: (imp.role && imp.role !== 'guru_mapel') ? imp.role : (match.role || 'guru_mapel'),
-            subject: (imp.subject && imp.subject !== '-') ? imp.subject : (match.subject || 'Guru'),
-            classAssigned: (imp.classAssigned && imp.classAssigned !== '-') ? imp.classAssigned : (match.classAssigned || 'Semua Kelas'),
-            phone: (imp.phone && imp.phone !== '-') ? imp.phone : (match.phone || '')
-          };
-        }
         return {
-          id: imp.id || `TCH-${idx + 1}-${Date.now()}`,
-          nip: imp.nip || '-',
-          name: imp.name || `Guru ${idx + 1}`,
-          role: imp.role || 'guru_mapel',
-          subject: imp.subject || 'Guru',
-          classAssigned: imp.classAssigned || 'Semua Kelas',
-          phone: imp.phone || ''
+          id: imp.id || (match ? match.id : `TCH-${idx + 1}`),
+          nip: (imp.nip && imp.nip !== '-') ? imp.nip : (match?.nip || '-'),
+          name: (imp.name && imp.name !== '-') ? imp.name : (match?.name || `Guru ${idx + 1}`),
+          role: imp.role || match?.role || 'guru_mapel',
+          subject: (imp.subject && imp.subject !== '-') ? imp.subject : (match?.subject || 'Guru'),
+          classAssigned: (imp.classAssigned && imp.classAssigned !== '-') ? imp.classAssigned : (match?.classAssigned || 'Semua Kelas'),
+          phone: (imp.phone && imp.phone !== '-') ? imp.phone : (match?.phone || '')
         };
       });
 
