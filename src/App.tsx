@@ -37,7 +37,10 @@ import {
   calculateSummaries,
   sanitizeStudents,
   sanitizeTeachers,
-  sanitizeRecords
+  sanitizeRecords,
+  normalizeRecordDate,
+  isCorruptedNisn,
+  isCorruptedAccessCode
 } from './utils/storage';
 import { syncFullStateToSheets, fetchFullStateFromSheets } from './utils/sheetsSync';
 import { OFFICIAL_WEBHOOK_URL, initialTeachers, initialPiketSchedules } from './data/initialData';
@@ -330,8 +333,8 @@ export default function App() {
 
       // Index both current state and localStorage
       [...students, ...existingStudents].forEach(s => {
-        if (s.nisn) prevMapByNisn.set(String(s.nisn).trim().toLowerCase(), s);
-        if (s.id) prevMapById.set(String(s.id).trim(), s);
+        if (s.nisn && !isCorruptedNisn(s.nisn)) prevMapByNisn.set(String(s.nisn).trim().toLowerCase(), s);
+        if (s.id && !s.id.startsWith('STU-L-') && !s.id.startsWith('STU-P-') && s.id !== 'STD-L' && s.id !== 'STD-P') prevMapById.set(String(s.id).trim(), s);
         if (s.name) prevMapByName.set(String(s.name).trim().toLowerCase(), s);
       });
 
@@ -340,9 +343,9 @@ export default function App() {
         const sId = String(s.id || '').trim();
         const sName = String(s.name || '').trim().toLowerCase();
 
-        const match = (sNisn ? prevMapByNisn.get(sNisn) : null) ||
-                      (sId ? prevMapById.get(sId) : null) ||
-                      (sName ? prevMapByName.get(sName) : null);
+        const match = (!isCorruptedNisn(sNisn) ? prevMapByNisn.get(sNisn) : null) ||
+                      (sName ? prevMapByName.get(sName) : null) ||
+                      (sId ? prevMapById.get(sId) : null);
 
         if (!match) return s;
 
@@ -350,6 +353,8 @@ export default function App() {
         const incomingParentPhone = String(s.parentPhone || '').replace(/^'/, '').trim();
         const incomingAddress = String(s.parentAddress || (s as any).address || '').trim();
         const incomingNik = String(s.nik || '').replace(/^'/, '').trim();
+        const incomingNisn = String(s.nisn || '').trim();
+        const incomingAccess = String(s.accessCode || '').trim();
 
         // Reject invalid / single-digit corrupted incoming values
         const isInvalidIncomingParentName = !incomingParentName || 
@@ -366,6 +371,9 @@ export default function App() {
         return {
           ...match,
           ...s,
+          id: (s.id && !s.id.startsWith('STU-L-') && !s.id.startsWith('STU-P-') && s.id !== 'STD-L' && s.id !== 'STD-P') ? s.id : match.id,
+          nisn: !isCorruptedNisn(incomingNisn) ? incomingNisn : match.nisn,
+          accessCode: (!isCorruptedAccessCode(incomingAccess) && incomingAccess !== '') ? incomingAccess : match.accessCode,
           parentName: !isInvalidIncomingParentName
             ? incomingParentName
             : (match.parentName || ''),
@@ -375,10 +383,9 @@ export default function App() {
           parentAddress: (incomingAddress && incomingAddress !== '-' && incomingAddress !== 'undefined')
             ? incomingAddress
             : (match.parentAddress || ''),
-          nik: (incomingNik && incomingNik !== '-' && incomingNik !== 'undefined')
+          nik: (incomingNik && incomingNik !== '-' && incomingNik !== 'undefined' && incomingNik.length >= 10)
             ? incomingNik
-            : (match.nik || undefined),
-          accessCode: (s.accessCode && String(s.accessCode).trim() !== '') ? s.accessCode : (match.accessCode || '')
+            : (match.nik || undefined)
         };
       });
 
@@ -432,28 +439,63 @@ export default function App() {
     }
 
     const sMap = new Map(finalStudents.map(s => [s.nisn, s.id]));
+    const sNameMap = new Map(finalStudents.map(s => [s.name.trim().toLowerCase(), s]));
 
     if (Array.isArray(imported.violations)) {
-      const mappedViolations = sanitizeRecords<ViolationRecord>(imported.violations.map(v => ({
-        ...v,
-        studentId: String(v.studentId || sMap.get((v as any).studentNisn || '') || '')
-      })), 'VIOL');
+      const mappedViolations = sanitizeRecords<ViolationRecord>(imported.violations.map(v => {
+        const student = (v.studentId ? finalStudents.find(s => s.id === v.studentId) : null) ||
+                        ((v as any).studentNisn ? finalStudents.find(s => s.nisn === (v as any).studentNisn) : null) ||
+                        (v.studentName ? sNameMap.get(v.studentName.trim().toLowerCase()) : null);
+        return {
+          ...v,
+          studentId: student ? student.id : (v.studentId || ''),
+          studentName: student ? student.name : (v.studentName || ''),
+          studentClass: student ? student.class : (v.studentClass || ''),
+          date: normalizeRecordDate(v.date),
+          ruleName: v.ruleName || (v as any).pelanggaran || (v as any).violationName || 'Pelanggaran Tata Tertib',
+          category: ((v.category || 'ringan').toLowerCase() as any),
+          points: Number(v.points) || 0,
+          reporterName: v.reporterName || (v as any).reporter || (v as any).reporterTeacherName || 'Guru Piket'
+        };
+      }), 'VIOL');
       setViolations(mappedViolations);
       saveViolations(mappedViolations);
     }
     if (Array.isArray(imported.rewards)) {
-      const mappedRewards = sanitizeRecords<RewardRecord>(imported.rewards.map(r => ({
-        ...r,
-        studentId: String(r.studentId || sMap.get((r as any).studentNisn || '') || '')
-      })), 'REW');
+      const mappedRewards = sanitizeRecords<RewardRecord>(imported.rewards.map(r => {
+        const student = (r.studentId ? finalStudents.find(s => s.id === r.studentId) : null) ||
+                        ((r as any).studentNisn ? finalStudents.find(s => s.nisn === (r as any).studentNisn) : null) ||
+                        (r.studentName ? sNameMap.get(r.studentName.trim().toLowerCase()) : null);
+        return {
+          ...r,
+          studentId: student ? student.id : (r.studentId || ''),
+          studentName: student ? student.name : (r.studentName || ''),
+          studentClass: student ? student.class : (r.studentClass || ''),
+          date: normalizeRecordDate(r.date),
+          ruleName: r.ruleName || (r as any).prestasi || (r as any).rewardName || 'Apresiasi Prestasi',
+          rank: r.rank || (r as any).peringkat || 'Juara 1',
+          level: r.level || (r as any).tingkat || 'Sekolah',
+          competitionName: r.competitionName || r.ruleName || 'Kegiatan Sekolah',
+          points: Number(r.points) || 0,
+          reporterName: r.reporterName || (r as any).reporter || (r as any).reporterTeacherName || 'Guru'
+        };
+      }), 'REW');
       setRewards(mappedRewards);
       saveRewards(mappedRewards);
     }
     if (Array.isArray(imported.compensations)) {
-      const mappedCompensations = sanitizeRecords<CompensationRecord>(imported.compensations.map(c => ({
-        ...c,
-        studentId: String(c.studentId || sMap.get((c as any).studentNisn || '') || '')
-      })), 'COMP');
+      const mappedCompensations = sanitizeRecords<CompensationRecord>(imported.compensations.map(c => {
+        const student = (c.studentId ? finalStudents.find(s => s.id === c.studentId) : null) ||
+                        ((c as any).studentNisn ? finalStudents.find(s => s.nisn === (c as any).studentNisn) : null) ||
+                        (c.studentName ? sNameMap.get(c.studentName.trim().toLowerCase()) : null);
+        return {
+          ...c,
+          studentId: student ? student.id : (c.studentId || ''),
+          studentName: student ? student.name : (c.studentName || ''),
+          studentClass: student ? student.class : (c.studentClass || ''),
+          date: normalizeRecordDate(c.date)
+        };
+      }), 'COMP');
       setCompensations(mappedCompensations);
       saveCompensations(mappedCompensations);
     }
@@ -600,40 +642,64 @@ export default function App() {
 
   // Handlers for Violations
   const handleSaveViolation = (violation: ViolationRecord) => {
-    const updated = [violation, ...violations];
+    lastLocalActionRef.current = Date.now();
+    const cleanViolation: ViolationRecord = {
+      ...violation,
+      date: normalizeRecordDate(violation.date)
+    };
+    const updated = [cleanViolation, ...violations];
     setViolations(updated);
+    saveViolations(updated);
     triggerSheetsSync({ violations: updated });
   };
 
   const handleDeleteViolation = (id: string) => {
+    lastLocalActionRef.current = Date.now();
     const updated = violations.filter(v => v.id !== id);
     setViolations(updated);
+    saveViolations(updated);
     triggerSheetsSync({ violations: updated });
   };
 
   // Handlers for Rewards
   const handleSaveReward = (reward: RewardRecord) => {
-    const updated = [reward, ...rewards];
+    lastLocalActionRef.current = Date.now();
+    const cleanReward: RewardRecord = {
+      ...reward,
+      date: normalizeRecordDate(reward.date)
+    };
+    const updated = [cleanReward, ...rewards];
     setRewards(updated);
+    saveRewards(updated);
     triggerSheetsSync({ rewards: updated });
   };
 
   const handleDeleteReward = (id: string) => {
+    lastLocalActionRef.current = Date.now();
     const updated = rewards.filter(r => r.id !== id);
     setRewards(updated);
+    saveRewards(updated);
     triggerSheetsSync({ rewards: updated });
   };
 
   // Handlers for Compensations
   const handleAddCompensation = (comp: CompensationRecord) => {
-    const updated = [comp, ...compensations];
+    lastLocalActionRef.current = Date.now();
+    const cleanComp: CompensationRecord = {
+      ...comp,
+      date: normalizeRecordDate(comp.date)
+    };
+    const updated = [cleanComp, ...compensations];
     setCompensations(updated);
+    saveCompensations(updated);
     triggerSheetsSync({ compensations: updated });
   };
 
   const handleDeleteCompensation = (id: string) => {
+    lastLocalActionRef.current = Date.now();
     const updated = compensations.filter(c => c.id !== id);
     setCompensations(updated);
+    saveCompensations(updated);
     triggerSheetsSync({ compensations: updated });
   };
 

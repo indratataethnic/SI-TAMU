@@ -105,6 +105,24 @@ app.post("/api/data", (req, res) => {
   }
 });
 
+function normalizeDateString(val: any): string {
+  if (!val) return new Date().toISOString().slice(0, 10);
+  const s = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+    const parts = s.split('/');
+    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+  }
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return s.slice(0, 10);
+}
+
 // POST API: Fetch data from Google Spreadsheet webhook via server proxy (no CORS issues, follows redirects)
 app.post("/api/sheets/fetch", async (req, res) => {
   try {
@@ -129,7 +147,34 @@ app.post("/api/sheets/fetch", async (req, res) => {
       // Sync into server cachedDb so all devices (HP, laptop, desktop) get the exact same fresh data!
       if (!cachedDb) cachedDb = {};
       if (Array.isArray(json.data.students) && json.data.students.length > 0) {
-        cachedDb.students = json.data.students;
+        const existingStudents = Array.isArray(cachedDb.students) ? cachedDb.students : [];
+        const existingByName = new Map<string, any>();
+        const existingByNisn = new Map<string, any>();
+        existingStudents.forEach((s: any) => {
+          if (s.name) existingByName.set(String(s.name).trim().toLowerCase(), s);
+          if (s.nisn && s.nisn.length >= 8 && !['L', 'P', 'LK', 'PR'].includes(s.nisn.toUpperCase())) {
+            existingByNisn.set(String(s.nisn).trim().toLowerCase(), s);
+          }
+        });
+
+        cachedDb.students = json.data.students.map((s: any) => {
+          const sName = String(s.name || '').trim().toLowerCase();
+          const rawNisn = String(s.nisn || '').trim();
+          const isCorruptedNisn = !rawNisn || ['L', 'P', 'LK', 'PR', '-'].includes(rawNisn.toUpperCase()) || rawNisn.replace(/[^0-9]/g, '').length < 8;
+          const match = existingByName.get(sName) || (!isCorruptedNisn ? existingByNisn.get(rawNisn.toLowerCase()) : null);
+
+          const rawAccess = String(s.accessCode || '').trim().toUpperCase();
+          const isCorruptedAccess = !rawAccess || ['STL', 'STP', 'ST-L', 'ST-P', '-'].includes(rawAccess);
+
+          return {
+            ...match,
+            ...s,
+            id: (s.id && !s.id.startsWith('STU-L-') && !s.id.startsWith('STU-P-') && s.id !== 'STD-L' && s.id !== 'STD-P') ? s.id : (match?.id || s.id),
+            nisn: !isCorruptedNisn ? rawNisn : (match?.nisn || s.nisn),
+            accessCode: !isCorruptedAccess ? rawAccess : (match?.accessCode || s.accessCode)
+          };
+        });
+        json.data.students = cachedDb.students;
       }
       if (Array.isArray(json.data.teachers) && json.data.teachers.length > 0) {
         cachedDb.teachers = json.data.teachers;
@@ -138,13 +183,25 @@ app.post("/api/sheets/fetch", async (req, res) => {
         cachedDb.piketSchedules = json.data.piketSchedules;
       }
       if (Array.isArray(json.data.violations)) {
-        cachedDb.violations = json.data.violations;
+        cachedDb.violations = json.data.violations.map((v: any) => ({
+          ...v,
+          date: normalizeDateString(v.date)
+        }));
+        json.data.violations = cachedDb.violations;
       }
       if (Array.isArray(json.data.rewards)) {
-        cachedDb.rewards = json.data.rewards;
+        cachedDb.rewards = json.data.rewards.map((r: any) => ({
+          ...r,
+          date: normalizeDateString(r.date)
+        }));
+        json.data.rewards = cachedDb.rewards;
       }
       if (Array.isArray(json.data.compensations)) {
-        cachedDb.compensations = json.data.compensations;
+        cachedDb.compensations = json.data.compensations.map((c: any) => ({
+          ...c,
+          date: normalizeDateString(c.date)
+        }));
+        json.data.compensations = cachedDb.compensations;
       }
       if (json.data.settings) {
         cachedDb.settings = { ...(cachedDb.settings || {}), ...json.data.settings };

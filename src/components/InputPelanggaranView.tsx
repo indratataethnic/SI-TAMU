@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Student, Teacher, ViolationRule, ViolationRecord, SchoolSettings, StudentScoreSummary } from '../types';
 import {
   AlertTriangle,
@@ -12,7 +12,9 @@ import {
   Search,
   MessageSquare,
   ShieldCheck,
-  GraduationCap
+  GraduationCap,
+  X,
+  Check
 } from 'lucide-react';
 import { openWhatsApp, generateViolationWAMessage, sendViaGateway } from '../utils/whatsapp';
 import { PRIMARY_SCHOOL_CLASSES, PRIMARY_SCHOOL_PARALLEL_CLASSES, getAvailableClasses, matchClassFilter } from '../data/classOptions';
@@ -73,6 +75,8 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
   );
   const [selectedClass, setSelectedClass] = useState<string>('ALL');
   const [studentSearch, setStudentSearch] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   const [selectedRuleId, setSelectedRuleId] = useState<string>(violationRules[0]?.id || '');
   const [customPoints, setCustomPoints] = useState<number>(violationRules[0]?.points || 20);
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
@@ -85,19 +89,52 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
 
   const availableClasses = useMemo(() => getAvailableClasses(students), [students]);
 
-  // Filter students for searchable picker
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filter students:
+  // When user types a search query, search globally across ALL 311 students (ignoring class constraints).
+  // When search query is empty, filter by selectedClass.
   const filteredStudents = useMemo(() => {
-    return students.filter(s => {
-      const matchesClass = matchClassFilter(s.class, selectedClass);
-      const q = studentSearch.toLowerCase().trim();
-      const matchesSearch =
-        !q ||
-        s.name.toLowerCase().includes(q) ||
-        s.nisn.includes(q) ||
-        s.class.toLowerCase().includes(q);
-      return matchesClass && matchesSearch;
-    });
+    const q = studentSearch.toLowerCase().trim();
+    if (q) {
+      return students.filter(s => {
+        const nameMatch = (s.name || '').toLowerCase().includes(q);
+        const nisnMatch = (s.nisn || '').includes(q);
+        const classMatch = (s.class || '').toLowerCase().includes(q);
+        const parentMatch = (s.parentName || '').toLowerCase().includes(q);
+        return nameMatch || nisnMatch || classMatch || parentMatch;
+      });
+    }
+    return students.filter(s => matchClassFilter(s.class, selectedClass));
   }, [students, selectedClass, studentSearch]);
+
+  // When filtered list changes, ensure selected student stays synchronized
+  useEffect(() => {
+    if (filteredStudents.length > 0) {
+      const isStillInList = filteredStudents.some(s => s.id === selectedStudentId);
+      if (!isStillInList) {
+        setSelectedStudentId(filteredStudents[0].id);
+      }
+    }
+  }, [filteredStudents, selectedStudentId]);
+
+  const handleSelectStudent = (student: Student) => {
+    setSelectedStudentId(student.id);
+    if (student.class && selectedClass !== 'ALL' && !matchClassFilter(student.class, selectedClass)) {
+      setSelectedClass(student.class);
+    }
+    setStudentSearch('');
+    setShowSuggestions(false);
+  };
 
   const selectedStudent = students.find(s => s.id === selectedStudentId);
   const selectedRule = violationRules.find(r => r.id === selectedRuleId);
@@ -216,9 +253,12 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
           <div className="flex items-center gap-1 overflow-x-auto pb-1">
             <button
               type="button"
-              onClick={() => setSelectedClass('ALL')}
+              onClick={() => {
+                setSelectedClass('ALL');
+                setStudentSearch('');
+              }}
               className={`px-2.5 py-1 rounded-md text-[11px] font-bold cursor-pointer transition ${
-                selectedClass === 'ALL'
+                selectedClass === 'ALL' && !studentSearch.trim()
                   ? 'bg-emerald-950 text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
@@ -227,17 +267,19 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
             </button>
             {availableClasses.map(cls => {
               const count = students.filter(s => matchClassFilter(s.class, cls)).length;
+              const isActive = selectedClass === cls && !studentSearch.trim();
               return (
                 <button
                   key={cls}
                   type="button"
                   onClick={() => {
                     setSelectedClass(cls);
+                    setStudentSearch('');
                     const firstMatch = students.find(s => matchClassFilter(s.class, cls));
                     if (firstMatch) setSelectedStudentId(firstMatch.id);
                   }}
                   className={`px-2.5 py-1 rounded-md text-[11px] font-bold cursor-pointer transition flex items-center gap-1 shrink-0 ${
-                    selectedClass === cls
+                    isActive
                       ? 'bg-emerald-900 text-amber-300 ring-1 ring-amber-400'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
@@ -249,47 +291,156 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
             })}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                value={studentSearch}
-                onChange={(e) => setStudentSearch(e.target.value)}
-                placeholder="Cari nama, NISN, atau kelas..."
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium"
-              />
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Search Box with Autocomplete suggestions */}
+              <div className="relative" ref={searchContainerRef}>
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+                <input
+                  type="text"
+                  value={studentSearch}
+                  onFocus={() => {
+                    if (studentSearch.trim()) setShowSuggestions(true);
+                  }}
+                  onChange={(e) => {
+                    setStudentSearch(e.target.value);
+                    setShowSuggestions(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault(); // Prevent accidental form submission
+                      if (filteredStudents.length > 0) {
+                        handleSelectStudent(filteredStudents[0]);
+                      }
+                    } else if (e.key === 'Escape') {
+                      setShowSuggestions(false);
+                    }
+                  }}
+                  placeholder="Ketik nama, NISN, atau kelas..."
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium text-slate-900 text-xs sm:text-sm"
+                />
+                {studentSearch && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStudentSearch('');
+                      setShowSuggestions(false);
+                    }}
+                    className="absolute right-2.5 top-2.5 p-0.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-200 transition cursor-pointer"
+                    title="Hapus kata kunci pencarian"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
+                {/* Suggestions Dropdown */}
+                {showSuggestions && studentSearch.trim().length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-100">
+                    <div className="px-3 py-1.5 bg-slate-50 text-[10px] font-bold text-slate-500 uppercase flex items-center justify-between sticky top-0">
+                      <span>Hasil Pencarian Siswa</span>
+                      <span className="text-emerald-700 font-bold">{filteredStudents.length} ditemukan</span>
+                    </div>
+                    {filteredStudents.length === 0 ? (
+                      <div className="p-3 text-xs text-slate-500 text-center italic">
+                        Tidak ditemukan siswa dengan kata kunci "{studentSearch}"
+                      </div>
+                    ) : (
+                      filteredStudents.slice(0, 8).map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => handleSelectStudent(s)}
+                          className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-emerald-50 transition cursor-pointer ${
+                            selectedStudentId === s.id ? 'bg-emerald-50/80 font-bold' : ''
+                          }`}
+                        >
+                          <div>
+                            <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                              <span>{s.name}</span>
+                              <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded text-[10px] font-semibold">
+                                {s.class}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-500">
+                              NISN: {s.nisn} • Wali: {s.parentName || '-'}
+                            </div>
+                          </div>
+                          {selectedStudentId === s.id && (
+                            <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Synchronized Select Dropdown */}
+              <select
+                value={selectedStudentId}
+                onChange={(e) => {
+                  setSelectedStudentId(e.target.value);
+                  const found = students.find(s => s.id === e.target.value);
+                  if (found && found.class && selectedClass !== 'ALL' && !matchClassFilter(found.class, selectedClass)) {
+                    setSelectedClass(found.class);
+                  }
+                }}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold text-slate-900 text-xs sm:text-sm"
+              >
+                {filteredStudents.length === 0 ? (
+                  <option value="">Tidak ada siswa yang cocok</option>
+                ) : (
+                  filteredStudents.map((s, idx) => (
+                    <option key={`${s.id || 'stu'}-${idx}`} value={s.id}>
+                      {s.name} ({s.class}) - NISN: {s.nisn}
+                    </option>
+                  ))
+                )}
+              </select>
             </div>
-            <select
-              value={selectedStudentId}
-              onChange={(e) => setSelectedStudentId(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold text-slate-900"
-            >
-              {filteredStudents.length === 0 ? (
-                <option value="">Tidak ada siswa di pilihan filter ini</option>
-              ) : (
-                filteredStudents.map((s, idx) => (
-                  <option key={`${s.id || 'stu'}-${idx}`} value={s.id}>
-                    {s.name} ({s.class}) - NISN: {s.nisn}
-                  </option>
-                ))
-              )}
-            </select>
+
+            {/* Match info text if searching */}
+            {studentSearch.trim() && (
+              <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
+                <span>
+                  Menampilkan <b>{filteredStudents.length}</b> hasil untuk kata kunci "<b>{studentSearch}</b>" di seluruh kelas
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStudentSearch('');
+                    setShowSuggestions(false);
+                  }}
+                  className="text-emerald-700 hover:text-emerald-900 font-semibold cursor-pointer underline"
+                >
+                  Tampilkan Semua Siswa
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Selected Student Info Card */}
           {selectedStudent && (
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between mt-2">
+            <div className="p-3.5 bg-emerald-50/50 border border-emerald-200 rounded-xl flex items-center justify-between mt-2">
               <div>
-                <span className="font-bold text-slate-900 block">{selectedStudent.name} ({selectedStudent.class})</span>
-                <span className="text-[11px] text-slate-500">
-                  Orang Tua: {selectedStudent.parentName} • WA: {selectedStudent.parentPhone}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-black text-slate-900 text-sm">{selectedStudent.name}</span>
+                  <span className="px-2 py-0.5 bg-emerald-800 text-white font-bold text-[10px] rounded-full">
+                    {selectedStudent.class}
+                  </span>
+                  <span className="px-2 py-0.5 bg-slate-200 text-slate-700 font-medium text-[10px] rounded-full font-mono">
+                    NISN: {selectedStudent.nisn}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-600 mt-1 flex flex-wrap items-center gap-x-3">
+                  <span>Wali: <b>{selectedStudent.parentName || '-'}</b></span>
+                  <span>WhatsApp: <b>{selectedStudent.parentPhone || '-'}</b></span>
+                </div>
               </div>
-              <div className="text-right">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Poin Aktif Saat Ini</span>
+              <div className="text-right shrink-0">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Poin Pelanggaran Aktif</span>
                 <span
-                  className={`font-black text-xs px-2 py-0.5 rounded-full ${
+                  className={`font-black text-xs px-2.5 py-0.5 rounded-full inline-block mt-0.5 ${
                     (studentSummary?.activeViolationPoints || 0) >= 100
                       ? 'bg-rose-100 text-rose-800'
                       : 'bg-emerald-100 text-emerald-800'

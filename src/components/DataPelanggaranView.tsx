@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ViolationRecord, Student, StudentScoreSummary, SchoolSettings } from '../types';
 import {
   AlertTriangle,
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { exportViolationsToExcel } from '../utils/excel';
 import { openWhatsApp, generateViolationWAMessage, sendViaGateway } from '../utils/whatsapp';
+import { normalizeRecordDate } from '../utils/storage';
 
 interface DataPelanggaranViewProps {
   violations: ViolationRecord[];
@@ -44,8 +45,30 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
   const [detailRecord, setDetailRecord] = useState<ViolationRecord | null>(null);
   const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
 
-  const studentMap = new Map<string, Student>(students.map(s => [s.id, s]));
-  const summaryMap = new Map<string, StudentScoreSummary>(summaries.map(s => [s.student.id, s]));
+  const studentMap = useMemo(() => {
+    const map = new Map<string, Student>();
+    students.forEach(s => {
+      if (s.id) map.set(s.id, s);
+      if (s.nisn) map.set(s.nisn, s);
+      if (s.name) map.set(s.name.trim().toLowerCase(), s);
+    });
+    return map;
+  }, [students]);
+
+  const summaryMap = useMemo(() => {
+    const map = new Map<string, StudentScoreSummary>();
+    summaries.forEach(s => {
+      if (s.student?.id) map.set(s.student.id, s);
+      if (s.student?.name) map.set(s.student.name.trim().toLowerCase(), s);
+    });
+    return map;
+  }, [summaries]);
+
+  const getStudentForViolation = (v: ViolationRecord): Student | undefined => {
+    return studentMap.get(v.studentId) || 
+           ((v as any).studentNisn ? studentMap.get((v as any).studentNisn) : undefined) || 
+           (v.studentName ? studentMap.get(v.studentName.trim().toLowerCase()) : undefined);
+  };
 
   const classesList = ['ALL', ...Array.from(new Set(violations.map(v => v.studentClass))).sort()];
 
@@ -62,13 +85,13 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
   });
 
   const handleSendWA = async (record: ViolationRecord) => {
-    const student = studentMap.get(record.studentId);
+    const student = getStudentForViolation(record);
     if (!student) {
       alert('Data siswa tidak ditemukan.');
       return;
     }
 
-    const summary = summaryMap.get(record.studentId);
+    const summary = summaryMap.get(student.id) || summaryMap.get(record.studentId);
     const activePts = summary?.activeViolationPoints || record.points;
     const message = generateViolationWAMessage(student, record, activePts, settings);
 
@@ -197,13 +220,13 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
                 </tr>
               ) : (
                 filteredViolations.map((v, idx) => {
-                  const student = studentMap.get(v.studentId);
-                  const summary = summaryMap.get(v.studentId);
+                  const student = getStudentForViolation(v);
+                  const summary = student ? summaryMap.get(student.id) : summaryMap.get(v.studentId);
 
                   return (
                     <tr key={`${v.id || 'v'}-${idx}`} className="hover:bg-slate-50/80 transition">
                       <td className="py-3 px-4 font-mono text-slate-600">
-                        <span>{v.date}</span>
+                        <span>{normalizeRecordDate(v.date)}</span>
                         {v.time && <span className="block text-[10px] text-slate-400">{v.time}</span>}
                       </td>
                       <td className="py-3 px-4">
@@ -327,7 +350,7 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   <div>
                     <span className="text-slate-400 block text-[10px]">Waktu & Tanggal:</span>
-                    <span className="font-medium text-slate-700">{detailRecord.date} {detailRecord.time || ''}</span>
+                    <span className="font-medium text-slate-700">{normalizeRecordDate(detailRecord.date)} {detailRecord.time || ''}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px]">Lokasi Kejadian:</span>

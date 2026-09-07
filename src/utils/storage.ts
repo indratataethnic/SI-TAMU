@@ -20,10 +20,46 @@ const initialStudentsByNik = new Map<string, Student>();
 const initialStudentsByName = new Map<string, Student>();
 
 (initialStudents || []).forEach(s => {
-  if (s.nisn) initialStudentsByNisn.set(String(s.nisn).trim().toLowerCase(), s);
+  if (s.nisn && s.nisn.length >= 8 && !['L', 'P', 'LK', 'PR'].includes(s.nisn.toUpperCase())) {
+    initialStudentsByNisn.set(String(s.nisn).trim().toLowerCase(), s);
+  }
   if (s.nik) initialStudentsByNik.set(String(s.nik).replace(/^'/, '').trim(), s);
   if (s.name) initialStudentsByName.set(String(s.name).trim().toLowerCase(), s);
 });
+
+export const normalizeRecordDate = (val: any): string => {
+  if (!val) return new Date().toISOString().slice(0, 10);
+  const s = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+    const parts = s.split('/');
+    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+  }
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return s.slice(0, 10);
+};
+
+export const isCorruptedNisn = (val: any): boolean => {
+  if (!val) return true;
+  const s = String(val).trim().toUpperCase();
+  if (s === 'L' || s === 'P' || s === 'LK' || s === 'PR' || s === '-' || s.startsWith('NISN-') || s === 'UNDEFINED' || s === 'NULL') {
+    return true;
+  }
+  const digits = s.replace(/[^0-9]/g, '');
+  return digits.length < 8;
+};
+
+export const isCorruptedAccessCode = (code: any): boolean => {
+  if (!code) return true;
+  const c = String(code).trim().toUpperCase();
+  return c === 'STL' || c === 'STP' || c === 'ST-L' || c === 'ST-P' || c === '-' || c === 'UNDEFINED';
+};
 
 // Sanitization helpers to prevent duplicate React keys or invalid phone-number IDs
 export const sanitizeStudents = (students: Student[]): Student[] => {
@@ -39,24 +75,35 @@ export const sanitizeStudents = (students: Student[]): Student[] => {
     const gUpper = String(s.gender || 'L').trim().toUpperCase();
     const cleanGender: 'L' | 'P' = gUpper.startsWith('P') || gUpper.includes('PEREMPUAN') || gUpper.includes('WANITA') ? 'P' : 'L';
 
-    if (!cleanId || seenIds.has(cleanId) || /^(\+?62|08)\d+$/.test(cleanId)) {
-      cleanId = `STU-${rawNisn || 'NO_NISN'}-${idx}-${Math.random().toString(36).substring(2, 6)}`;
+    // Match with authentic record if available
+    const authRecord = (rawName ? initialStudentsByName.get(rawName.toLowerCase()) : null) ||
+                       (!isCorruptedNisn(rawNisn) ? initialStudentsByNisn.get(rawNisn.toLowerCase()) : null) ||
+                       (rawNik ? initialStudentsByNik.get(rawNik) : null);
+
+    // Guard NISN: If incoming NISN is corrupted (e.g. 'L' or 'P'), restore authentic 10-digit NISN
+    let validNisn = rawNisn;
+    if (isCorruptedNisn(rawNisn)) {
+      validNisn = authRecord?.nisn || `00${idx + 10000000}`;
+    }
+
+    if (!cleanId || seenIds.has(cleanId) || /^(\+?62|08)\d+$/.test(cleanId) || cleanId.startsWith('STU-L-') || cleanId.startsWith('STU-P-') || cleanId === 'STD-L' || cleanId === 'STD-P') {
+      cleanId = authRecord?.id || `STU-${validNisn}-${idx}-${Math.random().toString(36).substring(2, 6)}`;
     }
     seenIds.add(cleanId);
 
+    // Guard PIN / accessCode: If incoming is corrupted (e.g. 'STL' or 'STP'), restore authentic PIN
     let cleanAccess = s.accessCode ? String(s.accessCode).replace(/^'/, '').trim().toUpperCase() : '';
-    if (!cleanAccess && rawName) {
-      const firstName = rawName.split(' ')[0] || 'SISWA';
-      const cleanCls = rawClass.replace(/[^a-zA-Z0-9]/g, '');
-      cleanAccess = (firstName + cleanCls).toUpperCase();
+    if (isCorruptedAccessCode(cleanAccess) || !cleanAccess) {
+      if (authRecord?.accessCode && !isCorruptedAccessCode(authRecord.accessCode)) {
+        cleanAccess = authRecord.accessCode;
+      } else if (rawName) {
+        const firstName = rawName.split(' ')[0] || 'SISWA';
+        const cleanCls = rawClass.replace(/[^a-zA-Z0-9]/g, '');
+        cleanAccess = (firstName + cleanCls).toUpperCase();
+      }
     }
 
-    // Match with authentic record if available
-    const authRecord = (rawNisn ? initialStudentsByNisn.get(rawNisn.toLowerCase()) : null) ||
-                       (rawNik ? initialStudentsByNik.get(rawNik) : null) ||
-                       (rawName ? initialStudentsByName.get(rawName.toLowerCase()) : null);
-
-    // Validate parent name: if purely numeric (e.g. "1", "3", "5"), phone number, or invalid
+    // Validate parent name: if purely numeric, phone number, or invalid
     let cleanParentName = String(s.parentName || '').trim();
     const isInvalidParentName = !cleanParentName || 
       /^\d+$/.test(cleanParentName) || 
@@ -92,8 +139,8 @@ export const sanitizeStudents = (students: Student[]): Student[] => {
     return {
       ...s,
       id: cleanId,
-      nik: rawNik && rawNik !== '-' ? rawNik : (authRecord?.nik || undefined),
-      nisn: rawNisn || authRecord?.nisn || `00${idx + 10000000}`,
+      nik: (rawNik && rawNik !== '-' && rawNik.replace(/[^0-9]/g, '').length >= 10) ? rawNik : (authRecord?.nik || undefined),
+      nisn: validNisn,
       name: rawName || authRecord?.name || `Siswa ${idx + 1}`,
       class: rawClass || authRecord?.class || 'Kelas 1',
       gender: cleanGender,
@@ -126,7 +173,13 @@ export const sanitizeRecords = <T extends { id: string }>(records: T[], prefix: 
       cleanId = `${prefix}-${idx}-${Math.random().toString(36).substring(2, 6)}`;
     }
     seenIds.add(cleanId);
-    return { ...r, id: cleanId };
+    
+    // Normalize date if present
+    const itemWithCleanDate = (r as any).date 
+      ? { ...r, id: cleanId, date: normalizeRecordDate((r as any).date) }
+      : { ...r, id: cleanId };
+
+    return itemWithCleanDate as T;
   });
 };
 
