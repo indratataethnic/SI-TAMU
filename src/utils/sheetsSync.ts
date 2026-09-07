@@ -66,6 +66,21 @@ function doPost(e) {
         status: "success",
         message: "Data berhasil dimuat dari Google Spreadsheet!",
         data: allData,
+        sheetNames: allData.sheetNames || [],
+        timestamp: new Date().toISOString()
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === "GET_SHEETS" || action === "LIST_SHEETS") {
+      var sheets = ss.getSheets();
+      var sNames = [];
+      for (var s = 0; s < sheets.length; s++) {
+        sNames.push(sheets[s].getName());
+      }
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        sheetNames: sNames,
+        totalSheets: sNames.length,
         timestamp: new Date().toISOString()
       })).setMimeType(ContentService.MimeType.JSON);
     }
@@ -120,10 +135,24 @@ function doPost(e) {
 }
 
 function doGet(e) {
+  var ss = null;
+  try {
+    ss = SpreadsheetApp.getActiveSpreadsheet();
+  } catch(err) {}
+
+  var sNames = [];
+  if (ss) {
+    var allSheets = ss.getSheets();
+    for (var s = 0; s < allSheets.length; s++) {
+      sNames.push(allSheets[s].getName());
+    }
+  }
+
   return ContentService.createTextOutput(JSON.stringify({
     status: "online",
     message: "Google Apps Script SI TAMU Aktif & Siap Menerima Sinkronisasi Data!",
     school: "${schoolName}",
+    sheetNames: sNames,
     timestamp: new Date().toISOString()
   })).setMimeType(ContentService.MimeType.JSON);
 }
@@ -403,8 +432,14 @@ function fetchAllData(ss) {
     piketSchedules: [],
     violations: [],
     rewards: [],
-    compensations: []
+    compensations: [],
+    sheetNames: []
   };
+
+  var allSheetsList = ss.getSheets();
+  for (var s = 0; s < allSheetsList.length; s++) {
+    data.sheetNames.push(allSheetsList[s].getName());
+  }
 
   // 1. Settings
   var settingsSheet = ss.getSheetByName("Pengaturan_Aplikasi");
@@ -601,18 +636,17 @@ function fetchAllData(ss) {
     var values = teacherSheet.getDataRange().getValues();
     if (values && values.length > 1) {
       var headerRowIdx = -1;
-      for (var r = 0; r < Math.min(values.length, 10); r++) {
-        var rStr = values[r].join(" ").toLowerCase();
-        if ((rStr.indexOf("nama") !== -1 || rStr.indexOf("pendidik") !== -1 || rStr.indexOf("pegawai") !== -1) && 
-            (rStr.indexOf("nip") !== -1 || rStr.indexOf("jabatan") !== -1 || rStr.indexOf("tugas") !== -1 || rStr.indexOf("mapel") !== -1 || rStr.indexOf("nuptk") !== -1 || rStr.indexOf("hp") !== -1 || rStr.indexOf("wa") !== -1)) {
+      for (var r = 0; r < Math.min(values.length, 5); r++) {
+        var rowText = values[r].map(function(c) { return String(c || "").toLowerCase().trim(); }).join(" ");
+        if ((rowText.indexOf("nip") !== -1 || rowText.indexOf("nuptk") !== -1) && (rowText.indexOf("nama") !== -1 || rowText.indexOf("gelar") !== -1)) {
           headerRowIdx = r;
           break;
         }
       }
       if (headerRowIdx === -1) {
-        for (var r = 0; r < Math.min(values.length, 10); r++) {
-          var rStr = values[r].join(" ").toLowerCase();
-          if (rStr.indexOf("nama") !== -1 || rStr.indexOf("nip") !== -1) {
+        for (var r = 0; r < Math.min(values.length, 5); r++) {
+          var rowText = values[r].map(function(c) { return String(c || "").toLowerCase().trim(); }).join(" ");
+          if (rowText.indexOf("nama") !== -1 || rowText.indexOf("nip") !== -1) {
             headerRowIdx = r;
             break;
           }
@@ -625,20 +659,21 @@ function fetchAllData(ss) {
       for (var h = 0; h < headerRow.length; h++) {
         var hName = String(headerRow[h] || "").toLowerCase().trim();
         if (hName.indexOf("nip") !== -1 || hName.indexOf("nik") !== -1 || hName.indexOf("nuptk") !== -1) colNip = h;
-        else if (hName.indexOf("nama") !== -1 || hName.indexOf("gtk") !== -1 || hName.indexOf("pengajar") !== -1 || hName.indexOf("pegawai") !== -1) colName = h;
+        else if (hName.indexOf("nama") !== -1 || hName.indexOf("gtk") !== -1 || hName.indexOf("pengajar") !== -1 || hName.indexOf("pegawai") !== -1 || hName.indexOf("gelar") !== -1) colName = h;
         else if (hName.indexOf("jabatan") !== -1 || hName.indexOf("peran") !== -1 || hName.indexOf("tugas") !== -1 || hName.indexOf("posisi") !== -1 || hName.indexOf("status") !== -1) colRole = h;
-        else if (hName.indexOf("mapel") !== -1 || hName.indexOf("mata pelajaran") !== -1 || hName.indexOf("mengajar") !== -1 || hName.indexOf("subjek") !== -1) colSubject = h;
-        else if (hName.indexOf("kelas") !== -1 || hName.indexOf("rombel") !== -1) colClass = h;
+        else if (hName.indexOf("mapel") !== -1 || hName.indexOf("mata pelajaran") !== -1 || hName.indexOf("mengajar") !== -1 || hName.indexOf("subjek") !== -1 || hName.indexOf("pelajaran") !== -1) colSubject = h;
+        else if (hName.indexOf("kelas") !== -1 || hName.indexOf("rombel") !== -1 || hName.indexOf("wali") !== -1 || hName.indexOf("penugasan") !== -1) colClass = h;
         else if (hName.indexOf("hp") !== -1 || hName.indexOf("telepon") !== -1 || hName.indexOf("wa") !== -1 || hName.indexOf("whatsapp") !== -1 || hName.indexOf("kontak") !== -1 || hName.indexOf("phone") !== -1) colPhone = h;
-        else if (hName === "id" || hName.indexOf("id guru") !== -1) colId = h;
+        else if (hName === "id" || hName.indexOf("id guru") !== -1 || hName.indexOf("id_guru") !== -1) colId = h;
       }
 
-      if (colName === -1) colName = 1;
       if (colNip === -1) colNip = 0;
+      if (colName === -1) colName = 1;
       if (colRole === -1) colRole = 2;
       if (colSubject === -1) colSubject = 3;
       if (colClass === -1) colClass = 4;
       if (colPhone === -1) colPhone = 5;
+      if (colId === -1 && headerRow.length > 6) colId = 6;
 
       for (var i = headerRowIdx + 1; i < values.length; i++) {
         var row = values[i];
@@ -646,20 +681,16 @@ function fetchAllData(ss) {
         var nameVal = colName < row.length ? String(row[colName] || "").trim() : "";
         var nipVal = colNip < row.length ? String(row[colNip] || "").trim() : "";
 
-        if ((!nameVal || !isNaN(Number(nameVal.replace(/\s+/g, '')))) && nipVal && isNaN(Number(nipVal.replace(/\s+/g, '')))) {
-          var temp = nameVal;
-          nameVal = nipVal;
-          nipVal = temp;
-        }
+        if (!nameVal && !nipVal) continue;
 
         var nameLower = nameVal.toLowerCase();
         var isHeaderRow = nameLower === "nama" || nameLower === "nama guru" || nameLower === "nama lengkap" || nameLower === "nama guru & gelar" || nameLower === "daftar guru" || nameLower.indexOf("nama &") === 0 || nameLower.indexOf("nip /") === 0;
 
         if (nameVal && nameVal !== "-" && !isHeaderRow) {
-          var roleVal = colRole < row.length ? String(row[colRole] || "").trim() : "";
-          var subjectVal = colSubject < row.length ? String(row[colSubject] || "").trim() : "";
-          var classVal = colClass < row.length ? String(row[colClass] || "").trim() : "";
-          var phoneVal = colPhone < row.length ? String(row[colPhone] || "").trim() : "";
+          var roleVal = colRole !== -1 && colRole < row.length ? String(row[colRole] || "").trim() : "";
+          var subjectVal = colSubject !== -1 && colSubject < row.length ? String(row[colSubject] || "").trim() : "";
+          var classVal = colClass !== -1 && colClass < row.length ? String(row[colClass] || "").trim() : "";
+          var phoneVal = colPhone !== -1 && colPhone < row.length ? String(row[colPhone] || "").trim() : "";
           var idVal = colId !== -1 && colId < row.length ? String(row[colId] || "").trim() : "";
 
           var roleCode = "guru_mapel";
@@ -682,14 +713,18 @@ function fetchAllData(ss) {
             subjectVal = "Guru Kelas / Tematik";
           }
 
+          var cleanNip = nipVal.replace(/^'/, '').trim();
+          var cleanPhone = phoneVal.replace(/^'/, '').replace(/[^0-9+]/g, '');
+          var teacherId = idVal ? idVal : ("TCH-" + (cleanNip ? cleanNip.replace(/[^0-9]/g, '') : ("N" + (i - headerRowIdx) + "-" + nameVal.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())));
+
           data.teachers.push({
-            id: idVal ? idVal : ("TCH-" + (i - headerRowIdx) + "-" + (nipVal ? nipVal.replace(/\s+/g, '') : nameVal.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())),
-            nip: nipVal.replace(/^'/, ''),
+            id: teacherId,
+            nip: cleanNip || "-",
             name: nameVal,
             role: roleCode,
-            subject: subjectVal,
-            classAssigned: classVal,
-            phone: phoneVal.replace(/^'/, '').replace(/[^0-9+]/g, '')
+            subject: subjectVal || "Guru",
+            classAssigned: classVal || "Semua Kelas",
+            phone: cleanPhone || ""
           });
         }
       }
@@ -701,7 +736,16 @@ function fetchAllData(ss) {
   if (piketSheet) {
     var values = piketSheet.getDataRange().getValues();
     if (values && values.length > 1) {
-      for (var i = 1; i < values.length; i++) {
+      var pHeaderIdx = 0;
+      for (var r = 0; r < Math.min(values.length, 5); r++) {
+        var rStr = values[r].map(function(c) { return String(c || "").toLowerCase().trim(); }).join(" ");
+        if (rStr.indexOf("hari") !== -1 || rStr.indexOf("jam") !== -1 || rStr.indexOf("piket") !== -1) {
+          pHeaderIdx = r;
+          break;
+        }
+      }
+
+      for (var i = pHeaderIdx + 1; i < values.length; i++) {
         var row = values[i];
         if (!row || row.length === 0) continue;
         var dayVal = String(row[0] || "").trim();
@@ -713,25 +757,29 @@ function fetchAllData(ss) {
           var idsStr = row[5] ? String(row[5]).trim() : "";
 
           var teacherIds = [];
-          if (idsStr) {
+          if (idsStr && idsStr !== "-") {
             teacherIds = idsStr.split(",").map(function(s) { return s.trim(); }).filter(Boolean);
           } else if (namesStr && namesStr !== "Belum ada guru piket" && namesStr !== "-") {
-            var rawNames = namesStr.split(/[,;]/);
+            var rawNames = namesStr.split(/[,;\n]/);
             for (var k = 0; k < rawNames.length; k++) {
-              var cleanN = rawNames[k].trim().toLowerCase();
+              var cleanN = rawNames[k].trim();
               if (!cleanN) continue;
-              var matched = false;
+              var cleanNLower = cleanN.toLowerCase();
+              var matchedId = null;
+
               for (var tIdx = 0; tIdx < data.teachers.length; tIdx++) {
                 var t = data.teachers[tIdx];
                 var tName = (t.name || "").toLowerCase();
-                if (tName === cleanN || tName.indexOf(cleanN) !== -1 || cleanN.indexOf(tName) !== -1 || t.nip === rawNames[k].trim() || t.id === rawNames[k].trim()) {
-                  if (teacherIds.indexOf(t.id) === -1) teacherIds.push(t.id);
-                  matched = true;
+                if (tName === cleanNLower || tName.indexOf(cleanNLower) !== -1 || cleanNLower.indexOf(tName) !== -1 || t.nip === cleanN || t.id === cleanN) {
+                  matchedId = t.id;
                   break;
                 }
               }
-              if (!matched) {
-                teacherIds.push(rawNames[k].trim());
+
+              if (matchedId) {
+                if (teacherIds.indexOf(matchedId) === -1) teacherIds.push(matchedId);
+              } else {
+                teacherIds.push(cleanN);
               }
             }
           }

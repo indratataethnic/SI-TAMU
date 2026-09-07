@@ -12,7 +12,7 @@ const CONFIG_DIR = path.join(process.cwd(), "data");
 const CONFIG_FILE = path.join(CONFIG_DIR, "global-config.json");
 const DB_FILE = path.join(CONFIG_DIR, "app-db.json");
 
-const DEFAULT_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyc9XP8BPzTKcGNlcna12L31mYhotfGnJLFXhA8EhYtG2wG7lO9AQq9Aet3hu7WMjo/exec";
+const DEFAULT_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbx6UobChbf4diPF4l2gMU_v1crUtGY4DEVSQTknBgnFJ2Ioe4zps1LU7ACiHLxEl_4/exec";
 
 // Ensure data folder exists
 if (!fs.existsSync(CONFIG_DIR)) {
@@ -126,10 +126,40 @@ app.post("/api/sheets/fetch", async (req, res) => {
 
     const json: any = await response.json();
     if (json.status === "success" && json.data) {
+      // Sync into server cachedDb so all devices (HP, laptop, desktop) get the exact same fresh data!
+      if (!cachedDb) cachedDb = {};
+      if (Array.isArray(json.data.students) && json.data.students.length > 0) {
+        cachedDb.students = json.data.students;
+      }
+      if (Array.isArray(json.data.teachers) && json.data.teachers.length > 0) {
+        cachedDb.teachers = json.data.teachers;
+      }
+      if (Array.isArray(json.data.piketSchedules) && json.data.piketSchedules.length > 0) {
+        cachedDb.piketSchedules = json.data.piketSchedules;
+      }
+      if (Array.isArray(json.data.violations)) {
+        cachedDb.violations = json.data.violations;
+      }
+      if (Array.isArray(json.data.rewards)) {
+        cachedDb.rewards = json.data.rewards;
+      }
+      if (Array.isArray(json.data.compensations)) {
+        cachedDb.compensations = json.data.compensations;
+      }
+      if (json.data.settings) {
+        cachedDb.settings = { ...(cachedDb.settings || {}), ...json.data.settings };
+      }
+      try {
+        fs.writeFileSync(DB_FILE, JSON.stringify(cachedDb), "utf-8");
+      } catch (e) {
+        console.error("Error writing cachedDb to file:", e);
+      }
+
       return res.json({
         success: true,
         message: json.message || "Data berhasil dimuat dari Google Spreadsheet",
-        data: json.data
+        data: json.data,
+        sheetNames: json.sheetNames || json.data?.sheetNames || []
       });
     } else {
       return res.json({

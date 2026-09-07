@@ -6,7 +6,8 @@ import {
   Clock,
   FileText,
   AlertTriangle,
-  Award
+  Award,
+  CheckSquare
 } from 'lucide-react';
 
 interface JurnalPiketModalProps {
@@ -152,6 +153,24 @@ export const JurnalPiketModal: React.FC<JurnalPiketModalProps> = ({
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Tugas Pokok & Tanggung Jawab Guru Piket */}
+          <div className="p-3.5 bg-emerald-50/60 rounded-xl border border-emerald-200 text-xs text-emerald-950">
+            <p className="font-bold text-emerald-900 uppercase text-[11px] mb-1.5 flex items-center gap-1.5">
+              <CheckSquare className="w-3.5 h-3.5 text-emerald-700" />
+              Tugas Pokok & Tanggung Jawab Guru Piket:
+            </p>
+            <ul className="space-y-1 text-[11px] font-medium pl-1 text-slate-700">
+              <li className="flex items-start gap-1.5">
+                <span className="text-emerald-700 font-bold">•</span>
+                <span>Pengawalan kedisiplinan dan kerapian seragam upacara bendera / senam</span>
+              </li>
+              <li className="flex items-start gap-1.5">
+                <span className="text-emerald-700 font-bold">•</span>
+                <span>Penyambutan siswa di gerbang 5S (Senyum, Salam, Sapa, Sopan, Santun) dan ketertiban KBM</span>
+              </li>
+            </ul>
           </div>
 
           {/* Summary Box */}

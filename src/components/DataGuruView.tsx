@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Teacher, PiketSchedule, ViolationRecord, RewardRecord, DayOfWeek, Student, SchoolSettings } from '../types';
-import { initialTeachers, initialPiketSchedules } from '../data/initialData';
+import { initialTeachers, initialPiketSchedules, STANDARD_PIKET_DUTY_NOTES } from '../data/initialData';
 import { getAvailableClasses } from '../data/classOptions';
 import {
   GraduationCap,
@@ -932,7 +932,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
                   day,
                   teacherIds: [],
                   dutyHours: day === 'Jumat' ? '06.30 - 14.00 WIB' : day === 'Sabtu' ? '06.30 - 13.00 WIB' : '06.30 - 15.00 WIB',
-                  notes: ''
+                  notes: STANDARD_PIKET_DUTY_NOTES
                 };
                 const dayDutyTeachers = teachers.filter(t => isTeacherAssignedToSched(t, sched.teacherIds));
                 const availableToAdd = teachers.filter(t => !isTeacherAssignedToSched(t, sched.teacherIds));
@@ -978,8 +978,9 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
 
                       {/* Notes / Special Instructions */}
                       {sched.notes && (
-                        <div className="px-4 py-2 bg-emerald-50/70 border-b border-emerald-100 text-[11px] text-emerald-900 font-medium">
-                          📝 {sched.notes}
+                        <div className="px-4 py-2.5 bg-emerald-50/80 border-b border-emerald-100 text-[11px] text-emerald-950 font-medium whitespace-pre-line leading-relaxed">
+                          <span className="font-bold text-emerald-900 block mb-0.5">📋 Tugas Pokok Guru Piket:</span>
+                          {sched.notes}
                         </div>
                       )}
 
@@ -1330,12 +1331,21 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Catatan / Instruksi Khusus Piket
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Catatan / Instruksi Tugas Piket
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setEditingDayPiket({ ...editingDayPiket, notes: STANDARD_PIKET_DUTY_NOTES })}
+                    className="text-[11px] text-emerald-700 hover:text-emerald-900 font-semibold cursor-pointer underline"
+                  >
+                    Gunakan Tugas Standar
+                  </button>
+                </div>
                 <textarea
                   rows={3}
-                  placeholder="Cth: Fokus gerbang pagi jam 06.30 - 07.15 WIB & ketertiban upacara bendera"
+                  placeholder="Cth: Tugas pengawalan kedisiplinan dan penyambutan siswa..."
                   value={editingDayPiket.notes || ''}
                   onChange={(e) => setEditingDayPiket({ ...editingDayPiket, notes: e.target.value })}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"

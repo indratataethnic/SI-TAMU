@@ -160,42 +160,45 @@ export const initialTeachers: Teacher[] = [
   }
 ];
 
+export const STANDARD_PIKET_DUTY_NOTES = 
+  '- Pengawalan kedisiplinan dan kerapian seragam upacara bendera / senam\n- Penyambutan siswa di gerbang 5S (Senyum, Salam, Sapa, Sopan, Santun) dan ketertiban KBM';
+
 export const initialPiketSchedules: PiketSchedule[] = [
   {
     day: 'Senin',
     teacherIds: ['TCH-199107282015031006', 'TCH-198802182014021003', 'TCH-198709252010012022'],
     dutyHours: '06.30 - 15.00 WIB',
-    notes: 'Pengawalan kedisiplinan dan kerapian seragam upacara bendera'
+    notes: STANDARD_PIKET_DUTY_NOTES
   },
   {
     day: 'Selasa',
     teacherIds: ['TCH-198604122011012015', 'TCH-199103142015032008', 'TCH-198610152011011018'],
     dutyHours: '06.30 - 15.00 WIB',
-    notes: 'Penyambutan siswa di gerbang 5S (Senyum, Salam, Sapa, Sopan, Santun) dan ketertiban KBM'
+    notes: STANDARD_PIKET_DUTY_NOTES
   },
   {
     day: 'Rabu',
     teacherIds: ['TCH-198411082009021004', 'TCH-199208192019032014', 'TCH-199403212020121009'],
     dutyHours: '06.30 - 15.00 WIB',
-    notes: 'Pemeriksaan atribut lengkap, kuku, dan kerapian rambut siswa'
+    notes: STANDARD_PIKET_DUTY_NOTES
   },
   {
     day: 'Kamis',
     teacherIds: ['TCH-198506172010011019', 'TCH-198901232014022007', 'TCH-198207152008012007'],
     dutyHours: '06.30 - 15.00 WIB',
-    notes: 'Pengawasan area kantin sehat, perpustakaan, dan area bermain selama jam istirahat'
+    notes: STANDARD_PIKET_DUTY_NOTES
   },
   {
     day: 'Jumat',
     teacherIds: ['TCH-198610152011011018', 'TCH-198307042008011011', 'TCH-199012052015032009'],
     dutyHours: '06.30 - 14.00 WIB',
-    notes: 'Kedisiplinan salat dhuha/ibadah bersama dan pemantauan kegiatan pembiasaan karakter'
+    notes: STANDARD_PIKET_DUTY_NOTES
   },
   {
     day: 'Sabtu',
     teacherIds: ['TCH-197805122005011008', 'TCH-199304162019032011', 'TCH-199107282015031006'],
     dutyHours: '06.30 - 13.00 WIB',
-    notes: 'Pemeriksaan kebersihan kelas akhir pekan dan ketertiban penjemputan kepulangan'
+    notes: STANDARD_PIKET_DUTY_NOTES
   }
 ];
 
@@ -441,7 +444,7 @@ export const initialRewards: RewardRecord[] = [];
 
 export const initialCompensations: CompensationRecord[] = [];
 
-export const OFFICIAL_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbyc9XP8BPzTKcGNlcna12L31mYhotfGnJLFXhA8EhYtG2wG7lO9AQq9Aet3hu7WMjo/exec';
+export const OFFICIAL_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbx6UobChbf4diPF4l2gMU_v1crUtGY4DEVSQTknBgnFJ2Ioe4zps1LU7ACiHLxEl_4/exec';
 
 export const initialSettings: SchoolSettings = {
   schoolName: '',
