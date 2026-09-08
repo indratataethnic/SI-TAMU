@@ -1,5 +1,5 @@
 import { Student, Teacher, PiketSchedule, ViolationRule, RewardRule, ViolationRecord, RewardRecord, CompensationRecord, SchoolSettings, StudentScoreSummary } from '../types';
-import { initialStudents, initialTeachers, initialPiketSchedules, initialViolationRules, initialRewardRules, initialViolations, initialRewards, initialCompensations, initialSettings, OFFICIAL_WEBHOOK_URL } from '../data/initialData';
+import { initialStudents, initialTeachers, initialPiketSchedules, initialViolationRules, initialRewardRules, initialViolations, initialRewards, initialCompensations, initialSettings, OFFICIAL_WEBHOOK_URL, STANDARD_PIKET_DUTY_NOTES } from '../data/initialData';
 
 const STORAGE_KEYS = {
   STUDENTS: 'sitamu_students',
@@ -153,6 +153,16 @@ export const sanitizeStudents = (students: Student[]): Student[] => {
   });
 };
 
+export const normalizeTeacherNameForMatching = (name: string): string => {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    .replace(/,\s*(s\.pd\.sd|s\.pd\.i|s\.pd|m\.pd|s\.ap|s\.psi|m\.m|m\.si|s\.kom|s\.ag|dr\.|drs\.|dra\.|h\.|hj\.)/gi, '')
+    .replace(/\b(s\.pd\.sd|s\.pd\.i|s\.pd|m\.pd|s\.ap|s\.psi|m\.m|m\.si|s\.kom|s\.ag|dr\.|drs\.|dra\.|h\.|hj\.)\b/gi, '')
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
+};
+
 export const sanitizeTeachers = (teachers: Teacher[]): Teacher[] => {
   const seenIds = new Set<string>();
   return (teachers || []).map((t, idx) => {
@@ -163,6 +173,94 @@ export const sanitizeTeachers = (teachers: Teacher[]): Teacher[] => {
     seenIds.add(cleanId);
     return { ...t, id: cleanId };
   });
+};
+
+export const sanitizePiketSchedules = (
+  schedules: PiketSchedule[] = [],
+  teachersList: Teacher[] = []
+): PiketSchedule[] => {
+  const DAYS: Array<'Senin' | 'Selasa' | 'Rabu' | 'Kamis' | 'Jumat' | 'Sabtu'> = [
+    'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'
+  ];
+
+  const safeTeachers = Array.isArray(teachersList) && teachersList.length > 0
+    ? teachersList
+    : initialTeachers;
+
+  const matchTeacher = (rawId: string): Teacher | undefined => {
+    if (!rawId) return undefined;
+    const cleanRaw = String(rawId).trim();
+    // 1. Direct ID match
+    const byId = safeTeachers.find(t => t.id === cleanRaw);
+    if (byId) return byId;
+
+    // 2. NIP match (ignoring non-digits)
+    const rawDigits = cleanRaw.replace(/[^0-9]/g, '');
+    if (rawDigits.length >= 8) {
+      const byNip = safeTeachers.find(t => {
+        const tDigits = String(t.nip || '').replace(/[^0-9]/g, '');
+        return tDigits.length >= 8 && (tDigits === rawDigits || tDigits.includes(rawDigits) || rawDigits.includes(tDigits));
+      });
+      if (byNip) return byNip;
+    }
+
+    // 3. Name matching
+    const normRaw = normalizeTeacherNameForMatching(cleanRaw);
+    if (normRaw && normRaw.length >= 3) {
+      const byName = safeTeachers.find(t => {
+        const normName = normalizeTeacherNameForMatching(t.name);
+        return normName === normRaw || (normName.length >= 4 && (normName.includes(normRaw) || normRaw.includes(normName)));
+      });
+      if (byName) return byName;
+    }
+
+    return undefined;
+  };
+
+  const existingMap = new Map<string, PiketSchedule>();
+  if (Array.isArray(schedules)) {
+    schedules.forEach(s => {
+      if (s && s.day) existingMap.set(s.day, s);
+    });
+  }
+
+  // Build resolved schedules for all 6 days
+  const resolved = DAYS.map((day, dIdx) => {
+    const existing = existingMap.get(day);
+    const resolvedTeacherIds: string[] = [];
+    const seen = new Set<string>();
+
+    if (existing && Array.isArray(existing.teacherIds)) {
+      existing.teacherIds.forEach(id => {
+        const matched = matchTeacher(id);
+        if (matched && !seen.has(matched.id)) {
+          seen.add(matched.id);
+          resolvedTeacherIds.push(matched.id);
+        }
+      });
+    }
+
+    return {
+      day,
+      teacherIds: resolvedTeacherIds,
+      dutyHours: existing?.dutyHours || (day === 'Jumat' ? '06.30 - 14.00 WIB' : day === 'Sabtu' ? '06.30 - 13.00 WIB' : '06.30 - 15.00 WIB'),
+      notes: existing?.notes || STANDARD_PIKET_DUTY_NOTES
+    };
+  });
+
+  // Check if schedules need auto-populating (e.g. if all or most days have 0 teachers because of old demo IDs)
+  const totalAssigned = resolved.reduce((acc, s) => acc + s.teacherIds.length, 0);
+  if (totalAssigned === 0 && safeTeachers.length > 0) {
+    // Distribute teachers evenly across the 6 days
+    safeTeachers.forEach((t, tIdx) => {
+      const dayIdx = tIdx % 6;
+      if (!resolved[dayIdx].teacherIds.includes(t.id)) {
+        resolved[dayIdx].teacherIds.push(t.id);
+      }
+    });
+  }
+
+  return resolved;
 };
 
 export const sanitizeRecords = <T extends { id: string }>(records: T[], prefix: string): T[] => {
@@ -223,20 +321,22 @@ export const saveTeachers = (teachers: Teacher[]): void => {
 export const getStoredPiketSchedules = (): PiketSchedule[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.PIKET_SCHEDULES);
-    if (!raw) return initialPiketSchedules;
+    const teachers = getStoredTeachers();
+    if (!raw) return sanitizePiketSchedules(initialPiketSchedules, teachers);
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) return initialPiketSchedules;
-    return parsed;
+    if (!Array.isArray(parsed) || parsed.length === 0) return sanitizePiketSchedules(initialPiketSchedules, teachers);
+    return sanitizePiketSchedules(parsed, teachers);
   } catch (e) {
     console.error('Failed reading piket schedules from storage', e);
-    return initialPiketSchedules;
+    return sanitizePiketSchedules(initialPiketSchedules, getStoredTeachers());
   }
 };
 
 export const loadPiketSchedules = getStoredPiketSchedules;
 
 export const savePiketSchedules = (schedules: PiketSchedule[]): void => {
-  localStorage.setItem(STORAGE_KEYS.PIKET_SCHEDULES, JSON.stringify(schedules));
+  const teachers = getStoredTeachers();
+  localStorage.setItem(STORAGE_KEYS.PIKET_SCHEDULES, JSON.stringify(sanitizePiketSchedules(schedules, teachers)));
 };
 
 export const getStoredViolationRules = (): ViolationRule[] => {

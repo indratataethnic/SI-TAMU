@@ -37,6 +37,7 @@ import {
   calculateSummaries,
   sanitizeStudents,
   sanitizeTeachers,
+  sanitizePiketSchedules,
   sanitizeRecords,
   normalizeRecordDate,
   isCorruptedNisn,
@@ -557,18 +558,26 @@ export default function App() {
       const finalTeachers = sanitizeTeachers(updatedTeachers);
       setTeachers(finalTeachers);
       saveTeachers(finalTeachers);
-    } else if (teachers.length === 0) {
-      const defaultSanitized = sanitizeTeachers(initialTeachers);
-      setTeachers(defaultSanitized);
-      saveTeachers(defaultSanitized);
-    }
 
-    if (Array.isArray(imported.piketSchedules) && imported.piketSchedules.length > 0) {
-      setPiketSchedules(imported.piketSchedules);
-      savePiketSchedules(imported.piketSchedules);
-    } else if (!piketSchedules || piketSchedules.length === 0 || piketSchedules.every(p => !p.teacherIds || p.teacherIds.length === 0)) {
-      setPiketSchedules(initialPiketSchedules);
-      savePiketSchedules(initialPiketSchedules);
+      const safePiket = sanitizePiketSchedules(
+        Array.isArray(imported.piketSchedules) && imported.piketSchedules.length > 0 ? imported.piketSchedules : piketSchedules,
+        finalTeachers
+      );
+      setPiketSchedules(safePiket);
+      savePiketSchedules(safePiket);
+    } else {
+      const currentTeachersList = teachers.length > 0 ? teachers : sanitizeTeachers(initialTeachers);
+      if (teachers.length === 0) {
+        setTeachers(currentTeachersList);
+        saveTeachers(currentTeachersList);
+      }
+
+      const safePiket = sanitizePiketSchedules(
+        Array.isArray(imported.piketSchedules) && imported.piketSchedules.length > 0 ? imported.piketSchedules : piketSchedules,
+        currentTeachersList
+      );
+      setPiketSchedules(safePiket);
+      savePiketSchedules(safePiket);
     }
 
     const sMap = new Map(finalStudents.map(s => [s.nisn, s.id]));

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { Teacher, PiketSchedule, ViolationRecord, RewardRecord, DayOfWeek, Student, SchoolSettings } from '../types';
 import { initialTeachers, initialPiketSchedules, STANDARD_PIKET_DUTY_NOTES } from '../data/initialData';
 import { getAvailableClasses } from '../data/classOptions';
+import { normalizeTeacherNameForMatching, sanitizePiketSchedules } from '../utils/storage';
 import {
   GraduationCap,
   Plus,
@@ -124,12 +125,37 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
 
   // Piket Workload Stats
   const isTeacherAssignedToSched = (t: Teacher, teacherIds: string[]) => {
-    if (!teacherIds || teacherIds.length === 0) return false;
-    return teacherIds.some(id => 
-      id === t.id || 
-      (t.nip && (id === t.nip || id.replace(/\s+/g, '') === t.nip.replace(/\s+/g, ''))) || 
-      id.trim().toLowerCase() === t.name.trim().toLowerCase()
-    );
+    if (!teacherIds || teacherIds.length === 0 || !t) return false;
+    const tDigits = (t.nip || '').replace(/[^0-9]/g, '');
+    const tNormName = normalizeTeacherNameForMatching(t.name);
+
+    return teacherIds.some(rawId => {
+      if (!rawId) return false;
+      const cleanRaw = String(rawId).trim();
+      if (cleanRaw === t.id) return true;
+
+      // NIP digits match
+      const rawDigits = cleanRaw.replace(/[^0-9]/g, '');
+      if (rawDigits.length >= 8 && tDigits.length >= 8) {
+        if (rawDigits === tDigits || rawDigits.includes(tDigits) || tDigits.includes(rawDigits)) {
+          return true;
+        }
+      }
+
+      // Exact name match
+      if (cleanRaw.toLowerCase() === t.name.trim().toLowerCase()) return true;
+
+      // Normalized name match (ignoring titles like S.Pd, S.Pd.SD, S.Pd.I, etc.)
+      const rawNorm = normalizeTeacherNameForMatching(cleanRaw);
+      if (rawNorm && tNormName) {
+        if (rawNorm === tNormName) return true;
+        if (rawNorm.length >= 4 && tNormName.length >= 4 && (rawNorm.includes(tNormName) || tNormName.includes(rawNorm))) {
+          return true;
+        }
+      }
+
+      return false;
+    });
   };
 
   const teacherPiketCountMap = useMemo(() => {
