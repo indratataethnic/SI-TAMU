@@ -150,9 +150,15 @@ app.get("/api/data", (req, res) => {
 // POST API: Fast persistence of full local database cache
 app.post("/api/data", (req, res) => {
   try {
-    const data = req.body;
-    cachedDb = data;
-    fs.writeFileSync(DB_FILE, JSON.stringify(data), "utf-8");
+    const data = req.body || {};
+    cachedDb = {
+      ...(cachedDb || {}),
+      ...data
+    };
+    if (!fs.existsSync(CONFIG_DIR)) {
+      fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    }
+    fs.writeFileSync(DB_FILE, JSON.stringify(cachedDb, null, 2), "utf-8");
     broadcastUpdate("local_save");
     return res.json({ success: true, version: dbVersion });
   } catch (err: any) {

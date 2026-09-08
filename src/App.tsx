@@ -223,13 +223,7 @@ export default function App() {
       if (json?.version) {
         lastKnownVersionRef.current = json.version;
       }
-      if (json?.data && (
-        (json.data.students && json.data.students.length > 0) ||
-        (json.data.teachers && json.data.teachers.length > 0) ||
-        (json.data.piketSchedules && json.data.piketSchedules.length > 0) ||
-        (json.data.violations && json.data.violations.length > 0) ||
-        (json.data.rewards && json.data.rewards.length > 0)
-      )) {
+      if (json?.data && typeof json.data === 'object') {
         handleImportFullData(json.data);
         return true;
       }
@@ -344,13 +338,38 @@ export default function App() {
       .then(json => {
         if (json?.version) lastKnownVersionRef.current = json.version;
         if (json?.data && (
-          (json.data.students && json.data.students.length > 0) ||
-          (json.data.teachers && json.data.teachers.length > 0) ||
-          (json.data.piketSchedules && json.data.piketSchedules.length > 0) ||
-          (json.data.violations && json.data.violations.length > 0) ||
-          (json.data.rewards && json.data.rewards.length > 0)
+          (Array.isArray(json.data.students) && json.data.students.length > 0) ||
+          (Array.isArray(json.data.teachers) && json.data.teachers.length > 0) ||
+          (Array.isArray(json.data.piketSchedules) && json.data.piketSchedules.length > 0) ||
+          (Array.isArray(json.data.violations) && json.data.violations.length > 0) ||
+          (Array.isArray(json.data.rewards) && json.data.rewards.length > 0)
         )) {
           handleImportFullData(json.data);
+        } else {
+          // If server database is empty on fresh cold-start, seed it from local client state
+          const currentStudents = loadStudents();
+          const currentTeachers = loadTeachers();
+          const currentPiket = loadPiketSchedules();
+          const currentViolations = loadViolations();
+          const currentRewards = loadRewards();
+          const currentCompensations = loadCompensations();
+          const currentSettings = loadSettings();
+
+          if (currentStudents.length > 0 || currentViolations.length > 0 || currentTeachers.length > 0) {
+            fetch('/api/data', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                students: currentStudents,
+                teachers: currentTeachers,
+                piketSchedules: currentPiket,
+                violations: currentViolations,
+                rewards: currentRewards,
+                compensations: currentCompensations,
+                settings: currentSettings
+              })
+            }).catch(() => {});
+          }
         }
       })
       .catch(() => {})
@@ -388,7 +407,7 @@ export default function App() {
       .catch(err => console.log('Error loading global configuration:', err));
   }, []);
 
-  // Background Google Sheets Sync Helper with direct state support
+  // Background Google Sheets & Multi-Device Real-Time Sync Helper
   const triggerSheetsSync = (override?: {
     students?: Student[];
     teachers?: Teacher[];
@@ -396,9 +415,10 @@ export default function App() {
     violations?: ViolationRecord[];
     rewards?: RewardRecord[];
     compensations?: CompensationRecord[];
+    settings?: SchoolSettings;
   }) => {
-    const webhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || '').trim();
-    if (!webhook) return;
+    lastLocalSaveTimestampRef.current = Date.now();
+    lastLocalActionRef.current = Date.now();
 
     const studentsToSync = override?.students ?? students;
     const teachersToSync = override?.teachers ?? teachers;
@@ -406,6 +426,33 @@ export default function App() {
     const violationsToSync = override?.violations ?? violations;
     const rewardsToSync = override?.rewards ?? rewards;
     const compensationsToSync = override?.compensations ?? compensations;
+    const settingsToSync = override?.settings ?? settings;
+
+    // 1. Instant POST to central server (/api/data) to trigger Real-Time SSE broadcast to all other open devices!
+    const serverPayload = {
+      students: studentsToSync,
+      teachers: teachersToSync,
+      piketSchedules: piketSchedulesToSync,
+      violations: violationsToSync,
+      rewards: rewardsToSync,
+      compensations: compensationsToSync,
+      settings: settingsToSync
+    };
+
+    fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(serverPayload)
+    })
+      .then(res => res.json())
+      .then(json => {
+        if (json?.version) lastKnownVersionRef.current = json.version;
+      })
+      .catch(err => console.log('Background server sync error:', err));
+
+    // 2. Push to Google Spreadsheet via Webhook (Background backup)
+    const webhook = (settingsToSync.googleSheetsWebhook || settingsToSync.googleSheetsWebhookUrl || '').trim();
+    if (!webhook) return;
 
     syncFullStateToSheets(
       webhook,
@@ -414,10 +461,10 @@ export default function App() {
       rewardsToSync,
       compensationsToSync,
       summaries,
-      settings.googleSheetsUrl,
+      settingsToSync.googleSheetsUrl,
       teachersToSync,
       piketSchedulesToSync,
-      settings
+      settingsToSync
     ).catch(err => console.log('Background sheets sync error:', err));
   };
 
@@ -737,25 +784,30 @@ export default function App() {
   const handleAddTeacher = (teacher: Teacher) => {
     const updated = [teacher, ...teachers];
     setTeachers(updated);
+    saveTeachers(updated);
     triggerSheetsSync({ teachers: updated });
   };
 
   const handleUpdateTeacher = (teacher: Teacher) => {
     const updated = teachers.map(t => t.id === teacher.id ? teacher : t);
     setTeachers(updated);
+    saveTeachers(updated);
     triggerSheetsSync({ teachers: updated });
   };
 
   const handleDeleteTeacher = (id: string) => {
     const updated = teachers.filter(t => t.id !== id);
     setTeachers(updated);
+    saveTeachers(updated);
     triggerSheetsSync({ teachers: updated });
   };
 
   const handleDeleteAllTeachers = () => {
     setTeachers([]);
+    saveTeachers([]);
     const updatedPiket = piketSchedules.map(p => ({ ...p, teacherIds: [] }));
     setPiketSchedules(updatedPiket);
+    savePiketSchedules(updatedPiket);
     triggerSheetsSync({
       teachers: [],
       piketSchedules: updatedPiket
@@ -764,6 +816,7 @@ export default function App() {
 
   const handleImportTeachers = (imported: Teacher[]) => {
     setTeachers(imported);
+    saveTeachers(imported);
     triggerSheetsSync({ teachers: imported });
   };
 
@@ -777,11 +830,13 @@ export default function App() {
       updated = [...piketSchedules, schedule];
     }
     setPiketSchedules(updated);
+    savePiketSchedules(updated);
     triggerSheetsSync({ piketSchedules: updated });
   };
 
   const handleUpdateAllPiketSchedules = (schedules: PiketSchedule[]) => {
     setPiketSchedules(schedules);
+    savePiketSchedules(schedules);
     triggerSheetsSync({ piketSchedules: schedules });
   };
 
