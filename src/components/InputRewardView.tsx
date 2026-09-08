@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Student, RewardRule, RewardRecord, SchoolSettings } from '../types';
+import { Student, Teacher, RewardRule, RewardRecord, SchoolSettings } from '../types';
 import {
   Award,
   Sparkles,
@@ -12,13 +12,16 @@ import {
   Printer,
   GraduationCap,
   X,
-  Check
+  Check,
+  UserCheck,
+  BadgeCheck
 } from 'lucide-react';
 import { openWhatsApp, generateRewardWAMessage } from '../utils/whatsapp';
 import { PRIMARY_SCHOOL_CLASSES, PRIMARY_SCHOOL_PARALLEL_CLASSES, getAvailableClasses, matchClassFilter } from '../data/classOptions';
 
 interface InputRewardViewProps {
   students: Student[];
+  teachers?: Teacher[];
   rewardRules: RewardRule[];
   settings: SchoolSettings;
   preselectedStudent?: Student | null;
@@ -29,6 +32,7 @@ interface InputRewardViewProps {
 
 export const InputRewardView: React.FC<InputRewardViewProps> = ({
   students,
+  teachers = [],
   rewardRules,
   settings,
   preselectedStudent,
@@ -49,9 +53,37 @@ export const InputRewardView: React.FC<InputRewardViewProps> = ({
   const [level, setLevel] = useState<'Nasional' | 'Provinsi' | 'Kota/Kab' | 'Sekolah' | 'Umum'>('Kota/Kab');
   const [points, setPoints] = useState<number>(3);
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [reporterTeacherId, setReporterTeacherId] = useState<string>('');
+  const [reporterNip, setReporterNip] = useState<string>('');
+  const [reporterName, setReporterName] = useState<string>('Koordinator Prestasi & Kesiswaan');
   const [notes, setNotes] = useState('');
   const [autoSendWA, setAutoSendWA] = useState<boolean>(false);
   const [feedbackRecord, setFeedbackRecord] = useState<RewardRecord | null>(null);
+
+  useEffect(() => {
+    if (!reporterTeacherId && teachers && teachers.length > 0) {
+      const pembina = teachers.find(t => t.role === 'pembina_osis' || t.role === 'guru_bk') || teachers[0];
+      if (pembina) {
+        setReporterTeacherId(pembina.id);
+        setReporterName(pembina.name);
+        setReporterNip(pembina.nip || '');
+      }
+    }
+  }, [teachers]);
+
+  const handleSelectReporter = (teacherIdOrCustom: string) => {
+    if (teacherIdOrCustom === 'custom') {
+      setReporterTeacherId('');
+      setReporterNip('');
+      return;
+    }
+    const found = teachers?.find(t => t.id === teacherIdOrCustom);
+    if (found) {
+      setReporterTeacherId(found.id);
+      setReporterName(found.name);
+      setReporterNip(found.nip || '');
+    }
+  };
 
   const availableClasses = useMemo(() => getAvailableClasses(students), [students]);
 
@@ -155,7 +187,9 @@ export const InputRewardView: React.FC<InputRewardViewProps> = ({
       organizer: organizer.trim() || undefined,
       points: Number(points) || 0,
       date,
-      reporterName: 'Koordinator Prestasi & Kesiswaan',
+      reporterName: reporterName.trim() || 'Koordinator Prestasi & Kesiswaan',
+      reporterId: reporterTeacherId || undefined,
+      reporterNip: reporterNip || undefined,
       certificateNumber: `PIAGAM/${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`,
       notes,
       academicYear: settings.academicYear || '2026/2027',
@@ -528,9 +562,73 @@ export const InputRewardView: React.FC<InputRewardViewProps> = ({
           </div>
         </div>
 
-        {/* Step 4: Notes */}
+        {/* Step 4: Teacher / Supervisor */}
+        <div className="space-y-2 pt-2 border-t border-slate-100">
+          <label className="block font-bold text-slate-800 text-sm">4. Guru Pembina / Pelapor Prestasi</label>
+          {teachers && teachers.length > 0 ? (
+            <div className="space-y-1.5">
+              <select
+                value={reporterTeacherId || (teachers.some(t => t.name === reporterName) ? teachers.find(t => t.name === reporterName)?.id : 'custom')}
+                onChange={(e) => handleSelectReporter(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium text-xs text-slate-800"
+              >
+                <optgroup label="👨‍🏫 Daftar Guru Pembina & Wali Kelas">
+                  {teachers.map(t => (
+                    <option key={`rew-tch-${t.id}`} value={t.id}>
+                      {t.name} ({t.role === 'wali_kelas' ? `Wali ${t.classAssigned}` : t.role === 'pembina_osis' ? 'Pembina OSIS/Kesiswaan' : t.role === 'guru_bk' ? 'Guru BK' : 'Guru Mapel'})
+                    </option>
+                  ))}
+                </optgroup>
+                <option value="custom">✏️ Ketik Manual / Nama Lainnya...</option>
+              </select>
+
+              <input
+                type="text"
+                required
+                value={reporterName}
+                onChange={(e) => {
+                  setReporterName(e.target.value);
+                  const match = teachers.find(t => t.name.toLowerCase() === e.target.value.trim().toLowerCase());
+                  if (match) {
+                    setReporterTeacherId(match.id);
+                    setReporterNip(match.nip || '');
+                  } else {
+                    setReporterTeacherId('');
+                    setReporterNip('');
+                  }
+                }}
+                placeholder="Nama Guru Pembina / Pelapor"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium text-xs"
+              />
+
+              {reporterTeacherId ? (
+                <div className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-800 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
+                  <BadgeCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>
+                    Terekam ke profil: <strong>{reporterName}</strong> {reporterNip && `(NIP: ${reporterNip})`}
+                  </span>
+                </div>
+              ) : reporterName ? (
+                <div className="text-[11px] text-slate-500 italic px-1">
+                  Pencatat manual: {reporterName}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <input
+              type="text"
+              required
+              value={reporterName}
+              onChange={(e) => setReporterName(e.target.value)}
+              placeholder="Nama Guru Pembina / Pelapor"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium text-xs"
+            />
+          )}
+        </div>
+
+        {/* Step 5: Notes */}
         <div className="space-y-1 pt-2 border-t border-slate-100">
-          <label className="block font-bold text-slate-800 text-sm">4. Catatan Apresiasi (Opsional)</label>
+          <label className="block font-bold text-slate-800 text-sm">5. Catatan Apresiasi (Opsional)</label>
           <textarea
             rows={2}
             value={notes}

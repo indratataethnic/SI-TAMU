@@ -597,7 +597,9 @@ export default function App() {
           ruleName: v.ruleName || (v as any).pelanggaran || (v as any).violationName || 'Pelanggaran Tata Tertib',
           category: ((v.category || 'ringan').toLowerCase() as any),
           points: Number(v.points) || 0,
-          reporterName: v.reporterName || (v as any).reporter || (v as any).reporterTeacherName || 'Guru Piket'
+          reporterName: v.reporterName || (v as any).reporter || (v as any).reporterTeacherName || 'Guru Piket',
+          reporterId: v.reporterId || (v as any).reporterTeacherId,
+          reporterNip: v.reporterNip || (v as any).reporterTeacherNip
         };
       }), 'VIOL');
       setViolations(mappedViolations);
@@ -619,7 +621,9 @@ export default function App() {
           level: r.level || (r as any).tingkat || 'Sekolah',
           competitionName: r.competitionName || r.ruleName || 'Kegiatan Sekolah',
           points: Number(r.points) || 0,
-          reporterName: r.reporterName || (r as any).reporter || (r as any).reporterTeacherName || 'Guru'
+          reporterName: r.reporterName || (r as any).reporter || (r as any).reporterTeacherName || 'Guru',
+          reporterId: r.reporterId || (r as any).reporterTeacherId,
+          reporterNip: r.reporterNip || (r as any).reporterTeacherNip
         };
       }), 'REW');
       setRewards(mappedRewards);
@@ -1084,6 +1088,7 @@ export default function App() {
             <InputPelanggaranView
               students={students}
               teachers={teachers}
+              piketSchedules={piketSchedules}
               violationRules={violationRules}
               summaries={summaries}
               settings={settings}
@@ -1096,6 +1101,7 @@ export default function App() {
           {currentTab === 'input_reward' && (
             <InputRewardView
               students={students}
+              teachers={teachers}
               rewardRules={rewardRules}
               settings={settings}
               preselectedStudent={preselectedStudent}

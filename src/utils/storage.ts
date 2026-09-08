@@ -163,6 +163,53 @@ export const normalizeTeacherNameForMatching = (name: string): string => {
     .trim();
 };
 
+export const getDayNameFromDate = (dateStr: string): 'Senin' | 'Selasa' | 'Rabu' | 'Kamis' | 'Jumat' | 'Sabtu' | 'Minggu' => {
+  if (!dateStr) return 'Senin';
+  const d = new Date(dateStr + 'T00:00:00');
+  const dayIndex = isNaN(d.getDay()) ? 1 : d.getDay();
+  switch (dayIndex) {
+    case 1: return 'Senin';
+    case 2: return 'Selasa';
+    case 3: return 'Rabu';
+    case 4: return 'Kamis';
+    case 5: return 'Jumat';
+    case 6: return 'Sabtu';
+    default: return 'Minggu';
+  }
+};
+
+export const isTeacherRecorder = (
+  teacher: Teacher,
+  record: { reporterId?: string; reporterNip?: string; reporterName?: string }
+): boolean => {
+  if (!teacher || !record) return false;
+  if (record.reporterId && record.reporterId === teacher.id) return true;
+
+  const tDigits = String(teacher.nip || '').replace(/[^0-9]/g, '');
+  const rDigits = String(record.reporterNip || '').replace(/[^0-9]/g, '');
+  if (tDigits.length >= 8 && rDigits.length >= 8) {
+    if (tDigits === rDigits || tDigits.includes(rDigits) || rDigits.includes(tDigits)) {
+      return true;
+    }
+  }
+
+  const cleanRepName = (record.reporterName || '').trim();
+  if (cleanRepName && cleanRepName.toLowerCase() === teacher.name.trim().toLowerCase()) {
+    return true;
+  }
+
+  const normTeacher = normalizeTeacherNameForMatching(teacher.name);
+  const normRecord = normalizeTeacherNameForMatching(cleanRepName);
+  if (normTeacher && normRecord) {
+    if (normTeacher === normRecord) return true;
+    if (normTeacher.length >= 4 && normRecord.length >= 4 && (normTeacher.includes(normRecord) || normRecord.includes(normTeacher))) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 export const sanitizeTeachers = (teachers: Teacher[]): Teacher[] => {
   const seenIds = new Set<string>();
   return (teachers || []).map((t, idx) => {

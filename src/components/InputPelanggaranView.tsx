@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Student, Teacher, ViolationRule, ViolationRecord, SchoolSettings, StudentScoreSummary } from '../types';
+import { Student, Teacher, PiketSchedule, ViolationRule, ViolationRecord, SchoolSettings, StudentScoreSummary } from '../types';
 import {
   AlertTriangle,
   User,
@@ -20,10 +20,14 @@ import {
   PlusCircle,
   Share2,
   Sparkles,
-  Volume2
+  Volume2,
+  UserCheck,
+  CalendarCheck,
+  BadgeCheck
 } from 'lucide-react';
 import { openWhatsApp, generateViolationWAMessage, sendViaGateway } from '../utils/whatsapp';
 import { PRIMARY_SCHOOL_CLASSES, PRIMARY_SCHOOL_PARALLEL_CLASSES, getAvailableClasses, matchClassFilter } from '../data/classOptions';
+import { getDayNameFromDate } from '../utils/storage';
 
 const LOCATION_OPTIONS = [
   'Ruang Kelas',
@@ -81,6 +85,7 @@ const playSuccessSound = () => {
 interface InputPelanggaranViewProps {
   students: Student[];
   teachers?: Teacher[];
+  piketSchedules?: PiketSchedule[];
   violationRules: ViolationRule[];
   summaries: StudentScoreSummary[];
   settings: SchoolSettings;
@@ -92,6 +97,7 @@ interface InputPelanggaranViewProps {
 export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
   students,
   teachers = [],
+  piketSchedules = [],
   violationRules,
   summaries,
   settings,
@@ -112,7 +118,57 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
   const [time, setTime] = useState<string>(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
   const [location, setLocation] = useState<string>('Ruang Kelas');
   const [description, setDescription] = useState<string>('');
+  
+  const currentDayName = useMemo(() => getDayNameFromDate(date), [date]);
+
+  const todayPiketSchedule = useMemo(() => {
+    return (piketSchedules || []).find(p => p.day === currentDayName);
+  }, [piketSchedules, currentDayName]);
+
+  const todayDutyTeachers = useMemo(() => {
+    if (!todayPiketSchedule || !todayPiketSchedule.teacherIds || todayPiketSchedule.teacherIds.length === 0) {
+      return [];
+    }
+    return (teachers || []).filter(t => todayPiketSchedule.teacherIds.includes(t.id));
+  }, [todayPiketSchedule, teachers]);
+
+  const [reporterTeacherId, setReporterTeacherId] = useState<string>('');
+  const [reporterNip, setReporterNip] = useState<string>('');
   const [reporterName, setReporterName] = useState<string>(settings.bkCoordinatorName || 'Guru Piket');
+
+  // Set initial duty teacher on mount or when duty teachers change
+  useEffect(() => {
+    if (todayDutyTeachers.length > 0) {
+      if (!reporterTeacherId || !reporterName || reporterName === 'Guru Piket' || reporterName === (settings.bkCoordinatorName || '')) {
+        const first = todayDutyTeachers[0];
+        setReporterTeacherId(first.id);
+        setReporterName(first.name);
+        setReporterNip(first.nip || '');
+      }
+    } else if (!reporterTeacherId && teachers.length > 0) {
+      const defaultTeacher = teachers.find(t => t.name === settings.bkCoordinatorName) || teachers[0];
+      if (defaultTeacher) {
+        setReporterTeacherId(defaultTeacher.id);
+        setReporterName(defaultTeacher.name);
+        setReporterNip(defaultTeacher.nip || '');
+      }
+    }
+  }, [currentDayName, todayDutyTeachers, teachers]);
+
+  const handleSelectReporter = (teacherIdOrCustom: string) => {
+    if (teacherIdOrCustom === 'custom') {
+      setReporterTeacherId('');
+      setReporterNip('');
+      return;
+    }
+    const found = teachers.find(t => t.id === teacherIdOrCustom);
+    if (found) {
+      setReporterTeacherId(found.id);
+      setReporterName(found.name);
+      setReporterNip(found.nip || '');
+    }
+  };
+
   const [autoSendWA, setAutoSendWA] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -212,7 +268,9 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
       time,
       location,
       description: description.trim() || selectedRule.name,
-      reporterName,
+      reporterName: reporterName.trim() || 'Guru Piket',
+      reporterId: reporterTeacherId || undefined,
+      reporterNip: reporterNip || undefined,
       academicYear: settings.academicYear || '2026/2027',
       createdAt: new Date().toISOString()
     };
@@ -791,34 +849,104 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
                 />
               )}
             </div>
-            <div>
-              <label className="block font-semibold text-slate-600 mb-1">Guru Pencatat / Saksi</label>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="block font-semibold text-slate-700 text-xs">Guru Pencatat / Tim Piket</label>
+                {currentDayName && (
+                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    Hari: {currentDayName}
+                  </span>
+                )}
+              </div>
+
+              {/* Quick Chips for Today's Duty Teachers */}
+              {todayDutyTeachers.length > 0 && (
+                <div className="bg-emerald-50/80 p-2 rounded-lg border border-emerald-200/80 space-y-1">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-900">
+                    <CalendarCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Pilih Cepat Guru Piket Hari Ini:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {todayDutyTeachers.map(dt => {
+                      const isSelected = reporterTeacherId === dt.id || reporterName === dt.name;
+                      return (
+                        <button
+                          key={dt.id}
+                          type="button"
+                          onClick={() => handleSelectReporter(dt.id)}
+                          className={`px-2.5 py-1 text-xs font-semibold rounded-md transition flex items-center gap-1.5 ${
+                            isSelected
+                              ? 'bg-emerald-700 text-white shadow-xs'
+                              : 'bg-white text-emerald-900 hover:bg-emerald-100/70 border border-emerald-300'
+                          }`}
+                        >
+                          {isSelected ? <Check className="w-3 h-3 text-white" /> : <UserCheck className="w-3 h-3 text-emerald-600" />}
+                          <span>{dt.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {teachers && teachers.length > 0 ? (
                 <div className="space-y-1.5">
                   <select
-                    value={teachers.some(t => t.name === reporterName) ? reporterName : 'custom'}
-                    onChange={(e) => {
-                      if (e.target.value !== 'custom') {
-                        setReporterName(e.target.value);
-                      }
-                    }}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium text-xs"
+                    value={reporterTeacherId || (teachers.some(t => t.name === reporterName) ? teachers.find(t => t.name === reporterName)?.id : 'custom')}
+                    onChange={(e) => handleSelectReporter(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium text-xs text-slate-800"
                   >
-                    <option value="custom">-- Ketik Nama Guru Lainnya --</option>
-                    {teachers.map((t, idx) => (
-                      <option key={`${t.id || 'tch'}-${idx}`} value={t.name}>
-                        {t.name} ({t.role === 'wali_kelas' ? `Wali ${t.classAssigned}` : t.role === 'guru_bk' ? 'Guru BK' : 'Guru'})
-                      </option>
-                    ))}
+                    {todayDutyTeachers.length > 0 && (
+                      <optgroup label={`⭐ Tim Guru Piket Bertugas (${currentDayName})`}>
+                        {todayDutyTeachers.map(t => (
+                          <option key={`today-${t.id}`} value={t.id}>
+                            🌟 {t.name} (Piket {currentDayName})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <optgroup label="👨‍🏫 Seluruh Guru & Tenaga Kependidikan">
+                      {teachers.map(t => (
+                        <option key={`all-${t.id}`} value={t.id}>
+                          {t.name} ({t.role === 'wali_kelas' ? `Wali ${t.classAssigned}` : t.role === 'guru_bk' ? 'Guru BK' : 'Guru'})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <option value="custom">✏️ Ketik Manual Nama Lainnya...</option>
                   </select>
+
                   <input
                     type="text"
                     required
                     value={reporterName}
-                    onChange={(e) => setReporterName(e.target.value)}
-                    placeholder="Nama Guru / Petugas Piket"
+                    onChange={(e) => {
+                      setReporterName(e.target.value);
+                      const match = teachers.find(t => t.name.toLowerCase() === e.target.value.trim().toLowerCase());
+                      if (match) {
+                        setReporterTeacherId(match.id);
+                        setReporterNip(match.nip || '');
+                      } else {
+                        setReporterTeacherId('');
+                        setReporterNip('');
+                      }
+                    }}
+                    placeholder="Nama Guru / Petugas Pencatat"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium text-xs"
                   />
+
+                  {/* Indicator badge of recorded teacher */}
+                  {reporterTeacherId ? (
+                    <div className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-800 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
+                      <BadgeCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>
+                        Terekam ke profil: <strong>{reporterName}</strong> {reporterNip && `(NIP: ${reporterNip})`}
+                      </span>
+                    </div>
+                  ) : reporterName ? (
+                    <div className="text-[11px] text-slate-500 italic px-1">
+                      Pencatat manual: {reporterName}
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <input
@@ -826,7 +954,7 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
                   required
                   value={reporterName}
                   onChange={(e) => setReporterName(e.target.value)}
-                  placeholder="Nama Guru / Petugas Piket"
+                  placeholder="Nama Guru / Petugas Pencatat"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium text-xs"
                 />
               )}

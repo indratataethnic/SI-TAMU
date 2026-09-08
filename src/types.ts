@@ -70,6 +70,8 @@ export interface ViolationRecord {
   time?: string;
   location?: string;
   reporterName: string; // Guru pencatat / saksi
+  reporterId?: string; // ID unik guru pencatat
+  reporterNip?: string; // NIP guru pencatat
   description: string;
   evidenceNote?: string;
   whatsappSent?: boolean;
@@ -92,6 +94,8 @@ export interface RewardRecord {
   organizer?: string;
   certificateNumber?: string;
   reporterName: string;
+  reporterId?: string; // ID unik guru pembina / pencatat
+  reporterNip?: string; // NIP guru pembina / pencatat
   notes?: string;
   whatsappSent?: boolean;
   academicYear?: string; // e.g. "2026/2027"

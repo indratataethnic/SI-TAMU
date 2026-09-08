@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { Teacher, PiketSchedule, ViolationRecord, RewardRecord, DayOfWeek, Student, SchoolSettings } from '../types';
 import { initialTeachers, initialPiketSchedules, STANDARD_PIKET_DUTY_NOTES } from '../data/initialData';
 import { getAvailableClasses } from '../data/classOptions';
-import { normalizeTeacherNameForMatching, sanitizePiketSchedules } from '../utils/storage';
+import { normalizeTeacherNameForMatching, sanitizePiketSchedules, isTeacherRecorder } from '../utils/storage';
 import {
   GraduationCap,
   Plus,
@@ -332,8 +332,8 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
   // Export to Excel
   const handleExportExcel = () => {
     const dataToExport = teachers.map((t, idx) => {
-      const recordedViolations = violations.filter(v => v.reporterName === t.name || (t.nip && v.reporterNip === t.nip)).length;
-      const recordedRewards = rewards.filter(r => r.reporterName === t.name).length;
+      const recordedViolations = violations.filter(v => isTeacherRecorder(t, v)).length;
+      const recordedRewards = rewards.filter(r => isTeacherRecorder(t, r)).length;
 
       // Days of piket
       const assignedDays = DAYS_LIST.filter(day => {
@@ -762,8 +762,8 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
                     </tr>
                   ) : (
                     filteredTeachers.map((t, idx) => {
-                      const recViolations = violations.filter(v => v.reporterName === t.name || (t.nip && v.reporterNip === t.nip)).length;
-                      const recRewards = rewards.filter(r => r.reporterName === t.name).length;
+                      const recViolations = violations.filter(v => isTeacherRecorder(t, v)).length;
+                      const recRewards = rewards.filter(r => isTeacherRecorder(t, r)).length;
                       const assignedDays = DAYS_LIST.filter(day => {
                         const s = piketSchedules.find(p => p.day === day);
                         return s?.teacherIds.includes(t.id);
