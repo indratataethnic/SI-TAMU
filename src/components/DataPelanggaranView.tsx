@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ViolationRecord, Student, StudentScoreSummary, SchoolSettings } from '../types';
+import { ViolationRecord, Student, StudentScoreSummary, SchoolSettings, Teacher, PiketSchedule, ViolationRule } from '../types';
 import {
   AlertTriangle,
   Search,
@@ -10,6 +10,8 @@ import {
   Printer,
   Trash2,
   Eye,
+  Edit,
+  Pencil,
   FileSpreadsheet,
   Calendar,
   CheckCircle2,
@@ -19,13 +21,18 @@ import {
 import { exportViolationsToExcel } from '../utils/excel';
 import { openWhatsApp, generateViolationWAMessage, sendViaGateway } from '../utils/whatsapp';
 import { normalizeRecordDate } from '../utils/storage';
+import { EditPelanggaranModal } from './EditPelanggaranModal';
 
 interface DataPelanggaranViewProps {
   violations: ViolationRecord[];
   students: Student[];
+  teachers?: Teacher[];
+  piketSchedules?: PiketSchedule[];
+  violationRules?: ViolationRule[];
   summaries: StudentScoreSummary[];
   settings: SchoolSettings;
   onDeleteViolation: (id: string) => void;
+  onUpdateViolation: (updated: ViolationRecord) => void;
   onNavigateToInput: () => void;
   onOpenSurat: (summary: StudentScoreSummary) => void;
 }
@@ -33,9 +40,13 @@ interface DataPelanggaranViewProps {
 export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
   violations,
   students,
+  teachers = [],
+  piketSchedules = [],
+  violationRules = [],
   summaries,
   settings,
   onDeleteViolation,
+  onUpdateViolation,
   onNavigateToInput,
   onOpenSurat
 }) => {
@@ -43,6 +54,7 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [selectedClass, setSelectedClass] = useState<string>('ALL');
   const [detailRecord, setDetailRecord] = useState<ViolationRecord | null>(null);
+  const [editingRecord, setEditingRecord] = useState<ViolationRecord | null>(null);
   const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
 
   const studentMap = useMemo(() => {
@@ -285,6 +297,15 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
                             </button>
                           )}
 
+                          {/* Edit / Koreksi */}
+                          <button
+                            onClick={() => setEditingRecord(v)}
+                            className="p-1.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                            title="Edit / Koreksi Data Pelanggaran"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+
                           {/* Detail */}
                           <button
                             onClick={() => setDetailRecord(v)}
@@ -377,18 +398,32 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-between items-center border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleSendWA(detailRecord);
-                    setDetailRecord(null);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg font-semibold transition cursor-pointer"
-                >
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  Kirim ke WA Orang Tua
-                </button>
+              <div className="pt-2 flex flex-wrap justify-between items-center gap-2 border-t border-slate-200">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleSendWA(detailRecord);
+                      setDetailRecord(null);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg font-semibold transition cursor-pointer"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    Kirim WA Orang Tua
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const toEdit = detailRecord;
+                      setDetailRecord(null);
+                      setEditingRecord(toEdit);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition cursor-pointer"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit Data
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => setDetailRecord(null)}
@@ -401,6 +436,22 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Edit Pelanggaran Modal */}
+      <EditPelanggaranModal
+        isOpen={!!editingRecord}
+        onClose={() => setEditingRecord(null)}
+        violation={editingRecord}
+        students={students}
+        teachers={teachers}
+        piketSchedules={piketSchedules}
+        violationRules={violationRules}
+        onSave={(updated) => {
+          onUpdateViolation(updated);
+          setNotificationStatus(`Data pelanggaran ${updated.studentName} berhasil diperbarui!`);
+          setTimeout(() => setNotificationStatus(null), 4000);
+        }}
+      />
     </div>
   );
 };

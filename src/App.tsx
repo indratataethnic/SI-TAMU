@@ -803,6 +803,18 @@ export default function App() {
     triggerSheetsSync({ violations: updated });
   };
 
+  const handleUpdateViolation = (updatedViolation: ViolationRecord) => {
+    lastLocalActionRef.current = Date.now();
+    const cleanViolation: ViolationRecord = {
+      ...updatedViolation,
+      date: normalizeRecordDate(updatedViolation.date)
+    };
+    const updated = violations.map(v => v.id === cleanViolation.id ? cleanViolation : v);
+    setViolations(updated);
+    saveViolations(updated);
+    triggerSheetsSync({ violations: updated });
+  };
+
   const handleDeleteViolation = (id: string) => {
     lastLocalActionRef.current = Date.now();
     const updated = violations.filter(v => v.id !== id);
@@ -819,6 +831,18 @@ export default function App() {
       date: normalizeRecordDate(reward.date)
     };
     const updated = [cleanReward, ...rewards];
+    setRewards(updated);
+    saveRewards(updated);
+    triggerSheetsSync({ rewards: updated });
+  };
+
+  const handleUpdateReward = (updatedReward: RewardRecord) => {
+    lastLocalActionRef.current = Date.now();
+    const cleanReward: RewardRecord = {
+      ...updatedReward,
+      date: normalizeRecordDate(updatedReward.date)
+    };
+    const updated = rewards.map(r => r.id === cleanReward.id ? cleanReward : r);
     setRewards(updated);
     saveRewards(updated);
     triggerSheetsSync({ rewards: updated });
@@ -1044,9 +1068,13 @@ export default function App() {
             <DataPelanggaranView
               violations={violations}
               students={students}
+              teachers={teachers}
+              piketSchedules={piketSchedules}
+              violationRules={violationRules}
               summaries={summaries}
               settings={settings}
               onDeleteViolation={handleDeleteViolation}
+              onUpdateViolation={handleUpdateViolation}
               onNavigateToInput={() => setCurrentTab('input_pelanggaran')}
               onOpenSurat={(sum) => handleOpenSuratModal(sum, 'panggilan_100')}
             />
@@ -1056,8 +1084,11 @@ export default function App() {
             <DataRewardView
               rewards={rewards}
               students={students}
+              teachers={teachers}
+              rewardRules={rewardRules}
               settings={settings}
               onDeleteReward={handleDeleteReward}
+              onUpdateReward={handleUpdateReward}
               onNavigateToInput={() => setCurrentTab('input_reward')}
               onOpenSertifikat={handleOpenSertifikatModal}
             />

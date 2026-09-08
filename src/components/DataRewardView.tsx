@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { RewardRecord, Student, SchoolSettings } from '../types';
+import { RewardRecord, Student, SchoolSettings, Teacher, RewardRule } from '../types';
 import {
   Award,
   Search,
@@ -10,6 +10,7 @@ import {
   Printer,
   Trash2,
   Eye,
+  Pencil,
   FileSpreadsheet,
   Sparkles,
   CheckCircle2,
@@ -17,12 +18,16 @@ import {
 } from 'lucide-react';
 import { exportRewardsToExcel } from '../utils/excel';
 import { openWhatsApp, generateRewardWAMessage } from '../utils/whatsapp';
+import { EditRewardModal } from './EditRewardModal';
 
 interface DataRewardViewProps {
   rewards: RewardRecord[];
   students: Student[];
+  teachers?: Teacher[];
+  rewardRules?: RewardRule[];
   settings: SchoolSettings;
   onDeleteReward: (id: string) => void;
+  onUpdateReward: (updated: RewardRecord) => void;
   onNavigateToInput: () => void;
   onOpenSertifikat: (reward: RewardRecord) => void;
 }
@@ -30,14 +35,19 @@ interface DataRewardViewProps {
 export const DataRewardView: React.FC<DataRewardViewProps> = ({
   rewards,
   students,
+  teachers = [],
+  rewardRules = [],
   settings,
   onDeleteReward,
+  onUpdateReward,
   onNavigateToInput,
   onOpenSertifikat
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLevel, setSelectedLevel] = useState('ALL');
   const [selectedClass, setSelectedClass] = useState('ALL');
+  const [editingRecord, setEditingRecord] = useState<RewardRecord | null>(null);
+  const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
 
   const studentMap = new Map<string, Student>(students.map(s => [s.id, s]));
   const levelsList = ['ALL', 'Nasional', 'Provinsi', 'Kota/Kab', 'Sekolah', 'Umum'];
@@ -98,6 +108,13 @@ export const DataRewardView: React.FC<DataRewardViewProps> = ({
           </button>
         </div>
       </div>
+
+      {notificationStatus && (
+        <div className="p-3 bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-xl text-xs flex items-center gap-2 font-medium">
+          <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+          <span>{notificationStatus}</span>
+        </div>
+      )}
 
       {/* Filter & Search */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-3">
@@ -224,6 +241,15 @@ export const DataRewardView: React.FC<DataRewardViewProps> = ({
                             <MessageSquare className="w-3.5 h-3.5" />
                           </button>
 
+                          {/* Edit / Koreksi */}
+                          <button
+                            onClick={() => setEditingRecord(r)}
+                            className="p-1.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                            title="Edit / Koreksi Catatan Prestasi"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+
                           {/* Hapus */}
                           <button
                             onClick={() => {
@@ -246,6 +272,21 @@ export const DataRewardView: React.FC<DataRewardViewProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Edit Reward Modal */}
+      <EditRewardModal
+        isOpen={!!editingRecord}
+        onClose={() => setEditingRecord(null)}
+        reward={editingRecord}
+        students={students}
+        teachers={teachers}
+        rewardRules={rewardRules}
+        onSave={(updated) => {
+          onUpdateReward(updated);
+          setNotificationStatus(`Data prestasi ${updated.studentName} (${updated.competitionName}) berhasil diperbarui!`);
+          setTimeout(() => setNotificationStatus(null), 4000);
+        }}
+      />
     </div>
   );
 };
