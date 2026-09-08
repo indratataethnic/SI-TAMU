@@ -14,7 +14,13 @@ import {
   ShieldCheck,
   GraduationCap,
   X,
-  Check
+  Check,
+  Eye,
+  ArrowRight,
+  PlusCircle,
+  Share2,
+  Sparkles,
+  Volume2
 } from 'lucide-react';
 import { openWhatsApp, generateViolationWAMessage, sendViaGateway } from '../utils/whatsapp';
 import { PRIMARY_SCHOOL_CLASSES, PRIMARY_SCHOOL_PARALLEL_CLASSES, getAvailableClasses, matchClassFilter } from '../data/classOptions';
@@ -48,6 +54,29 @@ const CHRONOLOGY_TEMPLATES = [
   'Siswa tidak masuk sekolah tanpa surat pemberitahuan dari orang tua/wali (alpa).',
   'Siswa tidak mengikuti upacara bendera / apel rutin tanpa keterangan sah.'
 ];
+
+// Soft native chime via Web Audio API as a clear audio cue
+const playSuccessSound = () => {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+    osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.08); // E5
+    osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.16); // G5
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.35);
+  } catch (e) {
+    // audio not supported or blocked, graceful fallback
+  }
+};
 
 interface InputPelanggaranViewProps {
   students: Student[];
@@ -87,6 +116,21 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
   const [autoSendWA, setAutoSendWA] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
+  // States for clear notification indicators
+  const [submitState, setSubmitState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [floatingToast, setFloatingToast] = useState<{
+    show: boolean;
+    studentName: string;
+    ruleName: string;
+    points: number;
+  } | null>(null);
+  const [successModalRecord, setSuccessModalRecord] = useState<{
+    record: ViolationRecord;
+    student: Student;
+    activePoints: number;
+    wasWASent: boolean;
+  } | null>(null);
+
   const availableClasses = useMemo(() => getAvailableClasses(students), [students]);
 
   // Close suggestions on outside click
@@ -101,8 +145,6 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
   }, []);
 
   // Filter students:
-  // When user types a search query, search globally across ALL 311 students (ignoring class constraints).
-  // When search query is empty, filter by selectedClass.
   const filteredStudents = useMemo(() => {
     const q = studentSearch.toLowerCase().trim();
     if (q) {
@@ -155,6 +197,8 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
       return;
     }
 
+    setSubmitState('saving');
+
     const newViolation: ViolationRecord = {
       id: `VIOL-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       studentId: selectedStudent.id,
@@ -175,9 +219,12 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
 
     onSaveViolation(newViolation);
 
+    const currentActive = (studentSummary?.activeViolationPoints || 0) + newViolation.points;
+
     // If WhatsApp toggle is on
+    let wasWASent = false;
     if (autoSendWA) {
-      const currentActive = (studentSummary?.activeViolationPoints || 0) + newViolation.points;
+      wasWASent = true;
       const msg = generateViolationWAMessage(selectedStudent, newViolation, currentActive, settings);
 
       if (settings.waGatewayApiKey) {
@@ -187,12 +234,197 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
       }
     }
 
-    setFeedback(`Data pelanggaran atas nama ${selectedStudent.name} berhasil dicatat!`);
+    // Play subtle audio confirmation cue
+    playSuccessSound();
+
+    // Trigger visual cues
+    setSubmitState('saved');
+    setFeedback(`Data pelanggaran atas nama ${selectedStudent.name} berhasil dicatat! (+${newViolation.points} Poin)`);
+    
+    // Show prominent floating toast that is visible regardless of scroll position
+    setFloatingToast({
+      show: true,
+      studentName: selectedStudent.name,
+      ruleName: newViolation.ruleName,
+      points: newViolation.points
+    });
+
+    // Show complete confirmation modal
+    setSuccessModalRecord({
+      record: newViolation,
+      student: selectedStudent,
+      activePoints: currentActive,
+      wasWASent
+    });
+
     setDescription('');
+
+    // Reset button status after 3.5s
+    setTimeout(() => {
+      setSubmitState('idle');
+    }, 3500);
+
+    // Auto-dismiss floating toast after 5s
+    setTimeout(() => {
+      setFloatingToast(prev => prev ? { ...prev, show: false } : null);
+    }, 5000);
+  };
+
+  const handleResetForNextInput = () => {
+    setSuccessModalRecord(null);
+    setDescription('');
+    setStudentSearch('');
+    // Focus back on student select smoothly
+    window.scrollTo({ top: 120, behavior: 'smooth' });
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6 relative">
+      {/* Floating Toast Notification (Always visible at top-center of viewport regardless of scroll position) */}
+      {floatingToast && floatingToast.show && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-lg pointer-events-auto transition-all duration-300">
+          <div className="p-4 bg-emerald-900/95 backdrop-blur-md text-white rounded-2xl shadow-2xl border-2 border-emerald-400 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-500 text-white rounded-xl shadow-inner shrink-0">
+                <CheckCircle2 className="w-6 h-6 animate-pulse" />
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-extrabold text-sm text-emerald-100">Pelanggaran Berhasil Dicatat!</span>
+                  <span className="px-2 py-0.5 text-[10px] font-black bg-rose-500 text-white rounded-full">
+                    +{floatingToast.points} Poin
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-200 line-clamp-1">
+                  {floatingToast.studentName} • {floatingToast.ruleName}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={onNavigateToData}
+                className="px-3 py-1.5 bg-white text-emerald-950 rounded-xl font-black text-xs hover:bg-emerald-100 transition shadow cursor-pointer flex items-center gap-1"
+              >
+                <span>Rekap</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setFloatingToast(null)}
+                className="p-1.5 text-emerald-300 hover:text-white hover:bg-emerald-800 rounded-lg transition cursor-pointer"
+                title="Tutup Notifikasi"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal Confirmation Dialog */}
+      {successModalRecord && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden">
+            {/* Modal Header with Green Accent */}
+            <div className="bg-gradient-to-br from-emerald-600 to-teal-800 p-6 text-white text-center relative">
+              <button
+                onClick={() => setSuccessModalRecord(null)}
+                className="absolute top-4 right-4 p-1.5 text-emerald-200 hover:text-white hover:bg-white/10 rounded-full transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="w-16 h-16 bg-white rounded-2xl mx-auto flex items-center justify-center shadow-lg mb-3">
+                <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+              </div>
+              <h3 className="text-xl font-black">Pelanggaran Berhasil Dicatat!</h3>
+              <p className="text-xs text-emerald-100 mt-1">
+                Data telah tersimpan ke sistem rekapitulasi dan poin siswa otomatis diperbarui.
+              </p>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 text-xs">
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
+                  <span className="text-slate-500 font-medium">Nama Siswa:</span>
+                  <span className="font-bold text-slate-900 text-sm">{successModalRecord.student.name}</span>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
+                  <span className="text-slate-500 font-medium">Kelas / Rombel:</span>
+                  <span className="font-semibold text-slate-800">{successModalRecord.student.class}</span>
+                </div>
+
+                <div className="flex items-start justify-between border-b border-slate-200 pb-2.5">
+                  <span className="text-slate-500 font-medium">Jenis Pelanggaran:</span>
+                  <span className="font-semibold text-slate-800 text-right max-w-[60%]">
+                    {successModalRecord.record.ruleName}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
+                  <span className="text-slate-500 font-medium">Poin Pelanggaran:</span>
+                  <span className="px-2.5 py-1 bg-rose-100 text-rose-700 font-black rounded-lg text-xs">
+                    +{successModalRecord.record.points} Poin
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-medium">Total Poin Pelanggaran Aktif:</span>
+                  <span className="font-black text-rose-600 text-sm">
+                    {successModalRecord.activePoints} Poin
+                  </span>
+                </div>
+              </div>
+
+              {/* WA status alert if activated */}
+              {successModalRecord.wasWASent && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-emerald-900 font-medium">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Notifikasi WhatsApp telah disiapkan untuk wali murid.</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSuccessModalRecord(null);
+                    onNavigateToData();
+                  }}
+                  className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
+                >
+                  <Eye className="w-4 h-4" />
+                  <span>Buka Tabel Data Pelanggaran</span>
+                </button>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResetForNextInput}
+                    className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <PlusCircle className="w-4 h-4 text-slate-600" />
+                    <span>Input Siswa Lain</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSuccessModalRecord(null)}
+                    className="py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-semibold flex items-center justify-center transition cursor-pointer"
+                  >
+                    Tutup
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -211,7 +443,7 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
       {feedback && (
         <div className="p-4 bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-2xl text-xs flex items-center justify-between font-medium">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-emerald-700" />
+            <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0" />
             <span>{feedback}</span>
           </div>
           <button
@@ -665,21 +897,53 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
         </div>
 
         {/* Submit */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-          <button
-            type="button"
-            onClick={onNavigateToData}
-            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition cursor-pointer"
-          >
-            Batal
-          </button>
-          <button
-            type="submit"
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold transition shadow-md cursor-pointer"
-          >
-            <Send className="w-4 h-4" />
-            <span>Simpan & Catat Pelanggaran</span>
-          </button>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-slate-200">
+          <div className="flex items-center gap-2 text-xs">
+            {submitState === 'saved' && (
+              <span className="inline-flex items-center gap-1.5 text-emerald-800 font-bold bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-300 shadow-xs animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                <span>Pelanggaran tersimpan sukses & poin aktif dihitung!</span>
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              onClick={onNavigateToData}
+              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition cursor-pointer"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              disabled={submitState === 'saving'}
+              className={`inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all duration-300 shadow-md cursor-pointer min-w-[200px] ${
+                submitState === 'saved'
+                  ? 'bg-emerald-600 text-white ring-4 ring-emerald-200 shadow-emerald-200'
+                  : submitState === 'saving'
+                  ? 'bg-slate-400 text-white cursor-not-allowed'
+                  : 'bg-rose-600 hover:bg-rose-500 text-white'
+              }`}
+            >
+              {submitState === 'saving' ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+                  <span>Menyimpan Catatan...</span>
+                </>
+              ) : submitState === 'saved' ? (
+                <>
+                  <Check className="w-5 h-5 text-white animate-bounce shrink-0" />
+                  <span>✓ Berhasil Dicatat!</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 shrink-0" />
+                  <span>Simpan & Catat Pelanggaran</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </form>
     </div>

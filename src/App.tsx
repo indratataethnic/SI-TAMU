@@ -131,8 +131,11 @@ export default function App() {
   }, [summaries]);
 
   const isInitialLoadingRef = useRef(true);
+  const isImportingRef = useRef(false);
   const serverSaveTimeoutRef = useRef<any>(null);
   const lastLocalActionRef = useRef<number>(0);
+  const lastKnownVersionRef = useRef<number>(0);
+  const lastLocalSaveTimestampRef = useRef<number>(0);
 
   // Auto-save listeners
   useEffect(() => { saveStudents(students); }, [students]);
@@ -148,9 +151,10 @@ export default function App() {
 
   // High-speed debounced database persistence to server
   useEffect(() => {
-    if (isInitialLoadingRef.current) return;
+    if (isInitialLoadingRef.current || isImportingRef.current) return;
     if (serverSaveTimeoutRef.current) clearTimeout(serverSaveTimeoutRef.current);
     serverSaveTimeoutRef.current = setTimeout(() => {
+      lastLocalSaveTimestampRef.current = Date.now();
       fetch('/api/data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -165,7 +169,12 @@ export default function App() {
           compensations,
           settings
         })
-      }).catch(err => console.log('Error caching db to server:', err));
+      })
+      .then(res => res.json())
+      .then(json => {
+        if (json?.version) lastKnownVersionRef.current = json.version;
+      })
+      .catch(err => console.log('Error caching db to server:', err));
     }, 400);
   }, [students, teachers, piketSchedules, violationRules, rewardRules, violations, rewards, compensations, settings]);
 
@@ -204,12 +213,135 @@ export default function App() {
     return false;
   };
 
+  // Fast background fetch from centralized server cache
+  const fetchServerData = async (silent = true): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/data');
+      if (!res.ok) return false;
+      const json = await res.json();
+      if (json?.version) {
+        lastKnownVersionRef.current = json.version;
+      }
+      if (json?.data && (
+        (json.data.students && json.data.students.length > 0) ||
+        (json.data.teachers && json.data.teachers.length > 0) ||
+        (json.data.piketSchedules && json.data.piketSchedules.length > 0) ||
+        (json.data.violations && json.data.violations.length > 0) ||
+        (json.data.rewards && json.data.rewards.length > 0)
+      )) {
+        handleImportFullData(json.data);
+        return true;
+      }
+    } catch (err) {
+      console.log('Error fetching server data:', err);
+    }
+    return false;
+  };
+
+  // Real-time automatic synchronization across all devices (SSE + Background Polling + Focus Resync)
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: any = null;
+    let isSubscribed = true;
+
+    const connectSSE = () => {
+      if (!isSubscribed) return;
+      try {
+        eventSource = new EventSource('/api/stream');
+
+        eventSource.onmessage = (event) => {
+          if (!isSubscribed) return;
+          try {
+            const payload = JSON.parse(event.data);
+            if (payload.type === 'DATA_UPDATED') {
+              // If this device just saved within 2.5s, ignore self-broadcast
+              if (Date.now() - lastLocalSaveTimestampRef.current < 2500) {
+                if (payload.version) lastKnownVersionRef.current = payload.version;
+                return;
+              }
+              // An update occurred on another device or Google Sheets! Fetch latest silently
+              fetchServerData(true);
+            } else if (payload.type === 'CONNECTED') {
+              if (payload.version) lastKnownVersionRef.current = payload.version;
+            }
+          } catch {
+            // ignore non-json
+          }
+        };
+
+        eventSource.onerror = () => {
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          if (isSubscribed) {
+            reconnectTimeout = setTimeout(connectSSE, 4000);
+          }
+        };
+      } catch {
+        // Fallback to polling
+      }
+    };
+
+    connectSSE();
+
+    // Fallback Polling: Fast version check every 20 seconds
+    const pollInterval = setInterval(() => {
+      if (!isSubscribed) return;
+      fetch('/api/data/version')
+        .then(res => res.json())
+        .then(json => {
+          if (json?.success && json.version && json.version > lastKnownVersionRef.current) {
+            if (Date.now() - lastLocalSaveTimestampRef.current > 2500) {
+              fetchServerData(true);
+            }
+          }
+        })
+        .catch(() => {});
+    }, 20000);
+
+    // Immediate sync when screen is turned on (wake-up) or tab becomes active
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        fetch('/api/data/version')
+          .then(res => res.json())
+          .then(json => {
+            if (json?.success && json.version && json.version > lastKnownVersionRef.current) {
+              fetchServerData(true);
+            }
+          })
+          .catch(() => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    // Background Google Sheets auto-check every 2.5 minutes
+    const sheetsInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchSpreadsheetData(true);
+      }
+    }, 150000);
+
+    return () => {
+      isSubscribed = false;
+      if (eventSource) eventSource.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      clearInterval(pollInterval);
+      clearInterval(sheetsInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
+  }, []);
+
   // Load initial global config & server data instantly on mount
   useEffect(() => {
     // 1. Instant check from local server database cache
     fetch('/api/data')
       .then(res => res.json())
       .then(json => {
+        if (json?.version) lastKnownVersionRef.current = json.version;
         if (json?.data && (
           (json.data.students && json.data.students.length > 0) ||
           (json.data.teachers && json.data.teachers.length > 0) ||
@@ -297,6 +429,7 @@ export default function App() {
     compensations?: CompensationRecord[];
     piketSchedules?: any[];
   }) => {
+    isImportingRef.current = true;
     if (imported.settings) {
       setSettings(prev => {
         const fetched = (imported.settings || {}) as any;
@@ -499,6 +632,10 @@ export default function App() {
       setCompensations(mappedCompensations);
       saveCompensations(mappedCompensations);
     }
+
+    setTimeout(() => {
+      isImportingRef.current = false;
+    }, 800);
   };
 
   // Handlers for Students

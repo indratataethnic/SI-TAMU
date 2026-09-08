@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserRole, SchoolSettings } from '../types';
-import { ShieldCheck, User, Settings, Table, Lock, Unlock, Menu, ShieldAlert, Sparkles, GraduationCap } from 'lucide-react';
+import { ShieldCheck, User, Settings, Table, Lock, Unlock, Menu, ShieldAlert, Sparkles, GraduationCap, RefreshCw } from 'lucide-react';
 
 interface NavbarProps {
   role: UserRole;
@@ -64,6 +64,18 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Right: Date, Sheets Sync, Role Switcher, Settings */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Auto-sync across devices indicator */}
+            <div
+              className="hidden lg:flex items-center gap-2 px-2.5 py-1 bg-emerald-900/70 border border-emerald-700/60 rounded-lg text-[11px] text-emerald-200"
+              title="Semua data otomatis termuat dan tersinkronisasi di semua perangkat (HP, laptop, komputer sekolah)"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+              </span>
+              <span>Auto-Sync Semua Perangkat</span>
+            </div>
+
             {/* Live date badge */}
             <div className="hidden md:flex items-center text-xs text-emerald-300 bg-emerald-900/60 px-3 py-1.5 rounded-lg border border-emerald-800">
               <span>{currentDate}</span>

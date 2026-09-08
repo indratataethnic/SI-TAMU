@@ -54,6 +54,60 @@ try {
   cachedDb = null;
 }
 
+// Multi-device real-time sync state
+let dbVersion = Date.now();
+const sseClients = new Set<express.Response>();
+
+function broadcastUpdate(reason = "data_changed") {
+  dbVersion = Date.now();
+  const payload = JSON.stringify({
+    type: "DATA_UPDATED",
+    version: dbVersion,
+    reason,
+    timestamp: new Date().toISOString()
+  });
+  for (const client of sseClients) {
+    try {
+      client.write(`data: ${payload}\n\n`);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
+
+// GET API: Retrieve real-time version for background pollers
+app.get("/api/data/version", (req, res) => {
+  return res.json({ success: true, version: dbVersion });
+});
+
+// GET API: Server-Sent Events stream for instant multi-device synchronization
+app.get("/api/stream", (req, res) => {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive"
+  });
+
+  // Send initial connected event
+  res.write(`data: ${JSON.stringify({ type: "CONNECTED", version: dbVersion })}\n\n`);
+  sseClients.add(res);
+
+  // Heartbeat to keep connection alive through proxies
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(": heartbeat\n\n");
+    } catch {
+      clearInterval(heartbeat);
+      sseClients.delete(res);
+    }
+  }, 25000);
+
+  req.on("close", () => {
+    clearInterval(heartbeat);
+    sseClients.delete(res);
+  });
+});
+
 // GET API: Retrieve globally stored spreadsheet and webhook URL
 app.get("/api/global-config", (req, res) => {
   if (cachedConfig) {
@@ -77,6 +131,7 @@ app.post("/api/global-config", (req, res) => {
     };
     cachedConfig = config;
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), "utf-8");
+    broadcastUpdate("config_updated");
     return res.json({ success: true, config });
   } catch (err: any) {
     console.error("Error writing global config:", err);
@@ -87,9 +142,9 @@ app.post("/api/global-config", (req, res) => {
 // GET API: Retrieve full fast local database cache
 app.get("/api/data", (req, res) => {
   if (cachedDb) {
-    return res.json({ success: true, data: cachedDb });
+    return res.json({ success: true, data: cachedDb, version: dbVersion });
   }
-  return res.json({ success: true, data: null });
+  return res.json({ success: true, data: null, version: dbVersion });
 });
 
 // POST API: Fast persistence of full local database cache
@@ -98,7 +153,8 @@ app.post("/api/data", (req, res) => {
     const data = req.body;
     cachedDb = data;
     fs.writeFileSync(DB_FILE, JSON.stringify(data), "utf-8");
-    return res.json({ success: true });
+    broadcastUpdate("local_save");
+    return res.json({ success: true, version: dbVersion });
   } catch (err: any) {
     console.error("Error writing database cache:", err);
     return res.status(500).json({ success: false, error: err.message });
@@ -211,6 +267,7 @@ app.post("/api/sheets/fetch", async (req, res) => {
       } catch (e) {
         console.error("Error writing cachedDb to file:", e);
       }
+      broadcastUpdate("sheets_fetch");
 
       return res.json({
         success: true,
@@ -230,6 +287,45 @@ app.post("/api/sheets/fetch", async (req, res) => {
     return res.status(500).json({ success: false, message: err.message || "Gagal menghubungi Google Apps Script." });
   }
 });
+
+// Helper function to fetch latest from Google Sheets silently in the background
+async function backgroundFetchGoogleSheets() {
+  try {
+    const webhookUrl = (cachedConfig?.googleSheetsWebhook || DEFAULT_WEBHOOK_URL).trim();
+    if (!webhookUrl) return;
+
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "FETCH_ALL", sentAt: new Date().toISOString() }),
+      redirect: "follow"
+    });
+
+    if (!response.ok) return;
+    const json: any = await response.json();
+    if (json.status === "success" && json.data) {
+      if (!cachedDb) cachedDb = {};
+      if (Array.isArray(json.data.students) && json.data.students.length > 0) {
+        cachedDb.students = json.data.students;
+      }
+      if (Array.isArray(json.data.teachers)) cachedDb.teachers = json.data.teachers;
+      if (Array.isArray(json.data.piketSchedules)) cachedDb.piketSchedules = json.data.piketSchedules;
+      if (Array.isArray(json.data.violationRules)) cachedDb.violationRules = json.data.violationRules;
+      if (Array.isArray(json.data.rewardRules)) cachedDb.rewardRules = json.data.rewardRules;
+      if (Array.isArray(json.data.violations)) cachedDb.violations = json.data.violations;
+      if (Array.isArray(json.data.rewards)) cachedDb.rewards = json.data.rewards;
+      if (Array.isArray(json.data.compensations)) cachedDb.compensations = json.data.compensations;
+      if (json.data.settings) cachedDb.settings = { ...(cachedDb.settings || {}), ...json.data.settings };
+      fs.writeFileSync(DB_FILE, JSON.stringify(cachedDb), "utf-8");
+      broadcastUpdate("background_sheets_fetch");
+    }
+  } catch {
+    // Non-blocking background fetch
+  }
+}
+
+// Automatically poll Google Sheets in the background every 3 minutes if webhook is set
+setInterval(backgroundFetchGoogleSheets, 180000);
 
 // POST API: Push data to Google Spreadsheet webhook via server proxy
 app.post("/api/sheets/sync", async (req, res) => {
@@ -251,6 +347,7 @@ app.post("/api/sheets/sync", async (req, res) => {
       redirect: "follow"
     });
 
+    broadcastUpdate("sheets_sync");
     const json: any = await response.json().catch(() => ({ status: "success", message: "Data terkirim ke Google Sheets" }));
     return res.json({ success: true, message: json.message || "Data berhasil disinkronkan ke Google Spreadsheet", data: json });
   } catch (err: any) {
