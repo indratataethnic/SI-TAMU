@@ -77,16 +77,19 @@ export const EditPelanggaranModal: React.FC<EditPelanggaranModalProps> = ({
       setDate(violation.date || new Date().toISOString().slice(0, 10));
       setTime(violation.time || '');
       setLocation(violation.location || 'Ruang Kelas');
-      setRuleName(violation.ruleName || '');
+      const initialRuleName = violation.ruleName || (violation as any).pelanggaran || (violation as any).violationName || (violation as any).description || '';
+      setRuleName(initialRuleName);
       setCategory(violation.category || 'ringan');
       setPoints(violation.points || 5);
-      setDescription(violation.description || '');
+      setDescription(violation.description || initialRuleName || '');
+      
+      const initialReporter = violation.reporterName || (violation as any).reporter || (violation as any).reporterTeacherName || 'Guru Piket';
       setReporterTeacherId(violation.reporterId || '');
-      setReporterName(violation.reporterName || 'Guru Piket');
+      setReporterName(initialReporter);
       setReporterNip(violation.reporterNip || '');
 
       // Try finding rule in catalog
-      const matchedRule = violationRules.find(r => r.name.toLowerCase() === violation.ruleName.toLowerCase());
+      const matchedRule = violationRules.find(r => r.name.toLowerCase() === initialRuleName.toLowerCase());
       if (matchedRule) {
         setSelectedRuleId(matchedRule.id);
       } else {
@@ -118,6 +121,10 @@ export const EditPelanggaranModal: React.FC<EditPelanggaranModalProps> = ({
       setRuleName(found.name);
       setCategory(found.category);
       setPoints(found.points);
+      // Synchronize description if it was empty or matched the old rule name
+      if (!description.trim() || description.trim() === ruleName.trim()) {
+        setDescription(found.name);
+      }
     }
   };
 
@@ -146,6 +153,10 @@ export const EditPelanggaranModal: React.FC<EditPelanggaranModalProps> = ({
       return;
     }
 
+    const finalRuleName = ruleName.trim();
+    const finalReporterName = reporterName.trim() || 'Guru Piket';
+    const finalDescription = description.trim() || finalRuleName;
+
     const updated: ViolationRecord = {
       ...violation,
       studentId: selectedStudent.id,
@@ -154,14 +165,20 @@ export const EditPelanggaranModal: React.FC<EditPelanggaranModalProps> = ({
       date,
       time: time || undefined,
       location: location.trim() || undefined,
-      ruleName: ruleName.trim(),
+      ruleName: finalRuleName,
       category,
       points: Number(points) || 1,
-      description: description.trim() || ruleName.trim(),
-      reporterName: reporterName.trim() || 'Guru Piket',
+      description: finalDescription,
+      reporterName: finalReporterName,
       reporterId: reporterTeacherId || undefined,
-      reporterNip: reporterNip || undefined
-    };
+      reporterNip: reporterNip || undefined,
+      // Comprehensive dual-mapping for Google Spreadsheet Webhook & backward compatibility
+      reporter: finalReporterName,
+      reporterTeacherName: finalReporterName,
+      violationName: finalRuleName,
+      pelanggaran: finalRuleName,
+      note: finalDescription
+    } as any;
 
     onSave(updated);
     onClose();

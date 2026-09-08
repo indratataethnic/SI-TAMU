@@ -72,14 +72,16 @@ export const EditRewardModal: React.FC<EditRewardModalProps> = ({
     if (reward) {
       setStudentId(reward.studentId || '');
       setDate(reward.date || new Date().toISOString().slice(0, 10));
-      setCompetitionName(reward.competitionName || '');
+      const initialTitle = reward.competitionName || (reward as any).title || reward.ruleName || (reward as any).prestasi || '';
+      setCompetitionName(initialTitle);
       setRank(reward.rank || 'Juara 1');
       setLevel(reward.level || 'Kota/Kab');
       setOrganizer(reward.organizer || '');
       setPoints(reward.points || 3);
-      setNotes(reward.notes || '');
+      setNotes(reward.notes || (reward as any).note || '');
+      const initialReporter = reward.reporterName || (reward as any).recordedBy || (reward as any).reporter || (reward as any).reporterTeacherName || 'Koordinator Prestasi & Kesiswaan';
       setReporterTeacherId(reward.reporterId || '');
-      setReporterName(reward.reporterName || 'Koordinator Prestasi & Kesiswaan');
+      setReporterName(initialReporter);
       setReporterNip(reward.reporterNip || '');
     }
   }, [reward]);
@@ -116,22 +118,32 @@ export const EditRewardModal: React.FC<EditRewardModalProps> = ({
       return;
     }
 
+    const finalCompetitionName = competitionName.trim();
+    const finalReporterName = reporterName.trim() || 'Koordinator Prestasi & Kesiswaan';
+    const finalNotes = notes.trim() || undefined;
+
     const updated: RewardRecord = {
       ...reward,
       studentId: selectedStudent.id,
       studentName: selectedStudent.name,
       studentClass: selectedStudent.class,
       date,
-      competitionName: competitionName.trim(),
+      competitionName: finalCompetitionName,
+      ruleName: finalCompetitionName,
       rank: rank.trim() || 'Juara',
       level,
       organizer: organizer.trim() || undefined,
       points: Number(points) || 1,
-      notes: notes.trim() || undefined,
-      reporterName: reporterName.trim() || 'Koordinator Prestasi & Kesiswaan',
+      notes: finalNotes,
+      reporterName: finalReporterName,
       reporterId: reporterTeacherId || undefined,
-      reporterNip: reporterNip || undefined
-    };
+      reporterNip: reporterNip || undefined,
+      // Compatibility aliases for Spreadsheet webhook
+      title: finalCompetitionName,
+      recordedBy: finalReporterName,
+      reporterTeacherName: finalReporterName,
+      note: finalNotes || ''
+    } as any;
 
     onSave(updated);
     onClose();

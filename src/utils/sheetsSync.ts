@@ -295,13 +295,13 @@ function writeViolationsSheet(ss, violations) {
       "'" + (v.studentNisn || ""),
       v.studentName || "",
       v.studentClass || "",
-      v.violationName || "",
+      v.violationName || v.ruleName || v.pelanggaran || v.description || "",
       v.category || "",
       v.points || 0,
-      v.reporterTeacherName || "",
+      v.reporterTeacherName || v.reporterName || v.reporter || "",
       v.parentName || "",
       "'" + (v.parentPhone || ""),
-      v.note || "",
+      v.note || v.description || "",
       v.parentNotified ? "Sudah Terkirim" : "Belum",
       v.id || ""
     ];
@@ -324,13 +324,13 @@ function writeRewardsSheet(ss, rewards) {
       "'" + (r.studentNisn || ""),
       r.studentName || "",
       r.studentClass || "",
-      r.competitionName || "",
+      r.competitionName || r.title || r.ruleName || r.prestasi || "",
       r.level || "",
       r.rank || "",
       r.points || 0,
       r.organizer || "",
-      r.reporterTeacherName || "",
-      r.note || "",
+      r.reporterTeacherName || r.reporterName || r.recordedBy || r.reporter || "",
+      r.note || r.notes || "",
       r.id || ""
     ];
   });
@@ -976,26 +976,51 @@ export const syncAllToGoogleSheets = async (
     const studentMap = new Map(payload.students?.map(s => [s.id, s]) || []);
 
     const enrichedViolations = (payload.violations || []).map(v => {
-      const student = studentMap.get(v.studentId);
+      const student = studentMap.get(v.studentId) || (payload.students || []).find((s: any) => s.nisn === (v as any).studentNisn || s.name === v.studentName);
+      const vRule = String(v.ruleName || (v as any).violationName || (v as any).pelanggaran || (v as any).description || 'Pelanggaran Tata Tertib').trim();
+      const vReporter = String(v.reporterName || (v as any).reporter || (v as any).reporterTeacherName || 'Guru Piket').trim();
+      const vDesc = String(v.description || vRule).trim();
+
       return {
         ...v,
-        studentNisn: student?.nisn || '',
-        violationName: v.ruleName || '',
-        reporterTeacherName: v.reporterName || '',
-        parentName: student?.parentName || '',
-        parentPhone: student?.parentPhone || '',
-        note: v.description || '',
+        studentNisn: student?.nisn || (v as any).studentNisn || '',
+        studentName: student?.name || v.studentName || '',
+        studentClass: student?.class || v.studentClass || '',
+        ruleName: vRule,
+        violationName: vRule,
+        pelanggaran: vRule,
+        description: vDesc,
+        reporter: vReporter,
+        reporterName: vReporter,
+        reporterTeacherName: vReporter,
+        parentName: student?.parentName || (v as any).parentName || '',
+        parentPhone: student?.parentPhone || (v as any).parentPhone || '',
+        note: vDesc,
         parentNotified: !!v.whatsappSent
       };
     });
 
     const enrichedRewards = (payload.rewards || []).map(r => {
-      const student = studentMap.get(r.studentId);
+      const student = studentMap.get(r.studentId) || (payload.students || []).find((s: any) => s.nisn === (r as any).studentNisn || s.name === r.studentName);
+      const rTitle = String((r as any).title || r.competitionName || r.ruleName || (r as any).prestasi || (r as any).rewardName || 'Apresiasi Prestasi').trim();
+      const rReporter = String(r.reporterName || (r as any).recordedBy || (r as any).reporter || (r as any).reporterTeacherName || 'Wali Kelas').trim();
+      const rNotes = String(r.notes || (r as any).note || '').trim();
+
       return {
         ...r,
-        studentNisn: student?.nisn || '',
-        reporterTeacherName: r.reporterName || '',
-        note: r.notes || ''
+        studentNisn: student?.nisn || (r as any).studentNisn || '',
+        studentName: student?.name || r.studentName || '',
+        studentClass: student?.class || r.studentClass || '',
+        competitionName: rTitle,
+        ruleName: rTitle,
+        title: rTitle,
+        prestasi: rTitle,
+        reporterName: rReporter,
+        recordedBy: rReporter,
+        reporterTeacherName: rReporter,
+        reporter: rReporter,
+        notes: rNotes,
+        note: rNotes
       };
     });
 

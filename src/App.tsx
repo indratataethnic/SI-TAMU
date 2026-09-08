@@ -635,16 +635,25 @@ export default function App() {
         const student = (v.studentId ? finalStudents.find(s => s.id === v.studentId) : null) ||
                         ((v as any).studentNisn ? finalStudents.find(s => s.nisn === (v as any).studentNisn) : null) ||
                         (v.studentName ? sNameMap.get(v.studentName.trim().toLowerCase()) : null);
+        const vRule = v.ruleName || (v as any).pelanggaran || (v as any).violationName || (v as any).description || 'Pelanggaran Tata Tertib';
+        const vReporter = v.reporterName || (v as any).reporter || (v as any).reporterTeacherName || 'Guru Piket';
+        const vDesc = v.description || vRule;
+
         return {
           ...v,
           studentId: student ? student.id : (v.studentId || ''),
           studentName: student ? student.name : (v.studentName || ''),
           studentClass: student ? student.class : (v.studentClass || ''),
           date: normalizeRecordDate(v.date),
-          ruleName: v.ruleName || (v as any).pelanggaran || (v as any).violationName || 'Pelanggaran Tata Tertib',
+          ruleName: vRule,
+          description: vDesc,
           category: ((v.category || 'ringan').toLowerCase() as any),
           points: Number(v.points) || 0,
-          reporterName: v.reporterName || (v as any).reporter || (v as any).reporterTeacherName || 'Guru Piket',
+          reporterName: vReporter,
+          reporter: vReporter,
+          reporterTeacherName: vReporter,
+          violationName: vRule,
+          pelanggaran: vRule,
           reporterId: v.reporterId || (v as any).reporterTeacherId,
           reporterNip: v.reporterNip || (v as any).reporterTeacherNip
         };
@@ -657,18 +666,24 @@ export default function App() {
         const student = (r.studentId ? finalStudents.find(s => s.id === r.studentId) : null) ||
                         ((r as any).studentNisn ? finalStudents.find(s => s.nisn === (r as any).studentNisn) : null) ||
                         (r.studentName ? sNameMap.get(r.studentName.trim().toLowerCase()) : null);
+        const rTitle = (r as any).title || r.competitionName || r.ruleName || (r as any).prestasi || (r as any).rewardName || 'Apresiasi Prestasi';
+        const rReporter = r.reporterName || (r as any).recordedBy || (r as any).reporter || (r as any).reporterTeacherName || 'Guru';
+
         return {
           ...r,
           studentId: student ? student.id : (r.studentId || ''),
           studentName: student ? student.name : (r.studentName || ''),
           studentClass: student ? student.class : (r.studentClass || ''),
           date: normalizeRecordDate(r.date),
-          ruleName: r.ruleName || (r as any).prestasi || (r as any).rewardName || 'Apresiasi Prestasi',
+          ruleName: rTitle,
+          competitionName: rTitle,
+          title: rTitle,
           rank: r.rank || (r as any).peringkat || 'Juara 1',
           level: r.level || (r as any).tingkat || 'Sekolah',
-          competitionName: r.competitionName || r.ruleName || 'Kegiatan Sekolah',
           points: Number(r.points) || 0,
-          reporterName: r.reporterName || (r as any).reporter || (r as any).reporterTeacherName || 'Guru',
+          reporterName: rReporter,
+          recordedBy: rReporter,
+          reporterTeacherName: rReporter,
           reporterId: r.reporterId || (r as any).reporterTeacherId,
           reporterNip: r.reporterNip || (r as any).reporterTeacherNip
         };
@@ -848,10 +863,22 @@ export default function App() {
   // Handlers for Violations
   const handleSaveViolation = (violation: ViolationRecord) => {
     lastLocalActionRef.current = Date.now();
+    const finalRule = String(violation.ruleName || (violation as any).pelanggaran || (violation as any).violationName || (violation as any).description || 'Pelanggaran Tata Tertib').trim();
+    const finalReporter = String(violation.reporterName || (violation as any).reporter || (violation as any).reporterTeacherName || 'Guru Piket').trim();
+    const finalDesc = String(violation.description || finalRule).trim();
+
     const cleanViolation: ViolationRecord = {
       ...violation,
-      date: normalizeRecordDate(violation.date)
-    };
+      date: normalizeRecordDate(violation.date),
+      ruleName: finalRule,
+      description: finalDesc,
+      reporterName: finalReporter,
+      reporter: finalReporter,
+      reporterTeacherName: finalReporter,
+      violationName: finalRule,
+      pelanggaran: finalRule,
+      note: finalDesc
+    } as any;
     const updated = [cleanViolation, ...violations];
     setViolations(updated);
     saveViolations(updated);
@@ -860,10 +887,22 @@ export default function App() {
 
   const handleUpdateViolation = (updatedViolation: ViolationRecord) => {
     lastLocalActionRef.current = Date.now();
+    const finalRule = String(updatedViolation.ruleName || (updatedViolation as any).pelanggaran || (updatedViolation as any).violationName || (updatedViolation as any).description || 'Pelanggaran Tata Tertib').trim();
+    const finalReporter = String(updatedViolation.reporterName || (updatedViolation as any).reporter || (updatedViolation as any).reporterTeacherName || 'Guru Piket').trim();
+    const finalDesc = String(updatedViolation.description || finalRule).trim();
+
     const cleanViolation: ViolationRecord = {
       ...updatedViolation,
-      date: normalizeRecordDate(updatedViolation.date)
-    };
+      date: normalizeRecordDate(updatedViolation.date),
+      ruleName: finalRule,
+      description: finalDesc,
+      reporterName: finalReporter,
+      reporter: finalReporter,
+      reporterTeacherName: finalReporter,
+      violationName: finalRule,
+      pelanggaran: finalRule,
+      note: finalDesc
+    } as any;
     const updated = violations.map(v => v.id === cleanViolation.id ? cleanViolation : v);
     setViolations(updated);
     saveViolations(updated);
@@ -881,10 +920,20 @@ export default function App() {
   // Handlers for Rewards
   const handleSaveReward = (reward: RewardRecord) => {
     lastLocalActionRef.current = Date.now();
+    const finalTitle = String(reward.competitionName || reward.ruleName || (reward as any).title || (reward as any).prestasi || 'Prestasi Siswa').trim();
+    const finalReporter = String(reward.reporterName || (reward as any).recordedBy || (reward as any).reporter || (reward as any).reporterTeacherName || 'Wali Kelas').trim();
+
     const cleanReward: RewardRecord = {
       ...reward,
-      date: normalizeRecordDate(reward.date)
-    };
+      date: normalizeRecordDate(reward.date),
+      competitionName: finalTitle,
+      ruleName: finalTitle,
+      title: finalTitle,
+      reporterName: finalReporter,
+      recordedBy: finalReporter,
+      reporterTeacherName: finalReporter,
+      reporter: finalReporter
+    } as any;
     const updated = [cleanReward, ...rewards];
     setRewards(updated);
     saveRewards(updated);
@@ -893,10 +942,20 @@ export default function App() {
 
   const handleUpdateReward = (updatedReward: RewardRecord) => {
     lastLocalActionRef.current = Date.now();
+    const finalTitle = String(updatedReward.competitionName || updatedReward.ruleName || (updatedReward as any).title || (updatedReward as any).prestasi || 'Prestasi Siswa').trim();
+    const finalReporter = String(updatedReward.reporterName || (updatedReward as any).recordedBy || (updatedReward as any).reporter || (updatedReward as any).reporterTeacherName || 'Wali Kelas').trim();
+
     const cleanReward: RewardRecord = {
       ...updatedReward,
-      date: normalizeRecordDate(updatedReward.date)
-    };
+      date: normalizeRecordDate(updatedReward.date),
+      competitionName: finalTitle,
+      ruleName: finalTitle,
+      title: finalTitle,
+      reporterName: finalReporter,
+      recordedBy: finalReporter,
+      reporterTeacherName: finalReporter,
+      reporter: finalReporter
+    } as any;
     const updated = rewards.map(r => r.id === cleanReward.id ? cleanReward : r);
     setRewards(updated);
     saveRewards(updated);
