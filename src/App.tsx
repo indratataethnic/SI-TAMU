@@ -137,6 +137,9 @@ export default function App() {
   const lastLocalActionRef = useRef<number>(0);
   const lastKnownVersionRef = useRef<number>(0);
   const lastLocalSaveTimestampRef = useRef<number>(0);
+  const lastSpreadsheetFetchRef = useRef<number>(0);
+  const lastViolationsCountRef = useRef<number>(0);
+  const lastRewardsCountRef = useRef<number>(0);
 
   // Auto-save listeners
   useEffect(() => { saveStudents(students); }, [students]);
@@ -183,7 +186,13 @@ export default function App() {
 
   // Automatically load data from Google Spreadsheet when the page mounts or on user request
   const fetchSpreadsheetData = async (silent = false): Promise<boolean> => {
+    // Avoid overwriting if this device just saved locally within 3.5s
+    if (silent && Date.now() - lastLocalSaveTimestampRef.current < 3500) {
+      return false;
+    }
+
     try {
+      lastSpreadsheetFetchRef.current = Date.now();
       if (!silent) setIsLoadingSpreadsheet(true);
       const res = await fetch('/api/sheets/fetch', {
         method: 'POST',
@@ -199,10 +208,26 @@ export default function App() {
           const studentCount = json.data.students?.length || 0;
           const teacherCount = json.data.teachers?.length || 0;
           const piketCount = json.data.piketSchedules?.length || 0;
-          setSheetsSyncStatus(
-            `✓ Data termuat otomatis dari Google Spreadsheet (${studentCount} Siswa${teacherCount > 0 ? `, ${teacherCount} Guru` : ''}${piketCount > 0 ? `, Jadwal Piket` : ''})`
-          );
-          setTimeout(() => setSheetsSyncStatus(null), 6000);
+          const violationCount = json.data.violations?.length || 0;
+          const rewardCount = json.data.rewards?.length || 0;
+
+          // Check if new data arrived compared to previous count
+          const isNewViolations = lastViolationsCountRef.current > 0 && violationCount > lastViolationsCountRef.current;
+          const isNewRewards = lastRewardsCountRef.current > 0 && rewardCount > lastRewardsCountRef.current;
+          lastViolationsCountRef.current = violationCount;
+          lastRewardsCountRef.current = rewardCount;
+
+          if (!silent) {
+            setSheetsSyncStatus(
+              `✓ Sinkronisasi selesai: ${studentCount} Siswa, ${violationCount} Pelanggaran${teacherCount > 0 ? `, ${teacherCount} Guru` : ''}`
+            );
+            setTimeout(() => setSheetsSyncStatus(null), 5000);
+          } else if (isNewViolations || isNewRewards) {
+            setSheetsSyncStatus(
+              `✓ Data baru otomatis termuat dari perangkat lain (${violationCount} Pelanggaran${rewardCount > 0 ? `, ${rewardCount} Apresiasi` : ''})`
+            );
+            setTimeout(() => setSheetsSyncStatus(null), 6000);
+          }
           return true;
         }
       }
@@ -225,6 +250,12 @@ export default function App() {
       }
       if (json?.data && typeof json.data === 'object') {
         handleImportFullData(json.data);
+        if (Array.isArray(json.data.violations)) {
+          lastViolationsCountRef.current = json.data.violations.length;
+        }
+        if (Array.isArray(json.data.rewards)) {
+          lastRewardsCountRef.current = json.data.rewards.length;
+        }
         return true;
       }
     } catch (err) {
@@ -280,7 +311,7 @@ export default function App() {
 
     connectSSE();
 
-    // Fallback Polling: Fast version check every 20 seconds
+    // Fallback Polling: Fast version check every 15 seconds
     const pollInterval = setInterval(() => {
       if (!isSubscribed) return;
       fetch('/api/data/version')
@@ -293,11 +324,12 @@ export default function App() {
           }
         })
         .catch(() => {});
-    }, 20000);
+    }, 15000);
 
     // Immediate sync when screen is turned on (wake-up) or tab becomes active
     const handleVisibilityOrFocus = () => {
       if (document.visibilityState === 'visible') {
+        // 1. Check local server version
         fetch('/api/data/version')
           .then(res => res.json())
           .then(json => {
@@ -306,18 +338,23 @@ export default function App() {
             }
           })
           .catch(() => {});
+
+        // 2. Also check Google Spreadsheet if at least 6s since last fetch
+        if (Date.now() - lastSpreadsheetFetchRef.current > 6000) {
+          fetchSpreadsheetData(true);
+        }
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityOrFocus);
     window.addEventListener('focus', handleVisibilityOrFocus);
 
-    // Background Google Sheets auto-check every 2.5 minutes
+    // Background Google Sheets auto-check every 15 seconds (keeps HP & PC synchronized)
     const sheetsInterval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         fetchSpreadsheetData(true);
       }
-    }, 150000);
+    }, 15000);
 
     return () => {
       isSubscribed = false;
@@ -1084,6 +1121,8 @@ export default function App() {
         onOpenSettingsModal={() => setSettingsModalOpen(true)}
         onToggleMobileSidebar={() => setMobileSidebarOpen(prev => !prev)}
         urgentAlertCount={urgentAlertCount}
+        isSyncing={isLoadingSpreadsheet}
+        onManualSync={() => fetchSpreadsheetData(false)}
       />
 
       {/* Main Body Layout */}

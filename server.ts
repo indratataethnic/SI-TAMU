@@ -84,8 +84,9 @@ app.get("/api/data/version", (req, res) => {
 app.get("/api/stream", (req, res) => {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    "Connection": "keep-alive"
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no"
   });
 
   // Send initial connected event
@@ -100,7 +101,7 @@ app.get("/api/stream", (req, res) => {
       clearInterval(heartbeat);
       sseClients.delete(res);
     }
-  }, 25000);
+  }, 15000);
 
   req.on("close", () => {
     clearInterval(heartbeat);
@@ -361,6 +362,62 @@ app.post("/api/sheets/sync", async (req, res) => {
     return res.status(500).json({ success: false, message: err.message || "Gagal mengirim data ke Google Apps Script." });
   }
 });
+
+// Periodic background sync from Google Spreadsheet to keep central cache and all devices 100% up-to-date
+let isCheckingSheets = false;
+async function checkSpreadsheetBackground() {
+  if (isCheckingSheets) return;
+  const webhookUrl = (cachedConfig?.googleSheetsWebhook || DEFAULT_WEBHOOK_URL).trim();
+  if (!webhookUrl) return;
+
+  try {
+    isCheckingSheets = true;
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "FETCH_ALL", sentAt: new Date().toISOString() }),
+      redirect: "follow"
+    });
+
+    if (response.ok) {
+      const json: any = await response.json();
+      if (json?.status === "success" && json?.data) {
+        const fetchedViolations = json.data.violations || [];
+        const fetchedRewards = json.data.rewards || [];
+        const prevViolations = cachedDb?.violations || [];
+        const prevRewards = cachedDb?.rewards || [];
+
+        // Check if new data arrived from other devices
+        if (
+          fetchedViolations.length !== prevViolations.length ||
+          fetchedRewards.length !== prevRewards.length ||
+          !cachedDb
+        ) {
+          if (!cachedDb) cachedDb = {};
+          cachedDb = {
+            ...cachedDb,
+            ...json.data,
+            violations: fetchedViolations.map((v: any) => ({ ...v, date: normalizeDateString(v.date) })),
+            rewards: fetchedRewards.map((r: any) => ({ ...r, date: normalizeDateString(r.date) }))
+          };
+          if (!fs.existsSync(CONFIG_DIR)) {
+            fs.mkdirSync(CONFIG_DIR, { recursive: true });
+          }
+          fs.writeFileSync(DB_FILE, JSON.stringify(cachedDb, null, 2), "utf-8");
+          broadcastUpdate("sheets_auto_sync");
+          console.log(`[Auto-Sync] Google Spreadsheet updated: ${fetchedViolations.length} violations, ${fetchedRewards.length} rewards. Broadcasted to devices.`);
+        }
+      }
+    }
+  } catch (err: any) {
+    // silently catch background error
+  } finally {
+    isCheckingSheets = false;
+  }
+}
+
+// Background poll every 25 seconds
+setInterval(checkSpreadsheetBackground, 25000);
 
 // Vite server integration
 async function startServer() {

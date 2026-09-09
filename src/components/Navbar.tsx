@@ -10,6 +10,8 @@ interface NavbarProps {
   onOpenSettingsModal: () => void;
   onToggleMobileSidebar: () => void;
   urgentAlertCount: number;
+  isSyncing?: boolean;
+  onManualSync?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -19,7 +21,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSheetsModal,
   onOpenSettingsModal,
   onToggleMobileSidebar,
-  urgentAlertCount
+  urgentAlertCount,
+  isSyncing = false,
+  onManualSync
 }) => {
   const currentDate = new Intl.DateTimeFormat('id-ID', {
     weekday: 'long',
@@ -64,17 +68,41 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Right: Date, Sheets Sync, Role Switcher, Settings */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Auto-sync across devices indicator */}
-            <div
-              className="hidden lg:flex items-center gap-2 px-2.5 py-1 bg-emerald-900/70 border border-emerald-700/60 rounded-lg text-[11px] text-emerald-200"
-              title="Semua data otomatis termuat dan tersinkronisasi di semua perangkat (HP, laptop, komputer sekolah)"
+            {/* Auto-sync across devices button & indicator (Desktop & Tablet) */}
+            <button
+              onClick={onManualSync}
+              disabled={isSyncing}
+              className={`hidden sm:inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition cursor-pointer shadow-sm ${
+                isSyncing
+                  ? 'bg-amber-900/60 border-amber-500/60 text-amber-200'
+                  : 'bg-emerald-900/70 hover:bg-emerald-800/90 border-emerald-700/70 text-emerald-200 hover:text-white'
+              }`}
+              title="Data otomatis sinkron setiap 15 detik & saat layar HP/laptop dibuka. Klik untuk sinkronkan sekarang."
             >
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-              </span>
-              <span>Auto-Sync Semua Perangkat</span>
-            </div>
+              <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isSyncing ? 'animate-spin text-amber-400' : ''}`} />
+              <span className="hidden lg:inline">{isSyncing ? 'Menyinkronkan...' : 'Auto-Sync Aktif'}</span>
+              <span className="lg:hidden">{isSyncing ? 'Sync...' : 'Sync'}</span>
+              {!isSyncing && (
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                </span>
+              )}
+            </button>
+
+            {/* Mobile-only fast sync button (Smartphone) */}
+            <button
+              onClick={onManualSync}
+              disabled={isSyncing}
+              className={`sm:hidden p-2 rounded-lg border transition shadow-sm cursor-pointer ${
+                isSyncing
+                  ? 'bg-amber-900/70 border-amber-500/70 text-amber-300'
+                  : 'bg-emerald-900/80 hover:bg-emerald-800 border-emerald-700/70 text-emerald-200'
+              }`}
+              title="Sinkronkan data sekarang"
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-amber-400' : 'text-emerald-300'}`} />
+            </button>
 
             {/* Live date badge */}
             <div className="hidden md:flex items-center text-xs text-emerald-300 bg-emerald-900/60 px-3 py-1.5 rounded-lg border border-emerald-800">
