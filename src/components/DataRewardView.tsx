@@ -28,6 +28,7 @@ interface DataRewardViewProps {
   rewardRules?: RewardRule[];
   settings: SchoolSettings;
   onDeleteReward: (id: string) => void;
+  onDeleteAllRewards?: () => void;
   onUpdateReward: (updated: RewardRecord) => void;
   onImportRewards?: (imported: RewardRecord[]) => void;
   onNavigateToInput: () => void;
@@ -41,6 +42,7 @@ export const DataRewardView: React.FC<DataRewardViewProps> = ({
   rewardRules = [],
   settings,
   onDeleteReward,
+  onDeleteAllRewards,
   onUpdateReward,
   onImportRewards,
   onNavigateToInput,
@@ -160,6 +162,23 @@ export const DataRewardView: React.FC<DataRewardViewProps> = ({
             <FileSpreadsheet className="w-3.5 h-3.5 text-slate-600" />
             Export Excel
           </button>
+
+          {onDeleteAllRewards && rewards.length > 0 && (
+            <button
+              onClick={() => {
+                if (window.confirm(`Apakah Anda yakin ingin menghapus SELURUH (${rewards.length}) data reward & prestasi? Aksi ini akan mengosongkan seluruh data reward.`)) {
+                  onDeleteAllRewards();
+                  setNotificationStatus('Semua data reward & prestasi berhasil dikosongkan.');
+                  setTimeout(() => setNotificationStatus(null), 3000);
+                }
+              }}
+              title="Kosongkan Semua Data Reward"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-semibold transition cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              Hapus Semua
+            </button>
+          )}
 
           <button
             onClick={onNavigateToInput}

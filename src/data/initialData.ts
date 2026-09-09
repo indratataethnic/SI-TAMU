@@ -438,85 +438,9 @@ export const initialRewardRules: RewardRule[] = [
   }
 ];
 
-export const initialViolations: ViolationRecord[] = [
-  {
-    id: 'VIO-SAMPLE-001',
-    studentId: 'STU-IMP-1788364303444-0-d3iej',
-    studentName: 'Andri Dwi Rahman',
-    studentClass: 'Kelas 1',
-    ruleId: 'rule_1',
-    ruleName: 'Datang terlambat ke sekolah (>15 menit)',
-    category: 'ringan',
-    points: 5,
-    date: '2026-09-08',
-    time: '07.20 WIB',
-    location: 'Gerbang Utama Sekolah',
-    reporterName: 'Indartha Meiputra, S.Pd.',
-    description: 'Terlambat 20 menit karena sepeda bocor di jalan.',
-    whatsappSent: true,
-    academicYear: '2026/2027',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'VIO-SAMPLE-002',
-    studentId: 'STU-IMP-1788364303444-1-hf2nd',
-    studentName: 'ABDUL AZIZ AL HAFIDZ',
-    studentClass: 'KELAS 1 B',
-    ruleId: 'rule_2',
-    ruleName: 'Tidak memakai atribut seragam lengkap (Dasi/Sabuk/Topi)',
-    category: 'ringan',
-    points: 5,
-    date: '2026-09-07',
-    time: '07.00 WIB',
-    location: 'Halaman Upacara',
-    reporterName: 'Ahmad Fauzi, S.Pd.',
-    description: 'Tidak memakai topi dan dasi saat upacara bendera hari Senin.',
-    whatsappSent: true,
-    academicYear: '2026/2027',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'VIO-SAMPLE-003',
-    studentId: 'STU-IMP-1788364303444-2-jph0e',
-    studentName: 'ABDUL MALIK MALDINI RAMADHAN KETJEWAY',
-    studentClass: 'KELAS 5 A',
-    ruleId: 'rule_12',
-    ruleName: 'Meninggalkan area sekolah tanpa izin guru piket / bolos',
-    category: 'sedang',
-    points: 15,
-    date: '2026-09-05',
-    time: '10.30 WIB',
-    location: 'Kantin Luar Sekolah',
-    reporterName: 'Ratna Dewi Kusuma, S.Psi., M.Pd.',
-    description: 'Keluar pagar sekolah saat jam istirahat tanpa membawa surat izin piket.',
-    whatsappSent: false,
-    academicYear: '2026/2027',
-    createdAt: new Date().toISOString()
-  }
-];
+export const initialViolations: ViolationRecord[] = [];
 
-export const initialRewards: RewardRecord[] = [
-  {
-    id: 'REW-SAMPLE-001',
-    studentId: 'STU-IMP-1788364303444-2-jph0e',
-    studentName: 'ABDUL MALIK MALDINI RAMADHAN KETJEWAY',
-    studentClass: 'KELAS 5 A',
-    ruleId: 'rew_1',
-    ruleName: 'Olimpiade Matematika Tingkat Kabupaten',
-    rank: 'Juara I',
-    level: 'Kota/Kab',
-    points: 15,
-    date: '2026-08-28',
-    competitionName: 'Olimpiade Sains & Matematika SD/MI',
-    organizer: 'Dinas Pendidikan',
-    certificateNumber: '421.2/089/SERT/2026',
-    reporterName: 'Siti Nurhaliza, S.Pd.',
-    notes: 'Meraih medali emas kategori siswa berprestasi.',
-    whatsappSent: true,
-    academicYear: '2026/2027',
-    createdAt: new Date().toISOString()
-  }
-];
+export const initialRewards: RewardRecord[] = [];
 
 export const initialCompensations: CompensationRecord[] = [];
 

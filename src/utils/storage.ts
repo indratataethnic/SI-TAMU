@@ -419,11 +419,11 @@ export const saveRewardRules = (rules: RewardRule[]): void => {
 export const getStoredViolations = (): ViolationRecord[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.VIOLATIONS);
-    if (!raw) return sanitizeRecords(initialViolations, 'VIOL');
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? sanitizeRecords(parsed, 'VIOL') : sanitizeRecords(initialViolations, 'VIOL');
+    return Array.isArray(parsed) ? sanitizeRecords(parsed, 'VIOL') : [];
   } catch (e) {
-    return sanitizeRecords(initialViolations, 'VIOL');
+    return [];
   }
 };
 
@@ -436,11 +436,11 @@ export const saveViolations = (records: ViolationRecord[]): void => {
 export const getStoredRewards = (): RewardRecord[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.REWARDS);
-    if (!raw) return sanitizeRecords(initialRewards, 'REW');
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? sanitizeRecords(parsed, 'REW') : sanitizeRecords(initialRewards, 'REW');
+    return Array.isArray(parsed) ? sanitizeRecords(parsed, 'REW') : [];
   } catch (e) {
-    return sanitizeRecords(initialRewards, 'REW');
+    return [];
   }
 };
 

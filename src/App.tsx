@@ -749,15 +749,7 @@ export default function App() {
         };
       }), 'VIOL');
 
-      const currentLocalViolations = loadViolations();
-      const vioMap = new Map<string, ViolationRecord>();
-      [...violations, ...currentLocalViolations].forEach(v => {
-        if (v && v.id) vioMap.set(v.id, v);
-      });
-      mappedViolations.forEach(v => {
-        if (v && v.id) vioMap.set(v.id, v);
-      });
-      const finalViolations = Array.from(vioMap.values());
+      const finalViolations = mappedViolations;
       setViolations(finalViolations);
       saveViolations(finalViolations);
     }
@@ -792,15 +784,7 @@ export default function App() {
         };
       }), 'REW');
 
-      const currentLocalRewards = loadRewards();
-      const rewMap = new Map<string, RewardRecord>();
-      [...rewards, ...currentLocalRewards].forEach(r => {
-        if (r && r.id) rewMap.set(r.id, r);
-      });
-      mappedRewards.forEach(r => {
-        if (r && r.id) rewMap.set(r.id, r);
-      });
-      const finalRewards = Array.from(rewMap.values());
+      const finalRewards = mappedRewards;
       setRewards(finalRewards);
       saveRewards(finalRewards);
     }
@@ -1040,21 +1024,21 @@ export default function App() {
     triggerSheetsSync({ violations: updated });
   };
 
+  const handleDeleteAllViolations = () => {
+    lastLocalActionRef.current = Date.now();
+    lastLocalSaveTimestampRef.current = Date.now();
+    setViolations([]);
+    saveViolations([]);
+    triggerSheetsSync({ violations: [] });
+  };
+
   const handleImportViolations = (importedViolations: ViolationRecord[]) => {
     lastLocalActionRef.current = Date.now();
     lastLocalSaveTimestampRef.current = Date.now();
-    const currentViolations = loadViolations();
-    const existingMap = new Map<string, ViolationRecord>();
-    [...violations, ...currentViolations].forEach(v => {
-      if (v && v.id) existingMap.set(v.id, v);
-    });
-    importedViolations.forEach(v => {
-      if (v && v.id) existingMap.set(v.id, v);
-    });
-    const updated = Array.from(existingMap.values());
-    setViolations(updated);
-    saveViolations(updated);
-    triggerSheetsSync({ violations: updated });
+    const clean = sanitizeRecords<ViolationRecord>(importedViolations, 'VIOL');
+    setViolations(clean);
+    saveViolations(clean);
+    triggerSheetsSync({ violations: clean });
   };
 
   // Handlers for Rewards
@@ -1113,21 +1097,21 @@ export default function App() {
     triggerSheetsSync({ rewards: updated });
   };
 
+  const handleDeleteAllRewards = () => {
+    lastLocalActionRef.current = Date.now();
+    lastLocalSaveTimestampRef.current = Date.now();
+    setRewards([]);
+    saveRewards([]);
+    triggerSheetsSync({ rewards: [] });
+  };
+
   const handleImportRewards = (importedRewards: RewardRecord[]) => {
     lastLocalActionRef.current = Date.now();
     lastLocalSaveTimestampRef.current = Date.now();
-    const currentRewards = loadRewards();
-    const existingMap = new Map<string, RewardRecord>();
-    [...rewards, ...currentRewards].forEach(r => {
-      if (r && r.id) existingMap.set(r.id, r);
-    });
-    importedRewards.forEach(r => {
-      if (r && r.id) existingMap.set(r.id, r);
-    });
-    const updated = Array.from(existingMap.values());
-    setRewards(updated);
-    saveRewards(updated);
-    triggerSheetsSync({ rewards: updated });
+    const clean = sanitizeRecords<RewardRecord>(importedRewards, 'REW');
+    setRewards(clean);
+    saveRewards(clean);
+    triggerSheetsSync({ rewards: clean });
   };
 
   // Handlers for Compensations
@@ -1351,6 +1335,7 @@ export default function App() {
               summaries={summaries}
               settings={settings}
               onDeleteViolation={handleDeleteViolation}
+              onDeleteAllViolations={handleDeleteAllViolations}
               onUpdateViolation={handleUpdateViolation}
               onImportViolations={handleImportViolations}
               onNavigateToInput={() => setCurrentTab('input_pelanggaran')}
@@ -1366,6 +1351,7 @@ export default function App() {
               rewardRules={rewardRules}
               settings={settings}
               onDeleteReward={handleDeleteReward}
+              onDeleteAllRewards={handleDeleteAllRewards}
               onUpdateReward={handleUpdateReward}
               onImportRewards={handleImportRewards}
               onNavigateToInput={() => setCurrentTab('input_reward')}
