@@ -650,14 +650,17 @@ export default function App() {
       savePiketSchedules(safePiket);
     }
 
-    const sMap = new Map(finalStudents.map(s => [s.nisn, s.id]));
-    const sNameMap = new Map(finalStudents.map(s => [s.name.trim().toLowerCase(), s]));
+    const sMapById = new Map(finalStudents.map(s => [s.id, s]));
+    const sMapByNisn = new Map(finalStudents.filter(s => s.nisn && s.nisn.length >= 8).map(s => [String(s.nisn).trim().toLowerCase(), s]));
+    const sNameMap = new Map(finalStudents.map(s => [s.name.toLowerCase().replace(/\s+/g, ' ').trim(), s]));
 
-    if (Array.isArray(imported.violations) && (imported.violations.length > 0 || (imported as any).action === 'RESET_VIOLATIONS' || (imported as any).action === 'RESET_ALL')) {
+    if (Array.isArray(imported.violations)) {
       const mappedViolations = sanitizeRecords<ViolationRecord>(imported.violations.map(v => {
-        const student = (v.studentId ? finalStudents.find(s => s.id === v.studentId) : null) ||
-                        ((v as any).studentNisn ? finalStudents.find(s => s.nisn === (v as any).studentNisn) : null) ||
-                        (v.studentName ? sNameMap.get(v.studentName.trim().toLowerCase()) : null);
+        const vNisn = (v as any).studentNisn ? String((v as any).studentNisn).trim().toLowerCase() : '';
+        const vName = v.studentName ? String(v.studentName).toLowerCase().replace(/\s+/g, ' ').trim() : '';
+        const student = (v.studentId ? sMapById.get(v.studentId) : null) ||
+                        (vNisn && vNisn.length >= 8 ? sMapByNisn.get(vNisn) : null) ||
+                        (vName ? sNameMap.get(vName) : null);
         const vRule = v.ruleName || (v as any).pelanggaran || (v as any).violationName || (v as any).description || 'Pelanggaran Tata Tertib';
         const vReporter = v.reporterName || (v as any).reporter || (v as any).reporterTeacherName || 'Guru Piket';
         const vLocation = v.location || (v as any).lokasi || 'Lingkungan Sekolah';
@@ -668,6 +671,7 @@ export default function App() {
           studentId: student ? student.id : (v.studentId || ''),
           studentName: student ? student.name : (v.studentName || ''),
           studentClass: student ? student.class : (v.studentClass || ''),
+          studentNisn: student ? student.nisn : ((v as any).studentNisn || ''),
           date: normalizeRecordDate(v.date),
           ruleName: vRule,
           description: vDesc,
@@ -687,11 +691,13 @@ export default function App() {
       setViolations(mappedViolations);
       saveViolations(mappedViolations);
     }
-    if (Array.isArray(imported.rewards) && (imported.rewards.length > 0 || (imported as any).action === 'RESET_REWARDS' || (imported as any).action === 'RESET_ALL')) {
+    if (Array.isArray(imported.rewards)) {
       const mappedRewards = sanitizeRecords<RewardRecord>(imported.rewards.map(r => {
-        const student = (r.studentId ? finalStudents.find(s => s.id === r.studentId) : null) ||
-                        ((r as any).studentNisn ? finalStudents.find(s => s.nisn === (r as any).studentNisn) : null) ||
-                        (r.studentName ? sNameMap.get(r.studentName.trim().toLowerCase()) : null);
+        const rNisn = (r as any).studentNisn ? String((r as any).studentNisn).trim().toLowerCase() : '';
+        const rName = r.studentName ? String(r.studentName).toLowerCase().replace(/\s+/g, ' ').trim() : '';
+        const student = (r.studentId ? sMapById.get(r.studentId) : null) ||
+                        (rNisn && rNisn.length >= 8 ? sMapByNisn.get(rNisn) : null) ||
+                        (rName ? sNameMap.get(rName) : null);
         const rTitle = (r as any).title || r.competitionName || r.ruleName || (r as any).prestasi || (r as any).rewardName || 'Apresiasi Prestasi';
         const rReporter = r.reporterName || (r as any).recordedBy || (r as any).reporter || (r as any).reporterTeacherName || 'Guru';
 
@@ -700,6 +706,7 @@ export default function App() {
           studentId: student ? student.id : (r.studentId || ''),
           studentName: student ? student.name : (r.studentName || ''),
           studentClass: student ? student.class : (r.studentClass || ''),
+          studentNisn: student ? student.nisn : ((r as any).studentNisn || ''),
           date: normalizeRecordDate(r.date),
           ruleName: rTitle,
           competitionName: rTitle,
@@ -717,16 +724,19 @@ export default function App() {
       setRewards(mappedRewards);
       saveRewards(mappedRewards);
     }
-    if (Array.isArray(imported.compensations) && (imported.compensations.length > 0 || (imported as any).action === 'RESET_ALL')) {
+    if (Array.isArray(imported.compensations)) {
       const mappedCompensations = sanitizeRecords<CompensationRecord>(imported.compensations.map(c => {
-        const student = (c.studentId ? finalStudents.find(s => s.id === c.studentId) : null) ||
-                        ((c as any).studentNisn ? finalStudents.find(s => s.nisn === (c as any).studentNisn) : null) ||
-                        (c.studentName ? sNameMap.get(c.studentName.trim().toLowerCase()) : null);
+        const cNisn = (c as any).studentNisn ? String((c as any).studentNisn).trim().toLowerCase() : '';
+        const cName = c.studentName ? String(c.studentName).toLowerCase().replace(/\s+/g, ' ').trim() : '';
+        const student = (c.studentId ? sMapById.get(c.studentId) : null) ||
+                        (cNisn && cNisn.length >= 8 ? sMapByNisn.get(cNisn) : null) ||
+                        (cName ? sNameMap.get(cName) : null);
         return {
           ...c,
           studentId: student ? student.id : (c.studentId || ''),
           studentName: student ? student.name : (c.studentName || ''),
           studentClass: student ? student.class : (c.studentClass || ''),
+          studentNisn: student ? student.nisn : ((c as any).studentNisn || ''),
           date: normalizeRecordDate(c.date)
         };
       }), 'COMP');

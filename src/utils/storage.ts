@@ -86,8 +86,8 @@ export const sanitizeStudents = (students: Student[]): Student[] => {
       validNisn = authRecord?.nisn || `00${idx + 10000000}`;
     }
 
-    if (!cleanId || seenIds.has(cleanId) || /^(\+?62|08)\d+$/.test(cleanId) || cleanId.startsWith('STU-L-') || cleanId.startsWith('STU-P-') || cleanId === 'STD-L' || cleanId === 'STD-P') {
-      cleanId = authRecord?.id || `STU-${validNisn}-${idx}-${Math.random().toString(36).substring(2, 6)}`;
+    if (!cleanId || seenIds.has(cleanId) || /^(\+?62|08)\d+$/.test(cleanId) || cleanId.startsWith('STU-L-') || cleanId.startsWith('STU-P-') || cleanId === 'STD-L' || cleanId === 'STD-P' || cleanId.startsWith('student_')) {
+      cleanId = authRecord?.id && !seenIds.has(authRecord.id) ? authRecord.id : `STU-${validNisn}-${idx}`;
     }
     seenIds.add(cleanId);
 
@@ -532,23 +532,50 @@ export const calculateStudentSummaries = (
   activeAcademicYear?: string
 ): StudentScoreSummary[] => {
   return students.map(student => {
-    const studentViolations = violations.filter(v => 
-      v.studentId === student.id && 
-      (!activeAcademicYear || !v.academicYear || v.academicYear === activeAcademicYear)
-    );
-    const studentRewards = rewards.filter(r => 
-      r.studentId === student.id && 
-      (!activeAcademicYear || !r.academicYear || r.academicYear === activeAcademicYear)
-    );
-    const studentCompensations = compensations.filter(
-      c => c.studentId === student.id && 
-      c.status === 'Disetujui' && 
-      (!activeAcademicYear || !c.academicYear || c.academicYear === activeAcademicYear)
-    );
+    const sId = student.id;
+    const sNisn = student.nisn ? String(student.nisn).trim().toLowerCase() : '';
+    const sName = student.name ? student.name.toLowerCase().replace(/\s+/g, ' ').trim() : '';
+
+    const studentViolations = violations.filter(v => {
+      const vId = v.studentId;
+      const vNisn = (v as any).studentNisn ? String((v as any).studentNisn).trim().toLowerCase() : '';
+      const vName = v.studentName ? String(v.studentName).toLowerCase().replace(/\s+/g, ' ').trim() : '';
+      
+      const isMatch = (vId && vId === sId) ||
+                      (sNisn && vNisn && sNisn === vNisn && sNisn.length >= 8 && !['l','p','lk','pr'].includes(sNisn)) ||
+                      (sName && vName && sName === vName);
+      const isYearMatch = !activeAcademicYear || !v.academicYear || v.academicYear === activeAcademicYear;
+      return isMatch && isYearMatch;
+    });
+
+    const studentRewards = rewards.filter(r => {
+      const rId = r.studentId;
+      const rNisn = (r as any).studentNisn ? String((r as any).studentNisn).trim().toLowerCase() : '';
+      const rName = r.studentName ? String(r.studentName).toLowerCase().replace(/\s+/g, ' ').trim() : '';
+
+      const isMatch = (rId && rId === sId) ||
+                      (sNisn && rNisn && sNisn === rNisn && sNisn.length >= 8 && !['l','p','lk','pr'].includes(sNisn)) ||
+                      (sName && rName && sName === rName);
+      const isYearMatch = !activeAcademicYear || !r.academicYear || r.academicYear === activeAcademicYear;
+      return isMatch && isYearMatch;
+    });
+
+    const studentCompensations = compensations.filter(c => {
+      const cId = c.studentId;
+      const cNisn = (c as any).studentNisn ? String((c as any).studentNisn).trim().toLowerCase() : '';
+      const cName = c.studentName ? String(c.studentName).toLowerCase().replace(/\s+/g, ' ').trim() : '';
+
+      const isMatch = (cId && cId === sId) ||
+                      (sNisn && cNisn && sNisn === cNisn && sNisn.length >= 8 && !['l','p','lk','pr'].includes(sNisn)) ||
+                      (sName && cName && sName === cName);
+      const isYearMatch = !activeAcademicYear || !c.academicYear || c.academicYear === activeAcademicYear;
+      const isApproved = !c.status || c.status === 'Disetujui' || (c as any).status === 'selesai' || (c as any).status === 'approved';
+      return isMatch && isYearMatch && isApproved;
+    });
 
     const totalViolationPoints = studentViolations.reduce((sum, v) => sum + (Number(v.points) || 0), 0);
     const totalRewardPoints = studentRewards.reduce((sum, r) => sum + (Number(r.points) || 0), 0);
-    const totalCompensationPoints = studentCompensations.reduce((sum, c) => sum + (Number(c.deductedPoints) || 0), 0);
+    const totalCompensationPoints = studentCompensations.reduce((sum, c) => sum + (Number((c as any).deductedPoints || (c as any).pointsReduced || (c as any).points || 0) || 0), 0);
 
     const activeViolationPoints = Math.max(0, totalViolationPoints - totalCompensationPoints);
 

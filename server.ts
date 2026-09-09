@@ -232,102 +232,60 @@ app.get("/api/data", (req, res) => {
   return res.json({ success: true, data: null, version: dbVersion });
 });
 
-// POST API: Fast persistence of full local database cache with SMART MERGING
+// POST API: Fast persistence of full local database cache
 app.post("/api/data", (req, res) => {
   try {
     const incoming = req.body || {};
     if (!cachedDb) cachedDb = {};
 
-    // 1. Smart merge violations: NEVER let an empty array wipe existing records!
+    // 1. Violations: save exact list from client
     if (Array.isArray(incoming.violations)) {
-      if (incoming.violations.length > 0) {
-        const vMap = new Map<string, any>();
-        // Keep existing violations
-        (cachedDb.violations || []).forEach((v: any) => {
-          if (v && v.id) vMap.set(String(v.id).trim(), v);
-        });
-        // Add or update incoming violations
-        incoming.violations.forEach((v: any) => {
-          if (v && v.id) {
-            const cleanId = String(v.id).trim();
-            const existingV = vMap.get(cleanId) || {};
-            const vRule = v.ruleName || v.pelanggaran || v.violationName || v.description || "Pelanggaran Tata Tertib";
-            const vReporter = v.reporterName || v.reporter || v.reporterTeacherName || "Guru Piket";
-            const vLocation = v.location || v.lokasi || existingV.location || existingV.lokasi || "Lingkungan Sekolah";
-            vMap.set(cleanId, {
-              ...existingV,
-              ...v,
-              ruleName: vRule,
-              violationName: vRule,
-              pelanggaran: vRule,
-              reporterName: vReporter,
-              reporter: vReporter,
-              reporterTeacherName: vReporter,
-              location: vLocation,
-              lokasi: vLocation,
-              date: normalizeDateString(v.date)
-            });
-          }
-        });
-        cachedDb.violations = Array.from(vMap.values());
-      } else if (incoming.action === 'RESET_VIOLATIONS' || incoming.action === 'RESET_ALL') {
-        cachedDb.violations = [];
-      }
+      cachedDb.violations = incoming.violations.map((v: any) => {
+        const vRule = v.ruleName || v.pelanggaran || v.violationName || v.description || "Pelanggaran Tata Tertib";
+        const vReporter = v.reporterName || v.reporter || v.reporterTeacherName || "Guru Piket";
+        const vLocation = v.location || v.lokasi || "Lingkungan Sekolah";
+        return {
+          ...v,
+          ruleName: vRule,
+          violationName: vRule,
+          pelanggaran: vRule,
+          reporterName: vReporter,
+          reporter: vReporter,
+          reporterTeacherName: vReporter,
+          location: vLocation,
+          lokasi: vLocation,
+          date: normalizeDateString(v.date)
+        };
+      });
     }
 
-    // 2. Smart merge rewards: NEVER let an empty array wipe existing rewards!
+    // 2. Rewards: save exact list from client
     if (Array.isArray(incoming.rewards)) {
-      if (incoming.rewards.length > 0) {
-        const rMap = new Map<string, any>();
-        (cachedDb.rewards || []).forEach((r: any) => {
-          if (r && r.id) rMap.set(String(r.id).trim(), r);
-        });
-        incoming.rewards.forEach((r: any) => {
-          if (r && r.id) {
-            const cleanId = String(r.id).trim();
-            const rTitle = r.title || r.competitionName || r.ruleName || r.prestasi || r.rewardName || "Apresiasi Prestasi";
-            const rReporter = r.reporterName || r.recordedBy || r.reporter || r.reporterTeacherName || "Guru";
-            rMap.set(cleanId, {
-              ...(rMap.get(cleanId) || {}),
-              ...r,
-              ruleName: rTitle,
-              competitionName: rTitle,
-              title: rTitle,
-              reporterName: rReporter,
-              recordedBy: rReporter,
-              reporterTeacherName: rReporter,
-              date: normalizeDateString(r.date)
-            });
-          }
-        });
-        cachedDb.rewards = Array.from(rMap.values());
-      } else if (incoming.action === 'RESET_REWARDS' || incoming.action === 'RESET_ALL') {
-        cachedDb.rewards = [];
-      }
+      cachedDb.rewards = incoming.rewards.map((r: any) => {
+        const rTitle = r.title || r.competitionName || r.ruleName || r.prestasi || r.rewardName || "Apresiasi Prestasi";
+        const rReporter = r.reporterName || r.recordedBy || r.reporter || r.reporterTeacherName || "Guru";
+        return {
+          ...r,
+          ruleName: rTitle,
+          competitionName: rTitle,
+          title: rTitle,
+          reporterName: rReporter,
+          recordedBy: rReporter,
+          reporterTeacherName: rReporter,
+          date: normalizeDateString(r.date)
+        };
+      });
     }
 
-    // 3. Smart merge compensations:
+    // 3. Compensations: save exact list from client
     if (Array.isArray(incoming.compensations)) {
-      if (incoming.compensations.length > 0) {
-        const cMap = new Map<string, any>();
-        (cachedDb.compensations || []).forEach((c: any) => {
-          if (c && c.id) cMap.set(String(c.id).trim(), c);
-        });
-        incoming.compensations.forEach((c: any) => {
-          if (c && c.id) {
-            const cleanId = String(c.id).trim();
-            cMap.set(cleanId, {
-              ...(cMap.get(cleanId) || {}),
-              ...c,
-              date: normalizeDateString(c.date)
-            });
-          }
-        });
-        cachedDb.compensations = Array.from(cMap.values());
-      }
+      cachedDb.compensations = incoming.compensations.map((c: any) => ({
+        ...c,
+        date: normalizeDateString(c.date)
+      }));
     }
 
-    // 4. Students, Teachers, Piket, Settings (only replace if provided with data)
+    // 4. Students, Teachers, Piket, Settings
     if (Array.isArray(incoming.students) && incoming.students.length > 0) {
       cachedDb.students = incoming.students;
     }
@@ -544,6 +502,8 @@ async function backgroundFetchGoogleSheets() {
 
 // Periodic background sync from Google Spreadsheet to keep central cache and all devices 100% up-to-date
 let isCheckingSheets = false;
+let lastSyncedSheetsSignature = "";
+
 async function checkSpreadsheetBackground() {
   if (isCheckingSheets) return;
   const webhookUrl = (cachedConfig?.googleSheetsWebhook || DEFAULT_WEBHOOK_URL).trim();
@@ -563,17 +523,19 @@ async function checkSpreadsheetBackground() {
       if (json?.status === "success" && json?.data) {
         const fetchedViolations = json.data.violations || [];
         const fetchedRewards = json.data.rewards || [];
-        const prevViolations = cachedDb?.violations || [];
-        const prevRewards = cachedDb?.rewards || [];
+        const fetchedCompensations = json.data.compensations || [];
 
-        // Check if new data arrived from other devices or if server cache is lacking records
-        if (
-          fetchedViolations.length !== prevViolations.length ||
-          fetchedRewards.length !== prevRewards.length ||
-          !cachedDb ||
-          !Array.isArray(cachedDb.violations) ||
-          cachedDb.violations.length === 0
-        ) {
+        // Build signature to detect ANY modifications (not just length changes)
+        const currentSignature = JSON.stringify({
+          v: fetchedViolations.map((v: any) => [v.id, v.studentId || v.studentName, v.points, v.date, v.ruleName || v.pelanggaran]),
+          r: fetchedRewards.map((r: any) => [r.id, r.studentId || r.studentName, r.points, r.date, r.title || r.prestasi]),
+          c: fetchedCompensations.map((c: any) => [c.id, c.studentId || c.studentName, c.status, c.deductedPoints || c.pointsReduced]),
+          sCount: json.data.students?.length || 0,
+          tCount: json.data.teachers?.length || 0
+        });
+
+        if (currentSignature !== lastSyncedSheetsSignature || !cachedDb || !cachedDb.violations) {
+          lastSyncedSheetsSignature = currentSignature;
           if (!cachedDb) cachedDb = {};
           cachedDb = {
             ...cachedDb,
@@ -581,6 +543,7 @@ async function checkSpreadsheetBackground() {
             violations: fetchedViolations.map((v: any) => {
               const vRule = v.ruleName || v.pelanggaran || v.violationName || v.description || "Pelanggaran Tata Tertib";
               const vReporter = v.reporterName || v.reporter || v.reporterTeacherName || "Guru Piket";
+              const vLocation = v.location || v.lokasi || "Lingkungan Sekolah";
               return {
                 ...v,
                 ruleName: vRule,
@@ -589,6 +552,8 @@ async function checkSpreadsheetBackground() {
                 reporterName: vReporter,
                 reporter: vReporter,
                 reporterTeacherName: vReporter,
+                location: vLocation,
+                lokasi: vLocation,
                 date: normalizeDateString(v.date)
               };
             }),
@@ -602,16 +567,21 @@ async function checkSpreadsheetBackground() {
                 title: rTitle,
                 reporterName: rReporter,
                 recordedBy: rReporter,
+                reporterTeacherName: rReporter,
                 date: normalizeDateString(r.date)
               };
-            })
+            }),
+            compensations: fetchedCompensations.map((c: any) => ({
+              ...c,
+              date: normalizeDateString(c.date)
+            }))
           };
           if (!fs.existsSync(CONFIG_DIR)) {
             fs.mkdirSync(CONFIG_DIR, { recursive: true });
           }
           fs.writeFileSync(DB_FILE, JSON.stringify(cachedDb, null, 2), "utf-8");
           broadcastUpdate("sheets_auto_sync");
-          console.log(`[Auto-Sync] Google Spreadsheet updated: ${fetchedViolations.length} violations, ${fetchedRewards.length} rewards. Broadcasted to devices.`);
+          console.log(`[Auto-Sync] Google Spreadsheet updated & broadcasted to devices (${fetchedViolations.length} violations, ${fetchedRewards.length} rewards).`);
         }
       }
     }
