@@ -537,7 +537,8 @@ export default function App() {
       settingsToSync.googleSheetsUrl,
       teachersToSync,
       piketSchedulesToSync,
-      settingsToSync
+      settingsToSync,
+      violationRules
     ).catch(err => console.log('Background sheets sync error:', err));
   };
 
@@ -549,8 +550,13 @@ export default function App() {
     rewards?: RewardRecord[];
     compensations?: CompensationRecord[];
     piketSchedules?: any[];
+    violationRules?: ViolationRule[];
   }) => {
     isImportingRef.current = true;
+    if (Array.isArray(imported.violationRules) && imported.violationRules.length > 0) {
+      setViolationRules(imported.violationRules);
+      saveViolationRules(imported.violationRules);
+    }
     if (imported.settings) {
       setSettings(prev => {
         const fetched = (imported.settings || {}) as any;
@@ -664,6 +670,8 @@ export default function App() {
         const impName = imp.name ? String(imp.name).trim().toLowerCase() : '';
         const match = (impNip ? prevMapByNip.get(impNip) : null) || (impName ? prevMapByName.get(impName) : null);
 
+        const impCode = (imp.accessCode || imp.pin || (imp as any).staffPin) ? String(imp.accessCode || imp.pin || (imp as any).staffPin).trim() : '';
+
         return {
           id: imp.id || (match ? match.id : `TCH-${idx + 1}`),
           nip: (imp.nip && imp.nip !== '-') ? imp.nip : (match?.nip || '-'),
@@ -671,7 +679,9 @@ export default function App() {
           role: imp.role || match?.role || 'guru_mapel',
           subject: (imp.subject && imp.subject !== '-') ? imp.subject : (match?.subject || 'Guru'),
           classAssigned: (imp.classAssigned && imp.classAssigned !== '-') ? imp.classAssigned : (match?.classAssigned || 'Semua Kelas'),
-          phone: (imp.phone && imp.phone !== '-') ? imp.phone : (match?.phone || '')
+          phone: (imp.phone && imp.phone !== '-') ? imp.phone : (match?.phone || ''),
+          accessCode: impCode || match?.accessCode || match?.pin || '',
+          pin: impCode || match?.pin || match?.accessCode || ''
         };
       });
 
@@ -1406,6 +1416,7 @@ export default function App() {
           teachers={teachers}
           piketSchedules={piketSchedules}
           violations={violations}
+          violationRules={violationRules}
           rewards={rewards}
           compensations={compensations}
           summaries={summaries}

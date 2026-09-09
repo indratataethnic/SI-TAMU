@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SchoolSettings, Student, Teacher, PiketSchedule, ViolationRecord, RewardRecord, CompensationRecord } from '../types';
+import { SchoolSettings, Student, Teacher, PiketSchedule, ViolationRecord, RewardRecord, CompensationRecord, ViolationRule } from '../types';
 import { Table, Copy, Check, ExternalLink, RefreshCw, AlertCircle, Sparkles, CheckCircle2, X, HelpCircle, ShieldAlert, ArrowRight, Download, Link2 } from 'lucide-react';
 import { getGoogleAppsScriptTemplate, syncAllToGoogleSheets, testGoogleSheetsWebhook, validateWebhookUrl, fetchFullStateFromSheets } from '../utils/sheetsSync';
 import { OFFICIAL_WEBHOOK_URL } from '../data/initialData';
@@ -10,6 +10,7 @@ interface GoogleSheetsModalProps {
   teachers?: Teacher[];
   piketSchedules?: PiketSchedule[];
   violations: ViolationRecord[];
+  violationRules?: ViolationRule[];
   rewards: RewardRecord[];
   compensations: CompensationRecord[];
   onSaveSettings?: (newSettings: SchoolSettings) => void;
@@ -22,6 +23,7 @@ interface GoogleSheetsModalProps {
     students?: Student[];
     teachers?: Teacher[];
     piketSchedules?: PiketSchedule[];
+    violationRules?: ViolationRule[];
     violations?: ViolationRecord[];
     rewards?: RewardRecord[];
     compensations?: CompensationRecord[];
@@ -34,6 +36,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
   teachers = [],
   piketSchedules = [],
   violations,
+  violationRules = [],
   rewards,
   compensations,
   summaries,
@@ -154,6 +157,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
             students,
             teachers,
             piketSchedules,
+            violationRules,
             violations,
             rewards,
             compensations,
@@ -170,6 +174,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
           students,
           teachers,
           piketSchedules,
+          violationRules,
           violations,
           rewards,
           compensations,
@@ -182,6 +187,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
         students,
         teachers,
         piketSchedules,
+        violationRules,
         violations,
         rewards,
         compensations,
@@ -244,9 +250,18 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
         const mergedSettings: SchoolSettings = {
           ...settings,
           schoolName: fetchedSettings.schoolName || settings.schoolName,
+          schoolSubtitle: fetchedSettings.schoolSubtitle || settings.schoolSubtitle,
           schoolAddress: fetchedSettings.schoolAddress || settings.schoolAddress,
-          headmasterName: fetchedSettings.headmasterName || settings.headmasterName,
-          headmasterNip: fetchedSettings.headmasterNip || settings.headmasterNip,
+          schoolPhone: fetchedSettings.schoolPhone || settings.schoolPhone,
+          schoolEmail: fetchedSettings.schoolEmail || settings.schoolEmail,
+          schoolWebsite: fetchedSettings.schoolWebsite || settings.schoolWebsite,
+          principalName: fetchedSettings.principalName || fetchedSettings.headmasterName || settings.principalName,
+          principalNip: fetchedSettings.principalNip || fetchedSettings.headmasterNip || settings.principalNip,
+          headmasterName: fetchedSettings.headmasterName || fetchedSettings.principalName || settings.headmasterName,
+          headmasterNip: fetchedSettings.headmasterNip || fetchedSettings.principalNip || settings.headmasterNip,
+          bkCoordinatorName: fetchedSettings.bkCoordinatorName || settings.bkCoordinatorName,
+          bkCoordinatorNip: fetchedSettings.bkCoordinatorNip || settings.bkCoordinatorNip,
+          staffPin: fetchedSettings.staffPin || settings.staffPin,
           letterNumberPrefix: fetchedSettings.letterNumberPrefix || settings.letterNumberPrefix,
           waGatewayApiKey: fetchedSettings.waGatewayApiKey || settings.waGatewayApiKey,
           waGatewayDevice: fetchedSettings.waGatewayDevice || settings.waGatewayDevice,
@@ -261,6 +276,7 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
           students: res.data.students,
           teachers: res.data.teachers,
           piketSchedules: res.data.piketSchedules,
+          violationRules: res.data.violationRules,
           violations: res.data.violations,
           rewards: res.data.rewards,
           compensations: res.data.compensations

@@ -12,7 +12,7 @@ const CONFIG_DIR = path.join(process.cwd(), "data");
 const CONFIG_FILE = path.join(CONFIG_DIR, "global-config.json");
 const DB_FILE = path.join(CONFIG_DIR, "app-db.json");
 
-const DEFAULT_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyBJJxFH7yOZLtD1IB61Gfi9LvZc0MnpPc0FdV7GjdxIuCx4tRrOOfE5fD7FqyLwys/exec";
+const DEFAULT_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxcDTgBEIYtGe4OmQWIb2cfhB-azDL2XuVsGllxRWiikEQB_TTMGR2tcTge9k69mLk/exec";
 
 // Ensure data folder exists
 if (!fs.existsSync(CONFIG_DIR)) {
@@ -31,7 +31,7 @@ try {
   if (fs.existsSync(CONFIG_FILE)) {
     const loaded = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
     const rawWebhook = (loaded.googleSheetsWebhook || "").trim();
-    const isObsolete = !rawWebhook || rawWebhook.includes("AKfycbyc9XP8BPzTKcGN");
+    const isObsolete = !rawWebhook || rawWebhook.includes("AKfycbyc9XP8BPzTKcGN") || rawWebhook.includes("AKfycbyBJJxFH7yOZLtD1IB61Gfi9LvZc0MnpPc0FdV7GjdxIuCx4tRrOOfE5fD7FqyLwys");
     const cleanWebhook = isObsolete ? DEFAULT_WEBHOOK_URL : rawWebhook;
 
     cachedConfig = {
@@ -370,6 +370,9 @@ app.post("/api/sheets/fetch", async (req, res) => {
       if (Array.isArray(json.data.piketSchedules) && json.data.piketSchedules.length > 0) {
         cachedDb.piketSchedules = json.data.piketSchedules;
       }
+      if (Array.isArray(json.data.violationRules) && json.data.violationRules.length > 0) {
+        cachedDb.violationRules = json.data.violationRules;
+      }
       const studentMapByName = new Map<string, any>((cachedDb.students || []).map((s: any) => [String(s.name || '').toLowerCase().replace(/\s+/g, ' ').trim(), s]));
       const studentMapByNisn = new Map<string, any>((cachedDb.students || []).filter((s: any) => s.nisn && String(s.nisn).length >= 8).map((s: any) => [String(s.nisn).trim().toLowerCase(), s]));
       const studentMapById = new Map<string, any>((cachedDb.students || []).map((s: any) => [String(s.id).trim(), s]));
@@ -491,6 +494,7 @@ app.post("/api/sheets/sync", async (req, res) => {
       students: payload.students || cachedDb?.students || [],
       teachers: payload.teachers || cachedDb?.teachers || [],
       piketSchedules: payload.piketSchedules || cachedDb?.piketSchedules || [],
+      violationRules: payload.violationRules || cachedDb?.violationRules || [],
       violations: payload.violations || cachedDb?.violations || [],
       rewards: payload.rewards || cachedDb?.rewards || [],
       compensations: payload.compensations || cachedDb?.compensations || [],

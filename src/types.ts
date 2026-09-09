@@ -27,6 +27,8 @@ export interface Teacher {
   classAssigned?: string;
   phone?: string;
   avatar?: string;
+  accessCode?: string;
+  pin?: string;
 }
 
 export type DayOfWeek = 'Senin' | 'Selasa' | 'Rabu' | 'Kamis' | 'Jumat' | 'Sabtu';

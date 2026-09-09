@@ -100,6 +100,9 @@ function doPost(e) {
       if (postData.piketSchedules && postData.piketSchedules.length >= 0) {
         writePiketSheet(ss, postData.piketSchedules, postData.teachers || []);
       }
+      if (postData.violationRules && postData.violationRules.length >= 0) {
+        writeRulesSheet(ss, postData.violationRules);
+      }
       if (postData.violations && postData.violations.length >= 0) {
         writeViolationsSheet(ss, postData.violations);
       }
@@ -163,6 +166,7 @@ function setupAllSheets(ss) {
     { name: "Data_Siswa", color: "#064E3B" },
     { name: "Data_Guru", color: "#134E4A" },
     { name: "Jadwal_Piket", color: "#4338CA" },
+    { name: "Aturan_Pelanggaran", color: "#C2410C" },
     { name: "Data_Pelanggaran", color: "#881337" },
     { name: "Data_Reward", color: "#78350F" },
     { name: "Data_Kompensasi", color: "#1E3A8A" },
@@ -218,7 +222,7 @@ function writeStudentsSheet(ss, students) {
 
 function writeTeachersSheet(ss, teachers) {
   var sheet = ss.getSheetByName("Data_Guru") || ss.getSheetByName("Data Guru") || ss.getSheetByName("Guru") || ss.getSheetByName("GTK") || ss.getSheetByName("Data_GTK") || ss.insertSheet("Data_Guru");
-  var headers = ["NIP / NUPTK", "Nama Guru & Gelar", "Jabatan / Tugas", "Mata Pelajaran", "Penugasan Kelas / Wali", "No HP / WhatsApp", "ID Guru"];
+  var headers = ["NIP / NUPTK", "Nama Guru & Gelar", "Jabatan / Tugas", "Mata Pelajaran", "Penugasan Kelas / Wali", "No HP / WhatsApp", "Kode Akses / PIN Guru", "ID Guru"];
   formatHeaderRow(sheet, headers, "#134E4A");
 
   if (!teachers || teachers.length === 0) return;
@@ -241,7 +245,30 @@ function writeTeachersSheet(ss, teachers) {
       t.subject || "-",
       t.classAssigned || "-",
       "'" + (t.phone || "-"),
+      "'" + (t.accessCode || t.pin || t.staffPin || ""),
       t.id || ""
+    ];
+  });
+
+  sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+  sheet.autoResizeColumns(1, headers.length);
+}
+
+function writeRulesSheet(ss, violationRules) {
+  var sheet = ss.getSheetByName("Aturan_Pelanggaran") || ss.getSheetByName("Aturan Pelanggaran") || ss.insertSheet("Aturan_Pelanggaran");
+  var headers = ["ID Aturan", "Nama Pelanggaran / Aturan", "Kategori", "Bobot Poin", "Sanksi Default / Rekomendasi", "Status Aktif"];
+  formatHeaderRow(sheet, headers, "#C2410C");
+
+  if (!violationRules || violationRules.length === 0) return;
+
+  var rows = violationRules.map(function(r) {
+    return [
+      r.id || "",
+      r.name || r.ruleName || "",
+      r.category || "ringan",
+      r.points || 0,
+      r.defaultSanction || r.sanction || "-",
+      r.isActive !== false ? "Aktif" : "Non-Aktif"
     ];
   });
 
@@ -431,6 +458,7 @@ function fetchAllData(ss) {
     students: [],
     teachers: [],
     piketSchedules: [],
+    violationRules: [],
     violations: [],
     rewards: [],
     compensations: [],
@@ -447,13 +475,14 @@ function fetchAllData(ss) {
   if (settingsSheet) {
     var values = settingsSheet.getDataRange().getValues();
     for (var i = 1; i < values.length; i++) {
-      var key = values[i][0];
+      var key = String(values[i][0] || "").trim();
       var val = values[i][1];
       if (key) {
         var strVal = String(val);
         data.settings[key] = strVal;
         if (key === "headmasterName") data.settings["principalName"] = strVal;
         if (key === "headmasterNip") data.settings["principalNip"] = strVal;
+        if (key === "staffPin" || key === "adminPin" || key === "pin" || key === "kodeAksesPetugas") data.settings["staffPin"] = strVal;
       }
     }
   }
@@ -656,7 +685,7 @@ function fetchAllData(ss) {
       if (headerRowIdx === -1) headerRowIdx = 0;
 
       var headerRow = values[headerRowIdx];
-      var colNip = -1, colName = -1, colRole = -1, colSubject = -1, colClass = -1, colPhone = -1, colId = -1;
+      var colNip = -1, colName = -1, colRole = -1, colSubject = -1, colClass = -1, colPhone = -1, colAccessCode = -1, colId = -1;
       for (var h = 0; h < headerRow.length; h++) {
         var hName = String(headerRow[h] || "").toLowerCase().trim();
         if (hName.indexOf("nip") !== -1 || hName.indexOf("nik") !== -1 || hName.indexOf("nuptk") !== -1) colNip = h;
@@ -665,6 +694,7 @@ function fetchAllData(ss) {
         else if (hName.indexOf("mapel") !== -1 || hName.indexOf("mata pelajaran") !== -1 || hName.indexOf("mengajar") !== -1 || hName.indexOf("subjek") !== -1 || hName.indexOf("pelajaran") !== -1) colSubject = h;
         else if (hName.indexOf("kelas") !== -1 || hName.indexOf("rombel") !== -1 || hName.indexOf("wali") !== -1 || hName.indexOf("penugasan") !== -1) colClass = h;
         else if (hName.indexOf("hp") !== -1 || hName.indexOf("telepon") !== -1 || hName.indexOf("wa") !== -1 || hName.indexOf("whatsapp") !== -1 || hName.indexOf("kontak") !== -1 || hName.indexOf("phone") !== -1) colPhone = h;
+        else if (hName.indexOf("kode") !== -1 || hName.indexOf("pin") !== -1 || hName.indexOf("akses") !== -1 || hName.indexOf("password") !== -1) colAccessCode = h;
         else if (hName === "id" || hName.indexOf("id guru") !== -1 || hName.indexOf("id_guru") !== -1) colId = h;
       }
 
@@ -716,6 +746,7 @@ function fetchAllData(ss) {
 
           var cleanNip = nipVal.replace(/^'/, '').trim();
           var cleanPhone = phoneVal.replace(/^'/, '').replace(/[^0-9+]/g, '');
+          var accessCodeVal = colAccessCode !== -1 && colAccessCode < row.length ? String(row[colAccessCode] || "").replace(/^'/, '').trim() : "";
           var teacherId = idVal ? idVal : ("TCH-" + (cleanNip ? cleanNip.replace(/[^0-9]/g, '') : ("N" + (i - headerRowIdx) + "-" + nameVal.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())));
 
           data.teachers.push({
@@ -725,7 +756,9 @@ function fetchAllData(ss) {
             role: roleCode,
             subject: subjectVal || "Guru",
             classAssigned: classVal || "Semua Kelas",
-            phone: cleanPhone || ""
+            phone: cleanPhone || "",
+            accessCode: accessCodeVal,
+            pin: accessCodeVal
           });
         }
       }
@@ -797,6 +830,47 @@ function fetchAllData(ss) {
             notes: (notesVal === "-" || notesVal === "undefined") ? "" : notesVal
           });
         }
+      }
+    }
+  }
+
+  // 3.8. Violation Rules (Aturan_Pelanggaran)
+  var ruleSheet = ss.getSheetByName("Aturan_Pelanggaran") || ss.getSheetByName("Aturan Pelanggaran") || ss.getSheetByName("Tata_Tertib") || ss.getSheetByName("Tata Tertib") || ss.getSheetByName("Aturan");
+  if (ruleSheet) {
+    var values = ruleSheet.getDataRange().getValues();
+    if (values && values.length > 1) {
+      var headerRow = values[0].map(function(h) { return String(h || "").toLowerCase().trim(); });
+      var colRuleId = -1, colRuleName = -1, colRuleCat = -1, colRulePts = -1, colRuleSanction = -1, colRuleActive = -1;
+      
+      headerRow.forEach(function(h, idx) {
+        if (h.indexOf("id") !== -1) colRuleId = idx;
+        else if (h.indexOf("nama") !== -1 || h.indexOf("aturan") !== -1 || h.indexOf("pelanggaran") !== -1) colRuleName = idx;
+        else if (h.indexOf("kategori") !== -1 || h.indexOf("tingkat") !== -1) colRuleCat = idx;
+        else if (h.indexOf("poin") !== -1 || h.indexOf("bobot") !== -1) colRulePts = idx;
+        else if (h.indexOf("sanksi") !== -1 || h.indexOf("rekomendasi") !== -1 || h.indexOf("tindakan") !== -1) colRuleSanction = idx;
+        else if (h.indexOf("status") !== -1 || h.indexOf("aktif") !== -1) colRuleActive = idx;
+      });
+
+      for (var i = 1; i < values.length; i++) {
+        var row = values[i];
+        if (!row || row.length === 0) continue;
+        var rName = colRuleName !== -1 && row[colRuleName] ? String(row[colRuleName]).trim() : (row[1] ? String(row[1]).trim() : "");
+        if (!rName || rName.toLowerCase() === "nama pelanggaran / aturan") continue;
+
+        var rId = colRuleId !== -1 && row[colRuleId] ? String(row[colRuleId]).trim() : ("rule_" + i);
+        var rCat = colRuleCat !== -1 && row[colRuleCat] ? String(row[colRuleCat]).trim().toLowerCase() : "ringan";
+        var rPts = colRulePts !== -1 && row[colRulePts] !== undefined ? (Number(row[colRulePts]) || 0) : 10;
+        var rSanc = colRuleSanction !== -1 && row[colRuleSanction] ? String(row[colRuleSanction]).trim() : "-";
+        var rAct = colRuleActive !== -1 && row[colRuleActive] ? (String(row[colRuleActive]).toLowerCase().indexOf("non") === -1) : true;
+
+        data.violationRules.push({
+          id: rId,
+          name: rName,
+          category: rCat,
+          points: rPts,
+          defaultSanction: rSanc,
+          isActive: rAct
+        });
       }
     }
   }
@@ -1013,6 +1087,7 @@ export const syncAllToGoogleSheets = async (
     students: any[];
     teachers?: any[];
     piketSchedules?: any[];
+    violationRules?: any[];
     violations: any[];
     rewards: any[];
     compensations: any[];
@@ -1101,6 +1176,7 @@ export const syncAllToGoogleSheets = async (
       students: payload.students || [],
       teachers: payload.teachers || [],
       piketSchedules: payload.piketSchedules || [],
+      violationRules: payload.violationRules || [],
       violations: enrichedViolations,
       rewards: enrichedRewards,
       compensations: enrichedCompensations,
@@ -1122,6 +1198,7 @@ export const syncAllToGoogleSheets = async (
             students: payload.students || [],
             teachers: payload.teachers || [],
             piketSchedules: payload.piketSchedules || [],
+            violationRules: payload.violationRules || [],
             violations: enrichedViolations,
             rewards: enrichedRewards,
             compensations: enrichedCompensations,
@@ -1175,12 +1252,14 @@ export const syncFullStateToSheets = async (
   sheetUrl?: string,
   teachers?: any[],
   piketSchedules?: any[],
-  settings?: any
+  settings?: any,
+  violationRules?: any[]
 ): Promise<{ success: boolean; message: string }> => {
   return syncAllToGoogleSheets(webhookUrl, {
     students,
     teachers,
     piketSchedules,
+    violationRules,
     violations,
     rewards,
     compensations,
@@ -1204,6 +1283,7 @@ export const fetchFullStateFromSheets = async (
     students?: any[];
     teachers?: any[];
     piketSchedules?: any[];
+    violationRules?: any[];
     violations?: any[];
     rewards?: any[];
     compensations?: any[];
