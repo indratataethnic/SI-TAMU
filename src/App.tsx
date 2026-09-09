@@ -153,41 +153,12 @@ export default function App() {
   useEffect(() => { saveSettings(settings); }, [settings]);
   useEffect(() => { saveUserRole(role); }, [role]);
 
-  // High-speed debounced database persistence to server
-  useEffect(() => {
-    if (isInitialLoadingRef.current || isImportingRef.current) return;
-    if (serverSaveTimeoutRef.current) clearTimeout(serverSaveTimeoutRef.current);
-    serverSaveTimeoutRef.current = setTimeout(() => {
-      lastLocalSaveTimestampRef.current = Date.now();
-      fetch('/api/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          students,
-          teachers,
-          piketSchedules,
-          violationRules,
-          rewardRules,
-          violations,
-          rewards,
-          compensations,
-          settings
-        })
-      })
-      .then(res => res.json())
-      .then(json => {
-        if (json?.version) lastKnownVersionRef.current = json.version;
-      })
-      .catch(err => console.log('Error caching db to server:', err));
-    }, 400);
-  }, [students, teachers, piketSchedules, violationRules, rewardRules, violations, rewards, compensations, settings]);
-
   const [isLoadingSpreadsheet, setIsLoadingSpreadsheet] = useState(false);
 
   // Automatically load data from Google Spreadsheet when the page mounts or on user request
   const fetchSpreadsheetData = async (silent = false): Promise<boolean> => {
-    // Avoid overwriting if this device just saved locally within 3.5s
-    if (silent && Date.now() - lastLocalSaveTimestampRef.current < 3500) {
+    // Avoid overwriting if this device just saved locally within 1.2s
+    if (silent && Date.now() - lastLocalSaveTimestampRef.current < 1200) {
       return false;
     }
 
@@ -280,14 +251,17 @@ export default function App() {
           try {
             const payload = JSON.parse(event.data);
             if (payload.type === 'DATA_UPDATED') {
-              // If this device just saved within 2.5s, ignore self-broadcast
-              if (Date.now() - lastLocalSaveTimestampRef.current < 2500) {
+              // If this device just saved within 1.2s, ignore self-broadcast
+              if (Date.now() - lastLocalSaveTimestampRef.current < 1200) {
                 if (payload.version) lastKnownVersionRef.current = payload.version;
                 return;
               }
               // An update occurred on another device or Google Sheets! Fetch latest silently
               fetchServerData(true);
             } else if (payload.type === 'CONNECTED') {
+              if (payload.version && lastKnownVersionRef.current > 0 && payload.version > lastKnownVersionRef.current) {
+                fetchServerData(true);
+              }
               if (payload.version) lastKnownVersionRef.current = payload.version;
             }
           } catch {
@@ -301,7 +275,7 @@ export default function App() {
             eventSource = null;
           }
           if (isSubscribed) {
-            reconnectTimeout = setTimeout(connectSSE, 4000);
+            reconnectTimeout = setTimeout(connectSSE, 3000);
           }
         };
       } catch {
@@ -311,20 +285,20 @@ export default function App() {
 
     connectSSE();
 
-    // Fallback Polling: Fast version check every 15 seconds
+    // Fallback Polling: Fast version check every 6 seconds
     const pollInterval = setInterval(() => {
       if (!isSubscribed) return;
       fetch('/api/data/version')
         .then(res => res.json())
         .then(json => {
           if (json?.success && json.version && json.version > lastKnownVersionRef.current) {
-            if (Date.now() - lastLocalSaveTimestampRef.current > 2500) {
+            if (Date.now() - lastLocalSaveTimestampRef.current > 1200) {
               fetchServerData(true);
             }
           }
         })
         .catch(() => {});
-    }, 15000);
+    }, 6000);
 
     // Immediate sync when screen is turned on (wake-up) or tab becomes active
     const handleVisibilityOrFocus = () => {
@@ -339,8 +313,8 @@ export default function App() {
           })
           .catch(() => {});
 
-        // 2. Also check Google Spreadsheet if at least 6s since last fetch
-        if (Date.now() - lastSpreadsheetFetchRef.current > 6000) {
+        // 2. Also check Google Spreadsheet if at least 4s since last fetch
+        if (Date.now() - lastSpreadsheetFetchRef.current > 4000) {
           fetchSpreadsheetData(true);
         }
       }
@@ -349,12 +323,12 @@ export default function App() {
     document.addEventListener('visibilitychange', handleVisibilityOrFocus);
     window.addEventListener('focus', handleVisibilityOrFocus);
 
-    // Background Google Sheets auto-check every 15 seconds (keeps HP & PC synchronized)
+    // Background Google Sheets auto-check every 12 seconds (keeps HP & PC synchronized)
     const sheetsInterval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         fetchSpreadsheetData(true);
       }
-    }, 15000);
+    }, 12000);
 
     return () => {
       isSubscribed = false;
@@ -541,7 +515,7 @@ export default function App() {
       });
     }
 
-    let finalStudents: Student[] = students;
+    let finalStudents: Student[] = students.length > 0 ? students : loadStudents();
 
     if (Array.isArray(imported.students) && imported.students.length > 0) {
       const existingStudents = loadStudents();
@@ -667,7 +641,7 @@ export default function App() {
     const sMap = new Map(finalStudents.map(s => [s.nisn, s.id]));
     const sNameMap = new Map(finalStudents.map(s => [s.name.trim().toLowerCase(), s]));
 
-    if (Array.isArray(imported.violations)) {
+    if (Array.isArray(imported.violations) && (imported.violations.length > 0 || (imported as any).action === 'RESET_VIOLATIONS' || (imported as any).action === 'RESET_ALL')) {
       const mappedViolations = sanitizeRecords<ViolationRecord>(imported.violations.map(v => {
         const student = (v.studentId ? finalStudents.find(s => s.id === v.studentId) : null) ||
                         ((v as any).studentNisn ? finalStudents.find(s => s.nisn === (v as any).studentNisn) : null) ||
@@ -698,7 +672,7 @@ export default function App() {
       setViolations(mappedViolations);
       saveViolations(mappedViolations);
     }
-    if (Array.isArray(imported.rewards)) {
+    if (Array.isArray(imported.rewards) && (imported.rewards.length > 0 || (imported as any).action === 'RESET_REWARDS' || (imported as any).action === 'RESET_ALL')) {
       const mappedRewards = sanitizeRecords<RewardRecord>(imported.rewards.map(r => {
         const student = (r.studentId ? finalStudents.find(s => s.id === r.studentId) : null) ||
                         ((r as any).studentNisn ? finalStudents.find(s => s.nisn === (r as any).studentNisn) : null) ||
@@ -728,7 +702,7 @@ export default function App() {
       setRewards(mappedRewards);
       saveRewards(mappedRewards);
     }
-    if (Array.isArray(imported.compensations)) {
+    if (Array.isArray(imported.compensations) && (imported.compensations.length > 0 || (imported as any).action === 'RESET_ALL')) {
       const mappedCompensations = sanitizeRecords<CompensationRecord>(imported.compensations.map(c => {
         const student = (c.studentId ? finalStudents.find(s => s.id === c.studentId) : null) ||
                         ((c as any).studentNisn ? finalStudents.find(s => s.nisn === (c as any).studentNisn) : null) ||

@@ -82,17 +82,22 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
            (v.studentName ? studentMap.get(v.studentName.trim().toLowerCase()) : undefined);
   };
 
-  const classesList = ['ALL', ...Array.from(new Set(violations.map(v => v.studentClass))).sort()];
+  const classesList = ['ALL', ...Array.from(new Set(violations.map(v => v.studentClass).filter(Boolean))).sort()];
 
   const filteredViolations = violations.filter(v => {
     const matchesCat = selectedCategory === 'ALL' || v.category === selectedCategory;
     const matchesCls = selectedClass === 'ALL' || v.studentClass === selectedClass;
     const q = searchQuery.toLowerCase();
+    const vRule = String(v.ruleName || (v as any).description || (v as any).pelanggaran || '').toLowerCase();
+    const vReporter = String(v.reporterName || (v as any).reporter || '').toLowerCase();
+    const vDesc = String(v.description || '').toLowerCase();
+    const sName = String(v.studentName || '').toLowerCase();
+
     const matchesSearch =
-      v.studentName.toLowerCase().includes(q) ||
-      v.ruleName.toLowerCase().includes(q) ||
-      v.reporterName.toLowerCase().includes(q) ||
-      v.description.toLowerCase().includes(q);
+      sName.includes(q) ||
+      vRule.includes(q) ||
+      vReporter.includes(q) ||
+      vDesc.includes(q);
     return matchesCat && matchesCls && matchesSearch;
   });
 
@@ -263,8 +268,8 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
                           {v.category.toUpperCase()}
                         </span>
                       </td>
-                      <td className="py-3 px-4 font-medium text-slate-800 max-w-xs truncate">
-                        {v.ruleName}
+                      <td className="py-3 px-4 font-medium text-slate-800 max-w-xs truncate" title={v.description || v.ruleName}>
+                        {v.ruleName || (v as any).description || (v as any).pelanggaran || 'Pelanggaran Tata Tertib'}
                       </td>
                       <td className="py-3 px-4 text-center">
                         <span className="font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
@@ -272,7 +277,9 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
                         </span>
                       </td>
                       <td className="py-3 px-4 text-slate-600">
-                        <span className="font-medium text-slate-900 block">{v.reporterName}</span>
+                        <span className="font-medium text-slate-900 block">
+                          {v.reporterName || (v as any).reporter || (v as any).reporterTeacherName || 'Guru Piket'}
+                        </span>
                         {v.reporterNip && <span className="text-[10px] text-slate-400 font-mono">NIP: {v.reporterNip}</span>}
                       </td>
                       <td className="py-3 px-4 text-center">

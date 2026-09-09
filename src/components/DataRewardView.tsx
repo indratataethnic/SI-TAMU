@@ -211,9 +211,13 @@ export const DataRewardView: React.FC<DataRewardViewProps> = ({
                       </td>
                       <td className="py-3 px-4 font-medium text-slate-700">{r.level}</td>
                       <td className="py-3 px-4">
-                        <span className="font-semibold text-slate-900 block max-w-xs truncate">{r.competitionName}</span>
+                        <span className="font-semibold text-slate-900 block max-w-xs truncate">{r.competitionName || (r as any).title || (r as any).ruleName || 'Apresiasi Prestasi'}</span>
                         {r.organizer && <span className="text-[10px] text-slate-400 block">{r.organizer}</span>}
-                        {r.reporterName && <span className="text-[10px] text-emerald-800 font-medium block">Pembina: {r.reporterName}</span>}
+                        {(r.reporterName || (r as any).recordedBy) && (
+                          <span className="text-[10px] text-emerald-800 font-medium block">
+                            Pembina: {r.reporterName || (r as any).recordedBy}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-center">
                         <span className="font-black text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">

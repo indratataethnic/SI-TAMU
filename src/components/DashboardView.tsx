@@ -872,9 +872,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         {v.category.toUpperCase()}
                       </span>
                     </div>
-                    <p className="text-slate-700 font-medium">{v.ruleName}</p>
+                    <p className="text-slate-700 font-medium">{v.ruleName || (v as any).description || (v as any).pelanggaran || 'Pelanggaran Tata Tertib'}</p>
                     <p className="text-[11px] text-slate-400">
-                      {v.date} {v.location ? `• 📍 ${v.location}` : ''} • Pencatat: {v.reporterName}
+                      {v.date} {v.location ? `• 📍 ${v.location}` : ''} • Pencatat: {v.reporterName || (v as any).reporter || (v as any).reporterTeacherName || 'Guru Piket'}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
@@ -918,8 +918,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </span>
                       <span className="text-[10px] font-medium text-slate-500">{r.level}</span>
                     </div>
-                    <p className="text-slate-800 font-medium">{r.competitionName}</p>
-                    <p className="text-[11px] text-slate-400">{r.date} {r.organizer ? `• ${r.organizer}` : ''}</p>
+                    <p className="text-slate-800 font-medium">{r.competitionName || (r as any).title || (r as any).ruleName || 'Apresiasi Prestasi'}</p>
+                    <p className="text-[11px] text-slate-400">{r.date} {r.organizer ? `• ${r.organizer}` : ''} {r.reporterName ? `• Pembina: ${r.reporterName}` : ((r as any).recordedBy ? `• Pembina: ${(r as any).recordedBy}` : '')}</p>
                   </div>
                   <div className="text-right shrink-0 flex items-center gap-2">
                     <span className="font-extrabold text-amber-600 text-sm">+{r.points} Poin</span>

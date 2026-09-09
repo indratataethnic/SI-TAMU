@@ -30,11 +30,18 @@ let cachedDb: any = null;
 try {
   if (fs.existsSync(CONFIG_FILE)) {
     const loaded = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+    const rawWebhook = (loaded.googleSheetsWebhook || "").trim();
+    const isObsolete = !rawWebhook || rawWebhook.includes("AKfycbyc9XP8BPzTKcGN");
+    const cleanWebhook = isObsolete ? DEFAULT_WEBHOOK_URL : rawWebhook;
+
     cachedConfig = {
       ...cachedConfig,
       ...loaded,
-      googleSheetsWebhook: loaded.googleSheetsWebhook || DEFAULT_WEBHOOK_URL
+      googleSheetsWebhook: cleanWebhook
     };
+    if (isObsolete) {
+      fs.writeFileSync(CONFIG_FILE, JSON.stringify(cachedConfig, null, 2), "utf-8");
+    }
   } else {
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(cachedConfig, null, 2), "utf-8");
   }
@@ -46,9 +53,66 @@ try {
   };
 }
 
+function normalizeDateString(val: any): string {
+  if (!val) return new Date().toISOString().slice(0, 10);
+  const s = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+    const parts = s.split('/');
+    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+  }
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return s.slice(0, 10);
+}
+
+function normalizeDbRecords(db: any) {
+  if (!db) return db;
+  if (Array.isArray(db.violations)) {
+    db.violations = db.violations.map((v: any) => {
+      const vRule = v.ruleName || v.pelanggaran || v.violationName || v.description || "Pelanggaran Tata Tertib";
+      const vReporter = v.reporterName || v.reporter || v.reporterTeacherName || "Guru Piket";
+      return {
+        ...v,
+        ruleName: vRule,
+        violationName: vRule,
+        pelanggaran: vRule,
+        reporterName: vReporter,
+        reporter: vReporter,
+        reporterTeacherName: vReporter,
+        date: normalizeDateString(v.date)
+      };
+    });
+  }
+  if (Array.isArray(db.rewards)) {
+    db.rewards = db.rewards.map((r: any) => {
+      const rTitle = r.title || r.competitionName || r.ruleName || r.prestasi || r.rewardName || "Apresiasi Prestasi";
+      const rReporter = r.reporterName || r.recordedBy || r.reporter || r.reporterTeacherName || "Guru";
+      return {
+        ...r,
+        ruleName: rTitle,
+        competitionName: rTitle,
+        title: rTitle,
+        reporterName: rReporter,
+        recordedBy: rReporter,
+        reporterTeacherName: rReporter,
+        date: normalizeDateString(r.date)
+      };
+    });
+  }
+  return db;
+}
+
 try {
   if (fs.existsSync(DB_FILE)) {
     cachedDb = JSON.parse(fs.readFileSync(DB_FILE, "utf-8"));
+    normalizeDbRecords(cachedDb);
+    fs.writeFileSync(DB_FILE, JSON.stringify(cachedDb, null, 2), "utf-8");
   }
 } catch (e) {
   cachedDb = null;
@@ -69,6 +133,9 @@ function broadcastUpdate(reason = "data_changed") {
   for (const client of sseClients) {
     try {
       client.write(`data: ${payload}\n\n`);
+      if (typeof (client as any).flush === "function") {
+        (client as any).flush();
+      }
     } catch {
       sseClients.delete(client);
     }
@@ -77,6 +144,7 @@ function broadcastUpdate(reason = "data_changed") {
 
 // GET API: Retrieve real-time version for background pollers
 app.get("/api/data/version", (req, res) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   return res.json({ success: true, version: dbVersion });
 });
 
@@ -89,19 +157,29 @@ app.get("/api/stream", (req, res) => {
     "X-Accel-Buffering": "no"
   });
 
+  if (typeof (res as any).flushHeaders === "function") {
+    (res as any).flushHeaders();
+  }
+
   // Send initial connected event
   res.write(`data: ${JSON.stringify({ type: "CONNECTED", version: dbVersion })}\n\n`);
+  if (typeof (res as any).flush === "function") {
+    (res as any).flush();
+  }
   sseClients.add(res);
 
-  // Heartbeat to keep connection alive through proxies
+  // Heartbeat to keep connection alive through proxies & Cloud Run
   const heartbeat = setInterval(() => {
     try {
-      res.write(": heartbeat\n\n");
+      res.write(": keepalive\n\n");
+      if (typeof (res as any).flush === "function") {
+        (res as any).flush();
+      }
     } catch {
       clearInterval(heartbeat);
       sseClients.delete(res);
     }
-  }, 15000);
+  }, 10000);
 
   req.on("close", () => {
     clearInterval(heartbeat);
@@ -111,6 +189,7 @@ app.get("/api/stream", (req, res) => {
 
 // GET API: Retrieve globally stored spreadsheet and webhook URL
 app.get("/api/global-config", (req, res) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   if (cachedConfig) {
     return res.json(cachedConfig);
   }
@@ -142,49 +221,130 @@ app.post("/api/global-config", (req, res) => {
 
 // GET API: Retrieve full fast local database cache
 app.get("/api/data", (req, res) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   if (cachedDb) {
+    normalizeDbRecords(cachedDb);
     return res.json({ success: true, data: cachedDb, version: dbVersion });
   }
   return res.json({ success: true, data: null, version: dbVersion });
 });
 
-// POST API: Fast persistence of full local database cache
+// POST API: Fast persistence of full local database cache with SMART MERGING
 app.post("/api/data", (req, res) => {
   try {
-    const data = req.body || {};
-    cachedDb = {
-      ...(cachedDb || {}),
-      ...data
-    };
+    const incoming = req.body || {};
+    if (!cachedDb) cachedDb = {};
+
+    // 1. Smart merge violations: NEVER let an empty array wipe existing records!
+    if (Array.isArray(incoming.violations)) {
+      if (incoming.violations.length > 0) {
+        const vMap = new Map<string, any>();
+        // Keep existing violations
+        (cachedDb.violations || []).forEach((v: any) => {
+          if (v && v.id) vMap.set(String(v.id).trim(), v);
+        });
+        // Add or update incoming violations
+        incoming.violations.forEach((v: any) => {
+          if (v && v.id) {
+            const cleanId = String(v.id).trim();
+            const vRule = v.ruleName || v.pelanggaran || v.violationName || v.description || "Pelanggaran Tata Tertib";
+            const vReporter = v.reporterName || v.reporter || v.reporterTeacherName || "Guru Piket";
+            vMap.set(cleanId, {
+              ...(vMap.get(cleanId) || {}),
+              ...v,
+              ruleName: vRule,
+              violationName: vRule,
+              pelanggaran: vRule,
+              reporterName: vReporter,
+              reporter: vReporter,
+              reporterTeacherName: vReporter,
+              date: normalizeDateString(v.date)
+            });
+          }
+        });
+        cachedDb.violations = Array.from(vMap.values());
+      } else if (incoming.action === 'RESET_VIOLATIONS' || incoming.action === 'RESET_ALL') {
+        cachedDb.violations = [];
+      }
+    }
+
+    // 2. Smart merge rewards: NEVER let an empty array wipe existing rewards!
+    if (Array.isArray(incoming.rewards)) {
+      if (incoming.rewards.length > 0) {
+        const rMap = new Map<string, any>();
+        (cachedDb.rewards || []).forEach((r: any) => {
+          if (r && r.id) rMap.set(String(r.id).trim(), r);
+        });
+        incoming.rewards.forEach((r: any) => {
+          if (r && r.id) {
+            const cleanId = String(r.id).trim();
+            const rTitle = r.title || r.competitionName || r.ruleName || r.prestasi || r.rewardName || "Apresiasi Prestasi";
+            const rReporter = r.reporterName || r.recordedBy || r.reporter || r.reporterTeacherName || "Guru";
+            rMap.set(cleanId, {
+              ...(rMap.get(cleanId) || {}),
+              ...r,
+              ruleName: rTitle,
+              competitionName: rTitle,
+              title: rTitle,
+              reporterName: rReporter,
+              recordedBy: rReporter,
+              reporterTeacherName: rReporter,
+              date: normalizeDateString(r.date)
+            });
+          }
+        });
+        cachedDb.rewards = Array.from(rMap.values());
+      } else if (incoming.action === 'RESET_REWARDS' || incoming.action === 'RESET_ALL') {
+        cachedDb.rewards = [];
+      }
+    }
+
+    // 3. Smart merge compensations:
+    if (Array.isArray(incoming.compensations)) {
+      if (incoming.compensations.length > 0) {
+        const cMap = new Map<string, any>();
+        (cachedDb.compensations || []).forEach((c: any) => {
+          if (c && c.id) cMap.set(String(c.id).trim(), c);
+        });
+        incoming.compensations.forEach((c: any) => {
+          if (c && c.id) {
+            const cleanId = String(c.id).trim();
+            cMap.set(cleanId, {
+              ...(cMap.get(cleanId) || {}),
+              ...c,
+              date: normalizeDateString(c.date)
+            });
+          }
+        });
+        cachedDb.compensations = Array.from(cMap.values());
+      }
+    }
+
+    // 4. Students, Teachers, Piket, Settings (only replace if provided with data)
+    if (Array.isArray(incoming.students) && incoming.students.length > 0) {
+      cachedDb.students = incoming.students;
+    }
+    if (Array.isArray(incoming.teachers) && incoming.teachers.length > 0) {
+      cachedDb.teachers = incoming.teachers;
+    }
+    if (Array.isArray(incoming.piketSchedules) && incoming.piketSchedules.length > 0) {
+      cachedDb.piketSchedules = incoming.piketSchedules;
+    }
+    if (incoming.settings) {
+      cachedDb.settings = { ...(cachedDb.settings || {}), ...incoming.settings };
+    }
+
     if (!fs.existsSync(CONFIG_DIR)) {
       fs.mkdirSync(CONFIG_DIR, { recursive: true });
     }
     fs.writeFileSync(DB_FILE, JSON.stringify(cachedDb, null, 2), "utf-8");
     broadcastUpdate("local_save");
-    return res.json({ success: true, version: dbVersion });
+    return res.json({ success: true, version: dbVersion, data: cachedDb });
   } catch (err: any) {
     console.error("Error writing database cache:", err);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
-
-function normalizeDateString(val: any): string {
-  if (!val) return new Date().toISOString().slice(0, 10);
-  const s = String(val).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
-    const parts = s.split('/');
-    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-  }
-  const parsed = new Date(s);
-  if (!isNaN(parsed.getTime())) {
-    const y = parsed.getFullYear();
-    const m = String(parsed.getMonth() + 1).padStart(2, '0');
-    const d = String(parsed.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-  return s.slice(0, 10);
-}
 
 // POST API: Fetch data from Google Spreadsheet webhook via server proxy (no CORS issues, follows redirects)
 app.post("/api/sheets/fetch", async (req, res) => {
@@ -331,38 +491,6 @@ async function backgroundFetchGoogleSheets() {
   }
 }
 
-// Automatically poll Google Sheets in the background every 3 minutes if webhook is set
-setInterval(backgroundFetchGoogleSheets, 180000);
-
-// POST API: Push data to Google Spreadsheet webhook via server proxy
-app.post("/api/sheets/sync", async (req, res) => {
-  try {
-    const webhookUrl = (req.body?.webhookUrl || cachedConfig.googleSheetsWebhook || DEFAULT_WEBHOOK_URL).trim();
-    if (!webhookUrl) {
-      return res.status(400).json({ success: false, message: "URL Webhook Google Sheets belum dikonfigurasi." });
-    }
-
-    const payload = req.body?.payload || req.body;
-    const response = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({
-        ...payload,
-        action: payload.action || "SYNC_ALL",
-        sentAt: new Date().toISOString()
-      }),
-      redirect: "follow"
-    });
-
-    broadcastUpdate("sheets_sync");
-    const json: any = await response.json().catch(() => ({ status: "success", message: "Data terkirim ke Google Sheets" }));
-    return res.json({ success: true, message: json.message || "Data berhasil disinkronkan ke Google Spreadsheet", data: json });
-  } catch (err: any) {
-    console.error("Error in /api/sheets/sync:", err);
-    return res.status(500).json({ success: false, message: err.message || "Gagal mengirim data ke Google Apps Script." });
-  }
-});
-
 // Periodic background sync from Google Spreadsheet to keep central cache and all devices 100% up-to-date
 let isCheckingSheets = false;
 async function checkSpreadsheetBackground() {
@@ -387,18 +515,45 @@ async function checkSpreadsheetBackground() {
         const prevViolations = cachedDb?.violations || [];
         const prevRewards = cachedDb?.rewards || [];
 
-        // Check if new data arrived from other devices
+        // Check if new data arrived from other devices or if server cache is lacking records
         if (
           fetchedViolations.length !== prevViolations.length ||
           fetchedRewards.length !== prevRewards.length ||
-          !cachedDb
+          !cachedDb ||
+          !Array.isArray(cachedDb.violations) ||
+          cachedDb.violations.length === 0
         ) {
           if (!cachedDb) cachedDb = {};
           cachedDb = {
             ...cachedDb,
             ...json.data,
-            violations: fetchedViolations.map((v: any) => ({ ...v, date: normalizeDateString(v.date) })),
-            rewards: fetchedRewards.map((r: any) => ({ ...r, date: normalizeDateString(r.date) }))
+            violations: fetchedViolations.map((v: any) => {
+              const vRule = v.ruleName || v.pelanggaran || v.violationName || v.description || "Pelanggaran Tata Tertib";
+              const vReporter = v.reporterName || v.reporter || v.reporterTeacherName || "Guru Piket";
+              return {
+                ...v,
+                ruleName: vRule,
+                violationName: vRule,
+                pelanggaran: vRule,
+                reporterName: vReporter,
+                reporter: vReporter,
+                reporterTeacherName: vReporter,
+                date: normalizeDateString(v.date)
+              };
+            }),
+            rewards: fetchedRewards.map((r: any) => {
+              const rTitle = r.title || r.competitionName || r.ruleName || r.prestasi || r.rewardName || "Apresiasi Prestasi";
+              const rReporter = r.reporterName || r.recordedBy || r.reporter || r.reporterTeacherName || "Guru";
+              return {
+                ...r,
+                ruleName: rTitle,
+                competitionName: rTitle,
+                title: rTitle,
+                reporterName: rReporter,
+                recordedBy: rReporter,
+                date: normalizeDateString(r.date)
+              };
+            })
           };
           if (!fs.existsSync(CONFIG_DIR)) {
             fs.mkdirSync(CONFIG_DIR, { recursive: true });
@@ -416,8 +571,8 @@ async function checkSpreadsheetBackground() {
   }
 }
 
-// Background poll every 25 seconds
-setInterval(checkSpreadsheetBackground, 25000);
+// Background poll every 12 seconds
+setInterval(checkSpreadsheetBackground, 12000);
 
 // Vite server integration
 async function startServer() {
@@ -437,6 +592,8 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`[SI TAMU Server] Running on http://localhost:${PORT}`);
+    // Run initial sync with Google Spreadsheet immediately on startup!
+    setTimeout(checkSpreadsheetBackground, 1000);
   });
 }
 
