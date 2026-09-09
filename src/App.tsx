@@ -163,52 +163,102 @@ export default function App() {
       return false;
     }
 
+    const cleanWebhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || OFFICIAL_WEBHOOK_URL).trim();
+    if (!cleanWebhook) return false;
+
     try {
       lastSpreadsheetFetchRef.current = Date.now();
       setIsLoadingSpreadsheet(true);
       if (!silent) {
-        setSheetsSyncStatus('🔄 Sedang menyinkronkan data dengan Google Spreadsheet...');
+        setSheetsSyncStatus('🔄 Sedang memuat pengaturan dan data dari Google Spreadsheet...');
       }
 
-      const res = await fetch('/api/sheets/fetch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          webhookUrl: settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || OFFICIAL_WEBHOOK_URL
-        })
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
-          handleImportFullData(json.data);
-          const studentCount = json.data.students?.length || 0;
-          const teacherCount = json.data.teachers?.length || 0;
-          const piketCount = json.data.piketSchedules?.length || 0;
-          const violationCount = json.data.violations?.length || 0;
-          const rewardCount = json.data.rewards?.length || 0;
-
-          // Check if new data arrived compared to previous count
-          const isNewViolations = lastViolationsCountRef.current > 0 && violationCount > lastViolationsCountRef.current;
-          const isNewRewards = lastRewardsCountRef.current > 0 && rewardCount > lastRewardsCountRef.current;
-          lastViolationsCountRef.current = violationCount;
-          lastRewardsCountRef.current = rewardCount;
-
-          const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          setLastSyncTime(timeStr);
-
-          if (!silent) {
-            setSheetsSyncStatus(
-              `✓ Sinkronisasi selesai (${timeStr}): ${studentCount} Siswa, ${violationCount} Pelanggaran${teacherCount > 0 ? `, ${teacherCount} Guru` : ''}`
-            );
-            setTimeout(() => setSheetsSyncStatus(null), 4500);
-          } else if (isNewViolations || isNewRewards) {
-            setSheetsSyncStatus(
-              `✓ Data baru otomatis termuat (${timeStr}): ${violationCount} Pelanggaran${rewardCount > 0 ? `, ${rewardCount} Apresiasi` : ''}`
-            );
-            setTimeout(() => setSheetsSyncStatus(null), 5000);
+      let resData: any = null;
+      try {
+        const res = await fetch('/api/sheets/fetch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ webhookUrl: cleanWebhook })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            resData = json.data;
           }
-          return true;
         }
+      } catch (err) {
+        console.warn('Server proxy fetch failed, falling back to direct client fetch:', err);
+      }
+
+      // Client-side fallback if server proxy did not return data
+      if (!resData) {
+        const clientRes = await fetchFullStateFromSheets(cleanWebhook);
+        if (clientRes.success && clientRes.data) {
+          resData = clientRes.data;
+        }
+      }
+
+      if (resData) {
+        const fetchedSettings = resData.settings || {};
+        const mergedSettings: SchoolSettings = {
+          ...settings,
+          schoolName: fetchedSettings.schoolName || settings.schoolName,
+          schoolSubtitle: fetchedSettings.schoolSubtitle || settings.schoolSubtitle,
+          schoolAddress: fetchedSettings.schoolAddress || settings.schoolAddress,
+          schoolPhone: fetchedSettings.schoolPhone || settings.schoolPhone,
+          schoolEmail: fetchedSettings.schoolEmail || settings.schoolEmail,
+          schoolWebsite: fetchedSettings.schoolWebsite || settings.schoolWebsite,
+          principalName: fetchedSettings.principalName || fetchedSettings.headmasterName || settings.principalName,
+          principalNip: fetchedSettings.principalNip || fetchedSettings.headmasterNip || settings.principalNip,
+          headmasterName: fetchedSettings.headmasterName || fetchedSettings.principalName || settings.headmasterName,
+          headmasterNip: fetchedSettings.headmasterNip || fetchedSettings.principalNip || settings.headmasterNip,
+          bkCoordinatorName: fetchedSettings.bkCoordinatorName || settings.bkCoordinatorName,
+          bkCoordinatorNip: fetchedSettings.bkCoordinatorNip || settings.bkCoordinatorNip,
+          staffPin: fetchedSettings.staffPin || settings.staffPin,
+          letterNumberPrefix: fetchedSettings.letterNumberPrefix || settings.letterNumberPrefix,
+          academicYear: fetchedSettings.academicYear || settings.academicYear || '2026/2027',
+          waGatewayApiKey: fetchedSettings.waGatewayApiKey || settings.waGatewayApiKey,
+          waGatewayDevice: fetchedSettings.waGatewayDevice || settings.waGatewayDevice,
+          googleSheetsWebhook: cleanWebhook,
+          googleSheetsWebhookUrl: cleanWebhook,
+          googleSheetsUrl: (fetchedSettings.googleSheetsUrl || settings.googleSheetsUrl || '').trim()
+        };
+
+        handleImportFullData({
+          settings: mergedSettings,
+          students: resData.students,
+          teachers: resData.teachers,
+          piketSchedules: resData.piketSchedules,
+          violations: resData.violations,
+          rewards: resData.rewards,
+          compensations: resData.compensations
+        });
+
+        const studentCount = resData.students?.length || students.length;
+        const teacherCount = resData.teachers?.length || teachers.length;
+        const violationCount = resData.violations?.length || 0;
+        const rewardCount = resData.rewards?.length || 0;
+
+        const isNewViolations = lastViolationsCountRef.current > 0 && violationCount > lastViolationsCountRef.current;
+        const isNewRewards = lastRewardsCountRef.current > 0 && rewardCount > lastRewardsCountRef.current;
+        lastViolationsCountRef.current = violationCount;
+        lastRewardsCountRef.current = rewardCount;
+
+        const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        setLastSyncTime(timeStr);
+
+        if (!silent) {
+          setSheetsSyncStatus(
+            `✓ Pengaturan dan data berhasil dimuat (${timeStr}): ${studentCount} Siswa, ${violationCount} Pelanggaran, ${rewardCount} Apresiasi`
+          );
+          setTimeout(() => setSheetsSyncStatus(null), 4500);
+        } else if (isNewViolations || isNewRewards) {
+          setSheetsSyncStatus(
+            `✓ Data baru otomatis termuat (${timeStr}): ${violationCount} Pelanggaran${rewardCount > 0 ? `, ${rewardCount} Apresiasi` : ''}`
+          );
+          setTimeout(() => setSheetsSyncStatus(null), 5000);
+        }
+        return true;
       }
     } catch (err) {
       console.log('Automated Google Sheets load error:', err);

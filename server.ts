@@ -370,25 +370,81 @@ app.post("/api/sheets/fetch", async (req, res) => {
       if (Array.isArray(json.data.piketSchedules) && json.data.piketSchedules.length > 0) {
         cachedDb.piketSchedules = json.data.piketSchedules;
       }
+      const studentMapByName = new Map<string, any>((cachedDb.students || []).map((s: any) => [String(s.name || '').toLowerCase().replace(/\s+/g, ' ').trim(), s]));
+      const studentMapByNisn = new Map<string, any>((cachedDb.students || []).filter((s: any) => s.nisn && String(s.nisn).length >= 8).map((s: any) => [String(s.nisn).trim().toLowerCase(), s]));
+      const studentMapById = new Map<string, any>((cachedDb.students || []).map((s: any) => [String(s.id).trim(), s]));
+
       if (Array.isArray(json.data.violations)) {
-        cachedDb.violations = json.data.violations.map((v: any) => ({
-          ...v,
-          date: normalizeDateString(v.date)
-        }));
+        cachedDb.violations = json.data.violations.map((v: any) => {
+          const vNisn = (v.studentNisn ? String(v.studentNisn) : '').trim().toLowerCase();
+          const vName = String(v.studentName || '').toLowerCase().replace(/\s+/g, ' ').trim();
+          const student = (v.studentId ? studentMapById.get(String(v.studentId).trim()) : null) ||
+                          (vNisn && vNisn.length >= 8 ? studentMapByNisn.get(vNisn) : null) ||
+                          (vName ? studentMapByName.get(vName) : null);
+          const vRule = v.ruleName || v.pelanggaran || v.violationName || v.description || "Pelanggaran Tata Tertib";
+          const vReporter = v.reporterName || v.reporter || v.reporterTeacherName || "Guru Piket";
+          const vLocation = v.location || v.lokasi || "Lingkungan Sekolah";
+          return {
+            ...v,
+            studentId: student ? student.id : (v.studentId || ''),
+            studentName: student ? student.name : (v.studentName || ''),
+            studentClass: student ? student.class : (v.studentClass || ''),
+            studentNisn: student ? student.nisn : ((v as any).studentNisn || ''),
+            ruleName: vRule,
+            violationName: vRule,
+            pelanggaran: vRule,
+            reporterName: vReporter,
+            reporter: vReporter,
+            reporterTeacherName: vReporter,
+            location: vLocation,
+            lokasi: vLocation,
+            date: normalizeDateString(v.date)
+          };
+        });
         json.data.violations = cachedDb.violations;
       }
       if (Array.isArray(json.data.rewards)) {
-        cachedDb.rewards = json.data.rewards.map((r: any) => ({
-          ...r,
-          date: normalizeDateString(r.date)
-        }));
+        cachedDb.rewards = json.data.rewards.map((r: any) => {
+          const rNisn = (r.studentNisn ? String(r.studentNisn) : '').trim().toLowerCase();
+          const rName = String(r.studentName || '').toLowerCase().replace(/\s+/g, ' ').trim();
+          const student = (r.studentId ? studentMapById.get(String(r.studentId).trim()) : null) ||
+                          (rNisn && rNisn.length >= 8 ? studentMapByNisn.get(rNisn) : null) ||
+                          (rName ? studentMapByName.get(rName) : null);
+          const rTitle = r.title || r.competitionName || r.ruleName || r.prestasi || r.rewardName || "Apresiasi Prestasi";
+          const rReporter = r.reporterName || r.recordedBy || r.reporter || r.reporterTeacherName || "Guru";
+          return {
+            ...r,
+            studentId: student ? student.id : (r.studentId || ''),
+            studentName: student ? student.name : (r.studentName || ''),
+            studentClass: student ? student.class : (r.studentClass || ''),
+            studentNisn: student ? student.nisn : ((r as any).studentNisn || ''),
+            ruleName: rTitle,
+            competitionName: rTitle,
+            title: rTitle,
+            reporterName: rReporter,
+            recordedBy: rReporter,
+            reporterTeacherName: rReporter,
+            date: normalizeDateString(r.date)
+          };
+        });
         json.data.rewards = cachedDb.rewards;
       }
       if (Array.isArray(json.data.compensations)) {
-        cachedDb.compensations = json.data.compensations.map((c: any) => ({
-          ...c,
-          date: normalizeDateString(c.date)
-        }));
+        cachedDb.compensations = json.data.compensations.map((c: any) => {
+          const cNisn = (c.studentNisn ? String(c.studentNisn) : '').trim().toLowerCase();
+          const cName = String(c.studentName || '').toLowerCase().replace(/\s+/g, ' ').trim();
+          const student = (c.studentId ? studentMapById.get(String(c.studentId).trim()) : null) ||
+                          (cNisn && cNisn.length >= 8 ? studentMapByNisn.get(cNisn) : null) ||
+                          (cName ? studentMapByName.get(cName) : null);
+          return {
+            ...c,
+            studentId: student ? student.id : (c.studentId || ''),
+            studentName: student ? student.name : (c.studentName || ''),
+            studentClass: student ? student.class : (c.studentClass || ''),
+            studentNisn: student ? student.nisn : ((c as any).studentNisn || ''),
+            date: normalizeDateString(c.date)
+          };
+        });
         json.data.compensations = cachedDb.compensations;
       }
       if (json.data.settings) {
@@ -537,15 +593,30 @@ async function checkSpreadsheetBackground() {
         if (currentSignature !== lastSyncedSheetsSignature || !cachedDb || !cachedDb.violations) {
           lastSyncedSheetsSignature = currentSignature;
           if (!cachedDb) cachedDb = {};
+
+          const studentList = (json.data.students && json.data.students.length > 0) ? json.data.students : (cachedDb.students || []);
+          const studentMapByName = new Map<string, any>(studentList.map((s: any) => [String(s.name || '').toLowerCase().replace(/\s+/g, ' ').trim(), s]));
+          const studentMapByNisn = new Map<string, any>(studentList.filter((s: any) => s.nisn && String(s.nisn).length >= 8).map((s: any) => [String(s.nisn).trim().toLowerCase(), s]));
+          const studentMapById = new Map<string, any>(studentList.map((s: any) => [String(s.id).trim(), s]));
+
           cachedDb = {
             ...cachedDb,
             ...json.data,
             violations: fetchedViolations.map((v: any) => {
+              const vNisn = (v.studentNisn ? String(v.studentNisn) : '').trim().toLowerCase();
+              const vName = String(v.studentName || '').toLowerCase().replace(/\s+/g, ' ').trim();
+              const student = (v.studentId ? studentMapById.get(String(v.studentId).trim()) : null) ||
+                              (vNisn && vNisn.length >= 8 ? studentMapByNisn.get(vNisn) : null) ||
+                              (vName ? studentMapByName.get(vName) : null);
               const vRule = v.ruleName || v.pelanggaran || v.violationName || v.description || "Pelanggaran Tata Tertib";
               const vReporter = v.reporterName || v.reporter || v.reporterTeacherName || "Guru Piket";
               const vLocation = v.location || v.lokasi || "Lingkungan Sekolah";
               return {
                 ...v,
+                studentId: student ? student.id : (v.studentId || ''),
+                studentName: student ? student.name : (v.studentName || ''),
+                studentClass: student ? student.class : (v.studentClass || ''),
+                studentNisn: student ? student.nisn : ((v as any).studentNisn || ''),
                 ruleName: vRule,
                 violationName: vRule,
                 pelanggaran: vRule,
@@ -558,10 +629,19 @@ async function checkSpreadsheetBackground() {
               };
             }),
             rewards: fetchedRewards.map((r: any) => {
+              const rNisn = (r.studentNisn ? String(r.studentNisn) : '').trim().toLowerCase();
+              const rName = String(r.studentName || '').toLowerCase().replace(/\s+/g, ' ').trim();
+              const student = (r.studentId ? studentMapById.get(String(r.studentId).trim()) : null) ||
+                              (rNisn && rNisn.length >= 8 ? studentMapByNisn.get(rNisn) : null) ||
+                              (rName ? studentMapByName.get(rName) : null);
               const rTitle = r.title || r.competitionName || r.ruleName || r.prestasi || r.rewardName || "Apresiasi Prestasi";
               const rReporter = r.reporterName || r.recordedBy || r.reporter || r.reporterTeacherName || "Guru";
               return {
                 ...r,
+                studentId: student ? student.id : (r.studentId || ''),
+                studentName: student ? student.name : (r.studentName || ''),
+                studentClass: student ? student.class : (r.studentClass || ''),
+                studentNisn: student ? student.nisn : ((r as any).studentNisn || ''),
                 ruleName: rTitle,
                 competitionName: rTitle,
                 title: rTitle,
@@ -571,10 +651,21 @@ async function checkSpreadsheetBackground() {
                 date: normalizeDateString(r.date)
               };
             }),
-            compensations: fetchedCompensations.map((c: any) => ({
-              ...c,
-              date: normalizeDateString(c.date)
-            }))
+            compensations: fetchedCompensations.map((c: any) => {
+              const cNisn = (c.studentNisn ? String(c.studentNisn) : '').trim().toLowerCase();
+              const cName = String(c.studentName || '').toLowerCase().replace(/\s+/g, ' ').trim();
+              const student = (c.studentId ? studentMapById.get(String(c.studentId).trim()) : null) ||
+                              (cNisn && cNisn.length >= 8 ? studentMapByNisn.get(cNisn) : null) ||
+                              (cName ? studentMapByName.get(cName) : null);
+              return {
+                ...c,
+                studentId: student ? student.id : (c.studentId || ''),
+                studentName: student ? student.name : (c.studentName || ''),
+                studentClass: student ? student.class : (c.studentClass || ''),
+                studentNisn: student ? student.nisn : ((c as any).studentNisn || ''),
+                date: normalizeDateString(c.date)
+              };
+            })
           };
           if (!fs.existsSync(CONFIG_DIR)) {
             fs.mkdirSync(CONFIG_DIR, { recursive: true });
