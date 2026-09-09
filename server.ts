@@ -609,58 +609,73 @@ async function checkSpreadsheetBackground() {
           const studentMapByNisn = new Map<string, any>(studentList.filter((s: any) => s.nisn && String(s.nisn).length >= 8).map((s: any) => [String(s.nisn).trim().toLowerCase(), s]));
           const studentMapById = new Map<string, any>(studentList.map((s: any) => [String(s.id).trim(), s]));
 
+          const existingViolations = Array.isArray(cachedDb?.violations) ? cachedDb.violations : [];
+          const existingRewards = Array.isArray(cachedDb?.rewards) ? cachedDb.rewards : [];
+
+          const mappedViolations = fetchedViolations.map((v: any) => {
+            const vNisn = (v.studentNisn ? String(v.studentNisn) : '').trim().toLowerCase();
+            const vName = String(v.studentName || '').toLowerCase().replace(/\s+/g, ' ').trim();
+            const student = (v.studentId ? studentMapById.get(String(v.studentId).trim()) : null) ||
+                            (vNisn && vNisn.length >= 8 ? studentMapByNisn.get(vNisn) : null) ||
+                            (vName ? studentMapByName.get(vName) : null);
+            const vRule = v.ruleName || v.pelanggaran || v.violationName || v.description || "Pelanggaran Tata Tertib";
+            const vReporter = v.reporterName || v.reporter || v.reporterTeacherName || "Guru Piket";
+            const vLocation = v.location || v.lokasi || "Lingkungan Sekolah";
+            return {
+              ...v,
+              studentId: student ? student.id : (v.studentId || ''),
+              studentName: student ? student.name : (v.studentName || ''),
+              studentClass: student ? student.class : (v.studentClass || ''),
+              studentNisn: student ? student.nisn : ((v as any).studentNisn || ''),
+              ruleName: vRule,
+              violationName: vRule,
+              pelanggaran: vRule,
+              reporterName: vReporter,
+              reporter: vReporter,
+              reporterTeacherName: vReporter,
+              location: vLocation,
+              lokasi: vLocation,
+              date: normalizeDateString(v.date)
+            };
+          });
+
+          const vioMap = new Map<string, any>();
+          existingViolations.forEach((v: any) => { if (v && v.id) vioMap.set(v.id, v); });
+          mappedViolations.forEach((v: any) => { if (v && v.id) vioMap.set(v.id, v); });
+
+          const mappedRewards = fetchedRewards.map((r: any) => {
+            const rNisn = (r.studentNisn ? String(r.studentNisn) : '').trim().toLowerCase();
+            const rName = String(r.studentName || '').toLowerCase().replace(/\s+/g, ' ').trim();
+            const student = (r.studentId ? studentMapById.get(String(r.studentId).trim()) : null) ||
+                            (rNisn && rNisn.length >= 8 ? studentMapByNisn.get(rNisn) : null) ||
+                            (rName ? studentMapByName.get(rName) : null);
+            const rTitle = r.title || r.competitionName || r.ruleName || r.prestasi || r.rewardName || "Apresiasi Prestasi";
+            const rReporter = r.reporterName || r.recordedBy || r.reporter || r.reporterTeacherName || "Guru";
+            return {
+              ...r,
+              studentId: student ? student.id : (r.studentId || ''),
+              studentName: student ? student.name : (r.studentName || ''),
+              studentClass: student ? student.class : (r.studentClass || ''),
+              studentNisn: student ? student.nisn : ((r as any).studentNisn || ''),
+              ruleName: rTitle,
+              competitionName: rTitle,
+              title: rTitle,
+              reporterName: rReporter,
+              recordedBy: rReporter,
+              reporterTeacherName: rReporter,
+              date: normalizeDateString(r.date)
+            };
+          });
+
+          const rewMap = new Map<string, any>();
+          existingRewards.forEach((r: any) => { if (r && r.id) rewMap.set(r.id, r); });
+          mappedRewards.forEach((r: any) => { if (r && r.id) rewMap.set(r.id, r); });
+
           cachedDb = {
             ...cachedDb,
             ...json.data,
-            violations: fetchedViolations.map((v: any) => {
-              const vNisn = (v.studentNisn ? String(v.studentNisn) : '').trim().toLowerCase();
-              const vName = String(v.studentName || '').toLowerCase().replace(/\s+/g, ' ').trim();
-              const student = (v.studentId ? studentMapById.get(String(v.studentId).trim()) : null) ||
-                              (vNisn && vNisn.length >= 8 ? studentMapByNisn.get(vNisn) : null) ||
-                              (vName ? studentMapByName.get(vName) : null);
-              const vRule = v.ruleName || v.pelanggaran || v.violationName || v.description || "Pelanggaran Tata Tertib";
-              const vReporter = v.reporterName || v.reporter || v.reporterTeacherName || "Guru Piket";
-              const vLocation = v.location || v.lokasi || "Lingkungan Sekolah";
-              return {
-                ...v,
-                studentId: student ? student.id : (v.studentId || ''),
-                studentName: student ? student.name : (v.studentName || ''),
-                studentClass: student ? student.class : (v.studentClass || ''),
-                studentNisn: student ? student.nisn : ((v as any).studentNisn || ''),
-                ruleName: vRule,
-                violationName: vRule,
-                pelanggaran: vRule,
-                reporterName: vReporter,
-                reporter: vReporter,
-                reporterTeacherName: vReporter,
-                location: vLocation,
-                lokasi: vLocation,
-                date: normalizeDateString(v.date)
-              };
-            }),
-            rewards: fetchedRewards.map((r: any) => {
-              const rNisn = (r.studentNisn ? String(r.studentNisn) : '').trim().toLowerCase();
-              const rName = String(r.studentName || '').toLowerCase().replace(/\s+/g, ' ').trim();
-              const student = (r.studentId ? studentMapById.get(String(r.studentId).trim()) : null) ||
-                              (rNisn && rNisn.length >= 8 ? studentMapByNisn.get(rNisn) : null) ||
-                              (rName ? studentMapByName.get(rName) : null);
-              const rTitle = r.title || r.competitionName || r.ruleName || r.prestasi || r.rewardName || "Apresiasi Prestasi";
-              const rReporter = r.reporterName || r.recordedBy || r.reporter || r.reporterTeacherName || "Guru";
-              return {
-                ...r,
-                studentId: student ? student.id : (r.studentId || ''),
-                studentName: student ? student.name : (r.studentName || ''),
-                studentClass: student ? student.class : (r.studentClass || ''),
-                studentNisn: student ? student.nisn : ((r as any).studentNisn || ''),
-                ruleName: rTitle,
-                competitionName: rTitle,
-                title: rTitle,
-                reporterName: rReporter,
-                recordedBy: rReporter,
-                reporterTeacherName: rReporter,
-                date: normalizeDateString(r.date)
-              };
-            }),
+            violations: Array.from(vioMap.values()),
+            rewards: Array.from(rewMap.values()),
             compensations: fetchedCompensations.map((c: any) => {
               const cNisn = (c.studentNisn ? String(c.studentNisn) : '').trim().toLowerCase();
               const cName = String(c.studentName || '').toLowerCase().replace(/\s+/g, ' ').trim();

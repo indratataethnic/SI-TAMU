@@ -748,8 +748,18 @@ export default function App() {
           reporterNip: v.reporterNip || (v as any).reporterTeacherNip
         };
       }), 'VIOL');
-      setViolations(mappedViolations);
-      saveViolations(mappedViolations);
+
+      const currentLocalViolations = loadViolations();
+      const vioMap = new Map<string, ViolationRecord>();
+      [...violations, ...currentLocalViolations].forEach(v => {
+        if (v && v.id) vioMap.set(v.id, v);
+      });
+      mappedViolations.forEach(v => {
+        if (v && v.id) vioMap.set(v.id, v);
+      });
+      const finalViolations = Array.from(vioMap.values());
+      setViolations(finalViolations);
+      saveViolations(finalViolations);
     }
     if (Array.isArray(imported.rewards)) {
       const mappedRewards = sanitizeRecords<RewardRecord>(imported.rewards.map(r => {
@@ -781,8 +791,18 @@ export default function App() {
           reporterNip: r.reporterNip || (r as any).reporterTeacherNip
         };
       }), 'REW');
-      setRewards(mappedRewards);
-      saveRewards(mappedRewards);
+
+      const currentLocalRewards = loadRewards();
+      const rewMap = new Map<string, RewardRecord>();
+      [...rewards, ...currentLocalRewards].forEach(r => {
+        if (r && r.id) rewMap.set(r.id, r);
+      });
+      mappedRewards.forEach(r => {
+        if (r && r.id) rewMap.set(r.id, r);
+      });
+      const finalRewards = Array.from(rewMap.values());
+      setRewards(finalRewards);
+      saveRewards(finalRewards);
     }
     if (Array.isArray(imported.compensations)) {
       const mappedCompensations = sanitizeRecords<CompensationRecord>(imported.compensations.map(c => {
@@ -1022,7 +1042,16 @@ export default function App() {
 
   const handleImportViolations = (importedViolations: ViolationRecord[]) => {
     lastLocalActionRef.current = Date.now();
-    const updated = [...importedViolations, ...violations];
+    lastLocalSaveTimestampRef.current = Date.now();
+    const currentViolations = loadViolations();
+    const existingMap = new Map<string, ViolationRecord>();
+    [...violations, ...currentViolations].forEach(v => {
+      if (v && v.id) existingMap.set(v.id, v);
+    });
+    importedViolations.forEach(v => {
+      if (v && v.id) existingMap.set(v.id, v);
+    });
+    const updated = Array.from(existingMap.values());
     setViolations(updated);
     saveViolations(updated);
     triggerSheetsSync({ violations: updated });
@@ -1031,6 +1060,7 @@ export default function App() {
   // Handlers for Rewards
   const handleSaveReward = (reward: RewardRecord) => {
     lastLocalActionRef.current = Date.now();
+    lastLocalSaveTimestampRef.current = Date.now();
     const finalTitle = String(reward.competitionName || reward.ruleName || (reward as any).title || (reward as any).prestasi || 'Prestasi Siswa').trim();
     const finalReporter = String(reward.reporterName || (reward as any).recordedBy || (reward as any).reporter || (reward as any).reporterTeacherName || 'Wali Kelas').trim();
 
@@ -1053,6 +1083,7 @@ export default function App() {
 
   const handleUpdateReward = (updatedReward: RewardRecord) => {
     lastLocalActionRef.current = Date.now();
+    lastLocalSaveTimestampRef.current = Date.now();
     const finalTitle = String(updatedReward.competitionName || updatedReward.ruleName || (updatedReward as any).title || (updatedReward as any).prestasi || 'Prestasi Siswa').trim();
     const finalReporter = String(updatedReward.reporterName || (updatedReward as any).recordedBy || (updatedReward as any).reporter || (updatedReward as any).reporterTeacherName || 'Wali Kelas').trim();
 
@@ -1075,6 +1106,7 @@ export default function App() {
 
   const handleDeleteReward = (id: string) => {
     lastLocalActionRef.current = Date.now();
+    lastLocalSaveTimestampRef.current = Date.now();
     const updated = rewards.filter(r => r.id !== id);
     setRewards(updated);
     saveRewards(updated);
@@ -1083,7 +1115,16 @@ export default function App() {
 
   const handleImportRewards = (importedRewards: RewardRecord[]) => {
     lastLocalActionRef.current = Date.now();
-    const updated = [...importedRewards, ...rewards];
+    lastLocalSaveTimestampRef.current = Date.now();
+    const currentRewards = loadRewards();
+    const existingMap = new Map<string, RewardRecord>();
+    [...rewards, ...currentRewards].forEach(r => {
+      if (r && r.id) existingMap.set(r.id, r);
+    });
+    importedRewards.forEach(r => {
+      if (r && r.id) existingMap.set(r.id, r);
+    });
+    const updated = Array.from(existingMap.values());
     setRewards(updated);
     saveRewards(updated);
     triggerSheetsSync({ rewards: updated });
