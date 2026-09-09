@@ -485,6 +485,8 @@ export default function App() {
     students?: Student[];
     teachers?: Teacher[];
     piketSchedules?: PiketSchedule[];
+    violationRules?: ViolationRule[];
+    rewardRules?: RewardRule[];
     violations?: ViolationRecord[];
     rewards?: RewardRecord[];
     compensations?: CompensationRecord[];
@@ -496,6 +498,8 @@ export default function App() {
     const studentsToSync = override?.students ?? students;
     const teachersToSync = override?.teachers ?? teachers;
     const piketSchedulesToSync = override?.piketSchedules ?? piketSchedules;
+    const violationRulesToSync = override?.violationRules ?? violationRules;
+    const rewardRulesToSync = override?.rewardRules ?? rewardRules;
     const violationsToSync = override?.violations ?? violations;
     const rewardsToSync = override?.rewards ?? rewards;
     const compensationsToSync = override?.compensations ?? compensations;
@@ -506,6 +510,8 @@ export default function App() {
       students: studentsToSync,
       teachers: teachersToSync,
       piketSchedules: piketSchedulesToSync,
+      violationRules: violationRulesToSync,
+      rewardRules: rewardRulesToSync,
       violations: violationsToSync,
       rewards: rewardsToSync,
       compensations: compensationsToSync,
@@ -538,7 +544,7 @@ export default function App() {
       teachersToSync,
       piketSchedulesToSync,
       settingsToSync,
-      violationRules
+      violationRulesToSync
     ).catch(err => console.log('Background sheets sync error:', err));
   };
 
@@ -1137,11 +1143,17 @@ export default function App() {
 
   // Rules Catalog Handlers
   const handleSaveViolationRules = (rules: ViolationRule[]) => {
+    lastLocalActionRef.current = Date.now();
     setViolationRules(rules);
+    saveViolationRules(rules);
+    triggerSheetsSync({ violationRules: rules });
   };
 
   const handleSaveRewardRules = (rules: RewardRule[]) => {
+    lastLocalActionRef.current = Date.now();
     setRewardRules(rules);
+    saveRewardRules(rules);
+    triggerSheetsSync({ rewardRules: rules });
   };
 
   // Role Switching & PIN

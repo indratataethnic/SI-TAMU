@@ -29,6 +29,7 @@ export const KelolaPoinView: React.FC<KelolaPoinViewProps> = ({
   onSaveRewardRules
 }) => {
   const [activeTab, setActiveTab] = useState<'pelanggaran' | 'reward'>('pelanggaran');
+  const [successToast, setSuccessToast] = useState<string | null>(null);
 
   // Modal state for Violation Rule
   const [violationModalOpen, setViolationModalOpen] = useState(false);
@@ -87,20 +88,26 @@ export const KelolaPoinView: React.FC<KelolaPoinViewProps> = ({
         r.id === editingViolation.id ? { ...editingViolation, ...violationForm } : r
       );
       onSaveViolationRules(updated);
+      setSuccessToast(`Aturan pelanggaran "${violationForm.name}" berhasil diperbarui dan disinkronkan ke sheet aturan_pelanggaran!`);
     } else {
       const newRule: ViolationRule = {
         id: `V-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         ...violationForm
       };
       onSaveViolationRules([...violationRules, newRule]);
+      setSuccessToast(`Aturan pelanggaran "${violationForm.name}" berhasil ditambahkan dan disinkronkan ke sheet aturan_pelanggaran!`);
     }
+    setTimeout(() => setSuccessToast(null), 5000);
     setViolationModalOpen(false);
   };
 
   // Delete violation rule
   const handleDeleteViolation = (id: string) => {
     if (window.confirm('Hapus jenis aturan pelanggaran ini dari katalog?')) {
+      const ruleToDelete = violationRules.find(r => r.id === id);
       onSaveViolationRules(violationRules.filter(r => r.id !== id));
+      setSuccessToast(`Aturan pelanggaran "${ruleToDelete?.name || ''}" telah dihapus dan disinkronkan ke sheet aturan_pelanggaran.`);
+      setTimeout(() => setSuccessToast(null), 5000);
     }
   };
 
@@ -140,13 +147,16 @@ export const KelolaPoinView: React.FC<KelolaPoinViewProps> = ({
         r.id === editingReward.id ? { ...editingReward, ...rewardForm } : r
       );
       onSaveRewardRules(updated);
+      setSuccessToast(`Aturan reward "${rewardForm.name}" berhasil diperbarui dan disinkronkan!`);
     } else {
       const newRule: RewardRule = {
         id: `REW-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         ...rewardForm
       };
       onSaveRewardRules([...rewardRules, newRule]);
+      setSuccessToast(`Aturan reward "${rewardForm.name}" berhasil ditambahkan dan disinkronkan!`);
     }
+    setTimeout(() => setSuccessToast(null), 5000);
     setRewardModalOpen(false);
   };
 
@@ -154,6 +164,8 @@ export const KelolaPoinView: React.FC<KelolaPoinViewProps> = ({
   const handleDeleteReward = (id: string) => {
     if (window.confirm('Hapus jenis aturan reward ini dari katalog?')) {
       onSaveRewardRules(rewardRules.filter(r => r.id !== id));
+      setSuccessToast('Aturan reward telah dihapus dan disinkronkan.');
+      setTimeout(() => setSuccessToast(null), 5000);
     }
   };
 
@@ -207,6 +219,22 @@ export const KelolaPoinView: React.FC<KelolaPoinViewProps> = ({
           )}
         </div>
       </div>
+
+      {/* Success Toast / Notification */}
+      {successToast && (
+        <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-3 rounded-xl flex items-center justify-between shadow-sm animate-fadeIn text-xs font-semibold">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{successToast}</span>
+          </div>
+          <button
+            onClick={() => setSuccessToast(null)}
+            className="text-emerald-700 hover:text-emerald-900 p-1 rounded transition cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 gap-4">

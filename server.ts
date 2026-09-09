@@ -285,7 +285,7 @@ app.post("/api/data", (req, res) => {
       }));
     }
 
-    // 4. Students, Teachers, Piket, Settings
+    // 4. Students, Teachers, Piket, Rules, Settings
     if (Array.isArray(incoming.students) && incoming.students.length > 0) {
       cachedDb.students = incoming.students;
     }
@@ -294,6 +294,12 @@ app.post("/api/data", (req, res) => {
     }
     if (Array.isArray(incoming.piketSchedules) && incoming.piketSchedules.length > 0) {
       cachedDb.piketSchedules = incoming.piketSchedules;
+    }
+    if (Array.isArray(incoming.violationRules) && incoming.violationRules.length > 0) {
+      cachedDb.violationRules = incoming.violationRules;
+    }
+    if (Array.isArray(incoming.rewardRules) && incoming.rewardRules.length > 0) {
+      cachedDb.rewardRules = incoming.rewardRules;
     }
     if (incoming.settings) {
       cachedDb.settings = { ...(cachedDb.settings || {}), ...incoming.settings };
@@ -590,6 +596,7 @@ async function checkSpreadsheetBackground() {
           v: fetchedViolations.map((v: any) => [v.id, v.studentId || v.studentName, v.points, v.date, v.ruleName || v.pelanggaran]),
           r: fetchedRewards.map((r: any) => [r.id, r.studentId || r.studentName, r.points, r.date, r.title || r.prestasi]),
           c: fetchedCompensations.map((c: any) => [c.id, c.studentId || c.studentName, c.status, c.deductedPoints || c.pointsReduced]),
+          vr: (json.data.violationRules || []).map((rule: any) => [rule.id, rule.code, rule.name, rule.points, rule.category]),
           sCount: json.data.students?.length || 0,
           tCount: json.data.teachers?.length || 0
         });

@@ -166,7 +166,7 @@ function setupAllSheets(ss) {
     { name: "Data_Siswa", color: "#064E3B" },
     { name: "Data_Guru", color: "#134E4A" },
     { name: "Jadwal_Piket", color: "#4338CA" },
-    { name: "Aturan_Pelanggaran", color: "#C2410C" },
+    { name: "aturan_pelanggaran", color: "#C2410C" },
     { name: "Data_Pelanggaran", color: "#881337" },
     { name: "Data_Reward", color: "#78350F" },
     { name: "Data_Kompensasi", color: "#1E3A8A" },
@@ -174,7 +174,8 @@ function setupAllSheets(ss) {
   ];
 
   sheets.forEach(function(s) {
-    var sheet = ss.getSheetByName(s.name);
+    var sheet = ss.getSheetByName(s.name) || 
+                (s.name === "aturan_pelanggaran" ? (ss.getSheetByName("Aturan_Pelanggaran") || ss.getSheetByName("Aturan Pelanggaran")) : null);
     if (!sheet) {
       sheet = ss.insertSheet(s.name);
     }
@@ -255,20 +256,27 @@ function writeTeachersSheet(ss, teachers) {
 }
 
 function writeRulesSheet(ss, violationRules) {
-  var sheet = ss.getSheetByName("Aturan_Pelanggaran") || ss.getSheetByName("Aturan Pelanggaran") || ss.insertSheet("Aturan_Pelanggaran");
-  var headers = ["ID Aturan", "Nama Pelanggaran / Aturan", "Kategori", "Bobot Poin", "Sanksi Default / Rekomendasi", "Status Aktif"];
+  var sheet = ss.getSheetByName("aturan_pelanggaran") || 
+              ss.getSheetByName("Aturan_Pelanggaran") || 
+              ss.getSheetByName("Aturan Pelanggaran") || 
+              ss.getSheetByName("Tata_Tertib") || 
+              ss.getSheetByName("Tata Tertib") || 
+              ss.getSheetByName("Aturan") || 
+              ss.insertSheet("aturan_pelanggaran");
+  var headers = ["Kode Aturan", "Nama Pelanggaran / Aturan", "Kategori", "Bobot Poin", "Sanksi Default / Rekomendasi", "Status Aktif", "ID Aturan"];
   formatHeaderRow(sheet, headers, "#C2410C");
 
   if (!violationRules || violationRules.length === 0) return;
 
   var rows = violationRules.map(function(r) {
     return [
-      r.id || "",
+      r.code || r.id || "",
       r.name || r.ruleName || "",
       r.category || "ringan",
       r.points || 0,
-      r.defaultSanction || r.sanction || "-",
-      r.isActive !== false ? "Aktif" : "Non-Aktif"
+      r.defaultSanction || r.description || r.sanction || "-",
+      r.isActive !== false ? "Aktif" : "Non-Aktif",
+      r.id || ""
     ];
   });
 
@@ -784,33 +792,41 @@ function fetchAllData(ss) {
     }
   }
 
-  // 3.8. Violation Rules (Aturan_Pelanggaran)
-  var ruleSheet = findSheet(["Aturan_Pelanggaran", "Aturan Pelanggaran", "Tata_Tertib", "Tata Tertib", "Aturan", "Kategori_Pelanggaran"], ["aturan", "tatib", "tertib", "rules"]);
+  // 3.8. Violation Rules (aturan_pelanggaran)
+  var ruleSheet = findSheet(["aturan_pelanggaran", "Aturan_Pelanggaran", "Aturan Pelanggaran", "Tata_Tertib", "Tata Tertib", "Aturan", "Kategori_Pelanggaran"], ["aturan", "tatib", "tertib", "rules", "pelanggaran"]);
   if (ruleSheet) {
     var values = ruleSheet.getDataRange().getValues();
     if (values && values.length > 1) {
       var headerRowIdx = 0;
       for (var r = 0; r < Math.min(values.length, 10); r++) {
         var rowText = values[r].map(function(c) { return String(c || "").toLowerCase().trim(); }).join(" ");
-        if (rowText.indexOf("aturan") !== -1 || rowText.indexOf("pelanggaran") !== -1 || rowText.indexOf("poin") !== -1 || rowText.indexOf("kategori") !== -1) {
+        if (rowText.indexOf("aturan") !== -1 || rowText.indexOf("pelanggaran") !== -1 || rowText.indexOf("poin") !== -1 || rowText.indexOf("kategori") !== -1 || rowText.indexOf("bobot") !== -1) {
           headerRowIdx = r;
           break;
         }
       }
 
       var headerRow = values[headerRowIdx].map(function(h) { return String(h || "").toLowerCase().trim(); });
-      var colRuleId = -1, colRuleName = -1, colRuleCat = -1, colRulePts = -1, colRuleSanction = -1, colRuleActive = -1;
+      var colRuleCode = -1, colRuleId = -1, colRuleName = -1, colRuleCat = -1, colRulePts = -1, colRuleSanction = -1, colRuleActive = -1;
       
       headerRow.forEach(function(h, idx) {
-        if (h === "id" || h.indexOf("kode") !== -1) colRuleId = idx;
+        if (h === "id" || h.indexOf("id aturan") !== -1 || h.indexOf("id_aturan") !== -1) colRuleId = idx;
+        else if (h.indexOf("kode") !== -1) colRuleCode = idx;
         else if (h.indexOf("nama") !== -1 || h.indexOf("aturan") !== -1 || h.indexOf("pelanggaran") !== -1 || h.indexOf("bentuk") !== -1 || h.indexOf("uraian") !== -1) colRuleName = idx;
         else if (h.indexOf("kategori") !== -1 || h.indexOf("tingkat") !== -1 || h.indexOf("jenis") !== -1) colRuleCat = idx;
         else if (h.indexOf("poin") !== -1 || h.indexOf("bobot") !== -1 || h.indexOf("skor") !== -1 || h.indexOf("nilai") !== -1) colRulePts = idx;
-        else if (h.indexOf("sanksi") !== -1 || h.indexOf("rekomendasi") !== -1 || h.indexOf("tindakan") !== -1 || h.indexOf("konsekuensi") !== -1) colRuleSanction = idx;
+        else if (h.indexOf("sanksi") !== -1 || h.indexOf("rekomendasi") !== -1 || h.indexOf("tindakan") !== -1 || h.indexOf("konsekuensi") !== -1 || h.indexOf("deskripsi") !== -1 || h.indexOf("keterangan") !== -1) colRuleSanction = idx;
         else if (h.indexOf("status") !== -1 || h.indexOf("aktif") !== -1) colRuleActive = idx;
       });
 
-      if (colRuleName === -1) colRuleName = 1;
+      if (colRuleName === -1) {
+        for (var c = 0; c < Math.min(values[headerRowIdx].length, 4); c++) {
+          if (c !== colRuleId && c !== colRuleCode && c !== colRulePts && c !== colRuleCat) {
+            colRuleName = c;
+            break;
+          }
+        }
+      }
 
       for (var i = headerRowIdx + 1; i < values.length; i++) {
         var row = values[i];
@@ -820,7 +836,8 @@ function fetchAllData(ss) {
         var rNameLow = rName.toLowerCase();
         if (rNameLow === "nama pelanggaran / aturan" || rNameLow === "pelanggaran" || rNameLow === "nama aturan" || rNameLow === "nama pelanggaran") continue;
 
-        var rId = colRuleId !== -1 && row[colRuleId] ? String(row[colRuleId]).trim() : ("rule_" + i);
+        var rId = colRuleId !== -1 && row[colRuleId] ? String(row[colRuleId]).trim() : ("V-" + i);
+        var rCode = colRuleCode !== -1 && row[colRuleCode] ? String(row[colRuleCode]).trim() : rId;
         var rCat = colRuleCat !== -1 && row[colRuleCat] ? String(row[colRuleCat]).trim().toLowerCase() : "ringan";
         var rPts = colRulePts !== -1 && row[colRulePts] !== undefined ? (Number(String(row[colRulePts]).replace(/[^0-9.-]/g, '')) || 10) : 10;
         var rSanc = colRuleSanction !== -1 && row[colRuleSanction] ? String(row[colRuleSanction]).trim() : "-";
@@ -828,9 +845,11 @@ function fetchAllData(ss) {
 
         data.violationRules.push({
           id: rId,
+          code: rCode,
           name: rName,
           category: rCat,
           points: rPts,
+          description: rSanc,
           defaultSanction: rSanc,
           isActive: rAct
         });
