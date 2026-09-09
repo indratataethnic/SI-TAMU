@@ -444,7 +444,7 @@ export const initialRewards: RewardRecord[] = [];
 
 export const initialCompensations: CompensationRecord[] = [];
 
-export const OFFICIAL_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbx6UobChbf4diPF4l2gMU_v1crUtGY4DEVSQTknBgnFJ2Ioe4zps1LU7ACiHLxEl_4/exec';
+export const OFFICIAL_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbyBJJxFH7yOZLtD1IB61Gfi9LvZc0MnpPc0FdV7GjdxIuCx4tRrOOfE5fD7FqyLwys/exec';
 
 export const initialSettings: SchoolSettings = {
   schoolName: '',

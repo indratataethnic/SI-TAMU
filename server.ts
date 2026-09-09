@@ -12,7 +12,7 @@ const CONFIG_DIR = path.join(process.cwd(), "data");
 const CONFIG_FILE = path.join(CONFIG_DIR, "global-config.json");
 const DB_FILE = path.join(CONFIG_DIR, "app-db.json");
 
-const DEFAULT_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbx6UobChbf4diPF4l2gMU_v1crUtGY4DEVSQTknBgnFJ2Ioe4zps1LU7ACiHLxEl_4/exec";
+const DEFAULT_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyBJJxFH7yOZLtD1IB61Gfi9LvZc0MnpPc0FdV7GjdxIuCx4tRrOOfE5fD7FqyLwys/exec";
 
 // Ensure data folder exists
 if (!fs.existsSync(CONFIG_DIR)) {
@@ -77,6 +77,7 @@ function normalizeDbRecords(db: any) {
     db.violations = db.violations.map((v: any) => {
       const vRule = v.ruleName || v.pelanggaran || v.violationName || v.description || "Pelanggaran Tata Tertib";
       const vReporter = v.reporterName || v.reporter || v.reporterTeacherName || "Guru Piket";
+      const vLocation = v.location || v.lokasi || "Lingkungan Sekolah";
       return {
         ...v,
         ruleName: vRule,
@@ -85,6 +86,8 @@ function normalizeDbRecords(db: any) {
         reporterName: vReporter,
         reporter: vReporter,
         reporterTeacherName: vReporter,
+        location: vLocation,
+        lokasi: vLocation,
         date: normalizeDateString(v.date)
       };
     });
@@ -247,10 +250,12 @@ app.post("/api/data", (req, res) => {
         incoming.violations.forEach((v: any) => {
           if (v && v.id) {
             const cleanId = String(v.id).trim();
+            const existingV = vMap.get(cleanId) || {};
             const vRule = v.ruleName || v.pelanggaran || v.violationName || v.description || "Pelanggaran Tata Tertib";
             const vReporter = v.reporterName || v.reporter || v.reporterTeacherName || "Guru Piket";
+            const vLocation = v.location || v.lokasi || existingV.location || existingV.lokasi || "Lingkungan Sekolah";
             vMap.set(cleanId, {
-              ...(vMap.get(cleanId) || {}),
+              ...existingV,
               ...v,
               ruleName: vRule,
               violationName: vRule,
@@ -258,6 +263,8 @@ app.post("/api/data", (req, res) => {
               reporterName: vReporter,
               reporter: vReporter,
               reporterTeacherName: vReporter,
+              location: vLocation,
+              lokasi: vLocation,
               date: normalizeDateString(v.date)
             });
           }

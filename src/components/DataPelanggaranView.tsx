@@ -16,6 +16,7 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
+  MapPin,
   X
 } from 'lucide-react';
 import { exportViolationsToExcel } from '../utils/excel';
@@ -90,6 +91,7 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
     const q = searchQuery.toLowerCase();
     const vRule = String(v.ruleName || (v as any).description || (v as any).pelanggaran || '').toLowerCase();
     const vReporter = String(v.reporterName || (v as any).reporter || '').toLowerCase();
+    const vLocation = String(v.location || (v as any).lokasi || '').toLowerCase();
     const vDesc = String(v.description || '').toLowerCase();
     const sName = String(v.studentName || '').toLowerCase();
 
@@ -97,6 +99,7 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
       sName.includes(q) ||
       vRule.includes(q) ||
       vReporter.includes(q) ||
+      vLocation.includes(q) ||
       vDesc.includes(q);
     return matchesCat && matchesCls && matchesSearch;
   });
@@ -268,8 +271,16 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
                           {v.category.toUpperCase()}
                         </span>
                       </td>
-                      <td className="py-3 px-4 font-medium text-slate-800 max-w-xs truncate" title={v.description || v.ruleName}>
-                        {v.ruleName || (v as any).description || (v as any).pelanggaran || 'Pelanggaran Tata Tertib'}
+                      <td className="py-3 px-4 font-medium text-slate-800 max-w-xs" title={v.description || v.ruleName}>
+                        <div className="font-semibold text-slate-900 leading-snug">
+                          {v.ruleName || (v as any).description || (v as any).pelanggaran || 'Pelanggaran Tata Tertib'}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/80 font-medium">
+                            <MapPin className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                            {v.location || (v as any).lokasi || 'Lingkungan Sekolah'}
+                          </span>
+                        </div>
                       </td>
                       <td className="py-3 px-4 text-center">
                         <span className="font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">

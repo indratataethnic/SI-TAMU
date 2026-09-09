@@ -1,4 +1,5 @@
 {
-  "googleSheetsWebhook": "https://script.google.com/macros/s/AKfycbx6UobChbf4diPF4l2gMU_v1crUtGY4DEVSQTknBgnFJ2Ioe4zps1LU7ACiHLxEl_4/exec",
-  "googleSheetsUrl": "https://docs.google.com/spreadsheets/d/1yWlVlC9-lP_X4lD-1bI6q2H9gU9vH8f7rZ3g9t3e5fA/edit"
+  "googleSheetsWebhook": "https://script.google.com/macros/s/AKfycbyBJJxFH7yOZLtD1IB61Gfi9LvZc0MnpPc0FdV7GjdxIuCx4tRrOOfE5fD7FqyLwys/exec",
+  "googleSheetsUrl": "https://docs.google.com/spreadsheets/d/1yWlVlC9-lP_X4lD-1bI6q2H9gU9vH8f7rZ3g9t3e5fA/edit",
+  "googleSheetsWebhookUrl": "https://script.google.com/macros/s/AKfycbyBJJxFH7yOZLtD1IB61Gfi9LvZc0MnpPc0FdV7GjdxIuCx4tRrOOfE5fD7FqyLwys/exec"
 }

@@ -648,6 +648,7 @@ export default function App() {
                         (v.studentName ? sNameMap.get(v.studentName.trim().toLowerCase()) : null);
         const vRule = v.ruleName || (v as any).pelanggaran || (v as any).violationName || (v as any).description || 'Pelanggaran Tata Tertib';
         const vReporter = v.reporterName || (v as any).reporter || (v as any).reporterTeacherName || 'Guru Piket';
+        const vLocation = v.location || (v as any).lokasi || 'Lingkungan Sekolah';
         const vDesc = v.description || vRule;
 
         return {
@@ -663,6 +664,8 @@ export default function App() {
           reporterName: vReporter,
           reporter: vReporter,
           reporterTeacherName: vReporter,
+          location: vLocation,
+          lokasi: vLocation,
           violationName: vRule,
           pelanggaran: vRule,
           reporterId: v.reporterId || (v as any).reporterTeacherId,
@@ -878,11 +881,15 @@ export default function App() {
     const finalReporter = String(violation.reporterName || (violation as any).reporter || (violation as any).reporterTeacherName || 'Guru Piket').trim();
     const finalDesc = String(violation.description || finalRule).trim();
 
+    const finalLocation = String(violation.location || (violation as any).lokasi || 'Lingkungan Sekolah').trim();
+
     const cleanViolation: ViolationRecord = {
       ...violation,
       date: normalizeRecordDate(violation.date),
       ruleName: finalRule,
       description: finalDesc,
+      location: finalLocation,
+      lokasi: finalLocation,
       reporterName: finalReporter,
       reporter: finalReporter,
       reporterTeacherName: finalReporter,
@@ -900,6 +907,7 @@ export default function App() {
     lastLocalActionRef.current = Date.now();
     const finalRule = String(updatedViolation.ruleName || (updatedViolation as any).pelanggaran || (updatedViolation as any).violationName || (updatedViolation as any).description || 'Pelanggaran Tata Tertib').trim();
     const finalReporter = String(updatedViolation.reporterName || (updatedViolation as any).reporter || (updatedViolation as any).reporterTeacherName || 'Guru Piket').trim();
+    const finalLocation = String(updatedViolation.location || (updatedViolation as any).lokasi || 'Lingkungan Sekolah').trim();
     const finalDesc = String(updatedViolation.description || finalRule).trim();
 
     const cleanViolation: ViolationRecord = {
@@ -907,6 +915,8 @@ export default function App() {
       date: normalizeRecordDate(updatedViolation.date),
       ruleName: finalRule,
       description: finalDesc,
+      location: finalLocation,
+      lokasi: finalLocation,
       reporterName: finalReporter,
       reporter: finalReporter,
       reporterTeacherName: finalReporter,

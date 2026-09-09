@@ -284,7 +284,7 @@ function writePiketSheet(ss, piketSchedules, teachers) {
 
 function writeViolationsSheet(ss, violations) {
   var sheet = ss.getSheetByName("Data_Pelanggaran") || ss.insertSheet("Data_Pelanggaran");
-  var headers = ["Tanggal", "NISN", "Nama Siswa", "Kelas", "Pelanggaran", "Kategori", "Poin Pelanggaran", "Guru Pelapor", "Nama Wali", "No HP Wali", "Keterangan", "Status Notifikasi WA", "ID Catatan"];
+  var headers = ["Tanggal", "NISN", "Nama Siswa", "Kelas", "Pelanggaran", "Kategori", "Poin Pelanggaran", "Guru Pelapor", "Lokasi Kejadian", "Nama Wali", "No HP Wali", "Keterangan", "Status Notifikasi WA", "ID Catatan"];
   formatHeaderRow(sheet, headers, "#881337");
 
   if (!violations || violations.length === 0) return;
@@ -299,6 +299,7 @@ function writeViolationsSheet(ss, violations) {
       v.category || "",
       v.points || 0,
       v.reporterTeacherName || v.reporterName || v.reporter || "",
+      v.location || v.lokasi || "Lingkungan Sekolah",
       v.parentName || "",
       "'" + (v.parentPhone || ""),
       v.note || v.description || "",
@@ -804,26 +805,80 @@ function fetchAllData(ss) {
   var violationSheet = ss.getSheetByName("Data_Pelanggaran") || ss.getSheetByName("Data Pelanggaran") || ss.getSheetByName("Pelanggaran");
   if (violationSheet) {
     var values = violationSheet.getDataRange().getValues();
-    for (var i = 1; i < values.length; i++) {
-      var row = values[i];
-      if (row[12] || row[1]) {
+    if (values && values.length > 1) {
+      var headerRow = values[0].map(function(h) { return String(h || "").toLowerCase().trim(); });
+      var colDate = -1, colNisn = -1, colName = -1, colClass = -1, colRule = -1, colCat = -1, colPts = -1, colReporter = -1, colLocation = -1, colParentName = -1, colParentPhone = -1, colNote = -1, colWa = -1, colId = -1;
+
+      headerRow.forEach(function(h, idx) {
+        if (h.indexOf("tanggal") !== -1 || h === "date") colDate = idx;
+        else if (h.indexOf("nisn") !== -1 || h === "nis") colNisn = idx;
+        else if (h.indexOf("siswa") !== -1 || h.indexOf("nama lengkap") !== -1) colName = idx;
+        else if (h.indexOf("kelas") !== -1 || h === "rombel") colClass = idx;
+        else if (h.indexOf("pelanggaran") !== -1 || h.indexOf("aturan") !== -1) colRule = idx;
+        else if (h.indexOf("kategori") !== -1) colCat = idx;
+        else if (h.indexOf("poin") !== -1 || h.indexOf("bobot") !== -1) colPts = idx;
+        else if (h.indexOf("pelapor") !== -1 || h.indexOf("pencatat") !== -1 || h.indexOf("guru") !== -1) colReporter = idx;
+        else if (h.indexOf("lokasi") !== -1 || h.indexOf("tempat") !== -1 || h.indexOf("ruang") !== -1 || h.indexOf("location") !== -1) colLocation = idx;
+        else if (h.indexOf("wali") !== -1 || h.indexOf("orang tua") !== -1 || h.indexOf("ortu") !== -1) colParentName = idx;
+        else if (h.indexOf("hp") !== -1 || h.indexOf("telepon") !== -1 || h.indexOf("wa") !== -1 || h.indexOf("kontak") !== -1) colParentPhone = idx;
+        else if (h.indexOf("keterangan") !== -1 || h.indexOf("catatan") !== -1 || h.indexOf("deskripsi") !== -1) colNote = idx;
+        else if (h.indexOf("status") !== -1 || h.indexOf("notifikasi") !== -1) colWa = idx;
+        else if (h.indexOf("id catatan") !== -1 || h === "id") colId = idx;
+      });
+
+      for (var i = 1; i < values.length; i++) {
+        var row = values[i];
+        if (!row || row.length === 0) continue;
+
+        var rawNisn = colNisn !== -1 && row[colNisn] !== undefined ? String(row[colNisn]).replace(/^'/, '').trim() : (row[1] ? String(row[1]).replace(/^'/, '').trim() : "");
+        var rawName = colName !== -1 && row[colName] !== undefined ? String(row[colName]).trim() : (row[2] ? String(row[2]).trim() : "");
+        var rawId = colId !== -1 && row[colId] ? String(row[colId]).trim() : (row[13] || row[12] ? String(row[13] || row[12]).trim() : ("violation_" + i));
+
+        if (!rawNisn && !rawName && !rawId) continue;
+
+        var rawRule = colRule !== -1 && row[colRule] ? String(row[colRule]).trim() : (row[4] ? String(row[4]).trim() : "Pelanggaran Tata Tertib");
+        var rawCategory = colCat !== -1 && row[colCat] ? String(row[colCat]).trim().toLowerCase() : (row[5] ? String(row[5]).trim().toLowerCase() : "ringan");
+        var rawPoints = colPts !== -1 && row[colPts] !== undefined ? (Number(row[colPts]) || 0) : (Number(row[6]) || 0);
+        var rawReporter = colReporter !== -1 && row[colReporter] ? String(row[colReporter]).trim() : (row[7] ? String(row[7]).trim() : "Guru Piket");
+        
+        var rawLocation = "";
+        if (colLocation !== -1 && row[colLocation]) {
+          rawLocation = String(row[colLocation]).trim();
+        } else if (row.length >= 14 && row[8] && !/^\d{9,}/.test(String(row[8])) && String(row[8]).indexOf("08") !== 0) {
+          rawLocation = String(row[8]).trim();
+        } else {
+          rawLocation = "Lingkungan Sekolah";
+        }
+
+        var rawParentName = colParentName !== -1 && row[colParentName] ? String(row[colParentName]).trim() : (colLocation !== -1 ? (row[9] ? String(row[9]).trim() : "") : (row[8] ? String(row[8]).trim() : ""));
+        var rawParentPhone = colParentPhone !== -1 && row[colParentPhone] ? String(row[colParentPhone]).replace(/^'/, '').trim() : (colLocation !== -1 ? (row[10] ? String(row[10]).replace(/^'/, '').trim() : "") : (row[9] ? String(row[9]).replace(/^'/, '').trim() : ""));
+        var rawDesc = colNote !== -1 && row[colNote] ? String(row[colNote]).trim() : (colLocation !== -1 ? (row[11] ? String(row[11]).trim() : rawRule) : (row[10] ? String(row[10]).trim() : rawRule));
+        var rawWa = colWa !== -1 ? (row[colWa] === "Sudah Terkirim" || row[colWa] === true) : (colLocation !== -1 ? row[12] === "Sudah Terkirim" : row[11] === "Sudah Terkirim");
+
         data.violations.push({
-          id: row[12] ? String(row[12]) : ("violation_" + i),
+          id: rawId,
           studentId: "",
-          studentNisn: String(row[1]),
-          studentName: String(row[2]),
-          studentClass: String(row[3]),
-          ruleName: String(row[4]),
-          category: String(row[5]),
-          points: Number(row[6]) || 0,
-          reporterName: String(row[7]),
-          parentName: String(row[8]),
-          parentPhone: String(row[9]),
-          description: String(row[10] || ""),
-          whatsappSent: row[11] === "Sudah Terkirim",
-          academicYear: row[13] ? String(row[13]) : "2026/2027",
-          date: String(row[0]),
-          createdAt: row[14] ? String(row[14]) : new Date().toISOString()
+          studentNisn: rawNisn,
+          studentName: rawName,
+          studentClass: colClass !== -1 && row[colClass] ? String(row[colClass]).trim() : (row[3] ? String(row[3]).trim() : ""),
+          ruleName: rawRule,
+          violationName: rawRule,
+          pelanggaran: rawRule,
+          category: rawCategory || "ringan",
+          points: rawPoints,
+          reporterName: rawReporter,
+          reporter: rawReporter,
+          reporterTeacherName: rawReporter,
+          location: rawLocation || "Lingkungan Sekolah",
+          lokasi: rawLocation || "Lingkungan Sekolah",
+          parentName: rawParentName,
+          parentPhone: rawParentPhone,
+          description: rawDesc || rawRule,
+          note: rawDesc || rawRule,
+          whatsappSent: rawWa,
+          academicYear: "2026/2027",
+          date: colDate !== -1 && row[colDate] ? String(row[colDate]).trim() : (row[0] ? String(row[0]).trim() : ""),
+          createdAt: new Date().toISOString()
         });
       }
     }
@@ -979,6 +1034,7 @@ export const syncAllToGoogleSheets = async (
       const student = studentMap.get(v.studentId) || (payload.students || []).find((s: any) => s.nisn === (v as any).studentNisn || s.name === v.studentName);
       const vRule = String(v.ruleName || (v as any).violationName || (v as any).pelanggaran || (v as any).description || 'Pelanggaran Tata Tertib').trim();
       const vReporter = String(v.reporterName || (v as any).reporter || (v as any).reporterTeacherName || 'Guru Piket').trim();
+      const vLocation = String(v.location || (v as any).lokasi || 'Lingkungan Sekolah').trim();
       const vDesc = String(v.description || vRule).trim();
 
       return {
@@ -990,6 +1046,8 @@ export const syncAllToGoogleSheets = async (
         violationName: vRule,
         pelanggaran: vRule,
         description: vDesc,
+        location: vLocation,
+        lokasi: vLocation,
         reporter: vReporter,
         reporterName: vReporter,
         reporterTeacherName: vReporter,
