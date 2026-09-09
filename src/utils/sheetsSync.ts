@@ -962,25 +962,34 @@ function fetchAllData(ss) {
   var rewardSheet = ss.getSheetByName("Data_Reward") || ss.getSheetByName("Data Reward") || ss.getSheetByName("Reward") || ss.getSheetByName("Prestasi");
   if (rewardSheet) {
     var values = rewardSheet.getDataRange().getValues();
-    for (var i = 1; i < values.length; i++) {
-      var row = values[i];
-      if (row[11] || row[1]) {
+    if (values && values.length > 1) {
+      for (var i = 1; i < values.length; i++) {
+        var row = values[i];
+        if (!row || row.length < 2) continue;
+        var rDate = String(row[0] || "").trim();
+        var rNisn = String(row[1] || "").replace(/^'/, '').trim();
+        var rName = String(row[2] || "").trim();
+        if (!rDate && !rNisn && !rName) continue;
+        if (rName.toLowerCase().indexOf("nama siswa") !== -1 || rNisn.toLowerCase() === "nisn") continue;
+
         data.rewards.push({
-          id: row[11] ? String(row[11]) : ("reward_" + i),
+          id: row[11] ? String(row[11]).trim() : ("reward_" + i),
           studentId: "",
-          studentNisn: String(row[1]),
-          studentName: String(row[2]),
-          studentClass: String(row[3]),
-          competitionName: String(row[4]),
-          level: String(row[5]),
-          rank: String(row[6]),
+          studentNisn: rNisn,
+          studentName: rName,
+          studentClass: String(row[3] || "").trim(),
+          competitionName: String(row[4] || "").trim(),
+          title: String(row[4] || "").trim(),
+          level: String(row[5] || "").trim(),
+          rank: String(row[6] || "").trim(),
           points: Number(row[7]) || 0,
-          organizer: String(row[8]),
-          reporterName: String(row[9]),
-          notes: String(row[10] || ""),
-          academicYear: row[12] ? String(row[12]) : "2026/2027",
-          date: String(row[0]),
-          createdAt: row[13] ? String(row[13]) : new Date().toISOString()
+          organizer: String(row[8] || "").trim(),
+          reporterName: String(row[9] || "").trim(),
+          recordedBy: String(row[9] || "").trim(),
+          notes: String(row[10] || "").trim(),
+          academicYear: "2026/2027",
+          date: rDate,
+          createdAt: new Date().toISOString()
         });
       }
     }
@@ -990,23 +999,33 @@ function fetchAllData(ss) {
   var compensationSheet = ss.getSheetByName("Data_Kompensasi") || ss.getSheetByName("Data Kompensasi") || ss.getSheetByName("Kompensasi");
   if (compensationSheet) {
     var values = compensationSheet.getDataRange().getValues();
-    for (var i = 1; i < values.length; i++) {
-      var row = values[i];
-      if (row[9] || row[1]) {
+    if (values && values.length > 1) {
+      for (var i = 1; i < values.length; i++) {
+        var row = values[i];
+        if (!row || row.length < 2) continue;
+        var cDate = String(row[0] || "").trim();
+        var cNisn = String(row[1] || "").replace(/^'/, '').trim();
+        var cName = String(row[2] || "").trim();
+        if (!cDate && !cNisn && !cName) continue;
+        if (cName.toLowerCase().indexOf("nama siswa") !== -1 || cNisn.toLowerCase() === "nisn") continue;
+
         data.compensations.push({
-          id: row[9] ? String(row[9]) : ("compensation_" + i),
+          id: row[9] ? String(row[9]).trim() : ("compensation_" + i),
           studentId: "",
-          studentNisn: String(row[1]),
-          studentName: String(row[2]),
-          studentClass: String(row[3]),
-          taskName: String(row[4]),
+          studentNisn: cNisn,
+          studentName: cName,
+          studentClass: String(row[3] || "").trim(),
+          actionType: String(row[4] || "").trim(),
+          taskName: String(row[4] || "").trim(),
+          pointsReduced: Number(row[5]) || 0,
           deductedPoints: Number(row[5]) || 0,
-          status: String(row[6] || "Disetujui"),
-          supervisorName: String(row[7]),
-          notes: String(row[8] || ""),
-          academicYear: row[10] ? String(row[10]) : "2026/2027",
-          date: String(row[0]),
-          createdAt: row[11] ? String(row[11]) : new Date().toISOString()
+          status: String(row[6] || "selesai").trim(),
+          supervisorTeacherName: String(row[7] || "").trim(),
+          supervisorName: String(row[7] || "").trim(),
+          notes: String(row[8] || "").trim(),
+          academicYear: "2026/2027",
+          date: cDate,
+          createdAt: new Date().toISOString()
         });
       }
     }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { RewardRecord, Student, SchoolSettings, Teacher, RewardRule } from '../types';
 import {
   Award,
@@ -12,11 +12,12 @@ import {
   Eye,
   Pencil,
   FileSpreadsheet,
+  Upload,
   Sparkles,
   CheckCircle2,
   X
 } from 'lucide-react';
-import { exportRewardsToExcel } from '../utils/excel';
+import { exportRewardsToExcel, downloadRewardTemplate, importRewardsFromExcel } from '../utils/excel';
 import { openWhatsApp, generateRewardWAMessage } from '../utils/whatsapp';
 import { EditRewardModal } from './EditRewardModal';
 
@@ -28,6 +29,7 @@ interface DataRewardViewProps {
   settings: SchoolSettings;
   onDeleteReward: (id: string) => void;
   onUpdateReward: (updated: RewardRecord) => void;
+  onImportRewards?: (imported: RewardRecord[]) => void;
   onNavigateToInput: () => void;
   onOpenSertifikat: (reward: RewardRecord) => void;
 }
@@ -40,6 +42,7 @@ export const DataRewardView: React.FC<DataRewardViewProps> = ({
   settings,
   onDeleteReward,
   onUpdateReward,
+  onImportRewards,
   onNavigateToInput,
   onOpenSertifikat
 }) => {
@@ -48,6 +51,27 @@ export const DataRewardView: React.FC<DataRewardViewProps> = ({
   const [selectedClass, setSelectedClass] = useState('ALL');
   const [editingRecord, setEditingRecord] = useState<RewardRecord | null>(null);
   const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setNotificationStatus('Membaca dan memproses file Excel reward/prestasi...');
+      const imported = await importRewardsFromExcel(file, students);
+      if (onImportRewards) {
+        onImportRewards(imported);
+      }
+      setNotificationStatus(`Berhasil mengimpor ${imported.length} data reward/prestasi!`);
+      setTimeout(() => setNotificationStatus(null), 5000);
+    } catch (err: any) {
+      alert(err?.message || 'Gagal mengimpor file Excel reward.');
+      setNotificationStatus(null);
+    } finally {
+      if (e.target) e.target.value = '';
+    }
+  };
 
   const studentMap = new Map<string, Student>(students.map(s => [s.id, s]));
   const levelsList = ['ALL', 'Nasional', 'Provinsi', 'Kota/Kab', 'Sekolah', 'Umum'];
@@ -93,12 +117,37 @@ export const DataRewardView: React.FC<DataRewardViewProps> = ({
 
         <div className="flex flex-wrap items-center gap-2">
           <button
+            onClick={downloadRewardTemplate}
+            title="Unduh Format Excel Template Import Reward"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 text-slate-500" />
+            Template Excel
+          </button>
+
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-semibold transition cursor-pointer"
+          >
+            <Upload className="w-3.5 h-3.5 text-amber-600" />
+            Import Excel
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImportFile}
+            accept=".xlsx, .xls, .csv"
+            className="hidden"
+          />
+
+          <button
             onClick={() => exportRewardsToExcel(rewards)}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <FileSpreadsheet className="w-3.5 h-3.5 text-slate-600" />
             Export Excel
           </button>
+
           <button
             onClick={onNavigateToInput}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-emerald-950 rounded-xl text-xs font-bold transition shadow cursor-pointer"

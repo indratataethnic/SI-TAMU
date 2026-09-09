@@ -1020,6 +1020,14 @@ export default function App() {
     triggerSheetsSync({ violations: updated });
   };
 
+  const handleImportViolations = (importedViolations: ViolationRecord[]) => {
+    lastLocalActionRef.current = Date.now();
+    const updated = [...importedViolations, ...violations];
+    setViolations(updated);
+    saveViolations(updated);
+    triggerSheetsSync({ violations: updated });
+  };
+
   // Handlers for Rewards
   const handleSaveReward = (reward: RewardRecord) => {
     lastLocalActionRef.current = Date.now();
@@ -1068,6 +1076,14 @@ export default function App() {
   const handleDeleteReward = (id: string) => {
     lastLocalActionRef.current = Date.now();
     const updated = rewards.filter(r => r.id !== id);
+    setRewards(updated);
+    saveRewards(updated);
+    triggerSheetsSync({ rewards: updated });
+  };
+
+  const handleImportRewards = (importedRewards: RewardRecord[]) => {
+    lastLocalActionRef.current = Date.now();
+    const updated = [...importedRewards, ...rewards];
     setRewards(updated);
     saveRewards(updated);
     triggerSheetsSync({ rewards: updated });
@@ -1295,6 +1311,7 @@ export default function App() {
               settings={settings}
               onDeleteViolation={handleDeleteViolation}
               onUpdateViolation={handleUpdateViolation}
+              onImportViolations={handleImportViolations}
               onNavigateToInput={() => setCurrentTab('input_pelanggaran')}
               onOpenSurat={(sum) => handleOpenSuratModal(sum, 'panggilan_100')}
             />
@@ -1309,6 +1326,7 @@ export default function App() {
               settings={settings}
               onDeleteReward={handleDeleteReward}
               onUpdateReward={handleUpdateReward}
+              onImportRewards={handleImportRewards}
               onNavigateToInput={() => setCurrentTab('input_reward')}
               onOpenSertifikat={handleOpenSertifikatModal}
             />

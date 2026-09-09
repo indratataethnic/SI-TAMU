@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { Student, ViolationRecord, RewardRecord, StudentScoreSummary } from '../types';
+import { Student, ViolationRecord, RewardRecord, StudentScoreSummary, ViolationRule, ViolationCategoryType } from '../types';
 
 export const downloadStudentTemplate = () => {
   const templateData = [
@@ -424,3 +424,393 @@ export const importStudentsFromExcel = async (file: File): Promise<Student[]> =>
     reader.readAsArrayBuffer(file);
   });
 };
+
+export const downloadViolationTemplate = () => {
+  const templateData = [
+    {
+      'Tanggal (YYYY-MM-DD)': new Date().toISOString().slice(0, 10),
+      'NISN Siswa': '0089123410',
+      'Nama Siswa': 'Contoh Siswa',
+      'Kelas': 'Kelas 1',
+      'Jenis Pelanggaran': 'Datang terlambat ke sekolah (>15 menit)',
+      'Kategori (ringan/sedang/berat/khusus)': 'ringan',
+      'Bobot Poin': 5,
+      'Lokasi Kejadian': 'Gerbang Depan Sekolah',
+      'Guru Pencatat / Saksi': 'Dra. Siti Rahmah, M.Pd.',
+      'Catatan / Kronologi': 'Terlambat 20 menit karena ban sepeda bocor.'
+    },
+    {
+      'Tanggal (YYYY-MM-DD)': new Date().toISOString().slice(0, 10),
+      'NISN Siswa': '0089123411',
+      'Nama Siswa': 'Contoh Siswi',
+      'Kelas': 'Kelas 2',
+      'Jenis Pelanggaran': 'Tidak memakai seragam sesuai jadwal',
+      'Kategori (ringan/sedang/berat/khusus)': 'ringan',
+      'Bobot Poin': 5,
+      'Lokasi Kejadian': 'Ruang Kelas',
+      'Guru Pencatat / Saksi': 'Bambang Subagyo, S.Pd.',
+      'Catatan / Kronologi': 'Memakai sepatu putih pada hari Senin.'
+    }
+  ];
+
+  const ws = XLSX.utils.json_to_sheet(templateData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Template_Pelanggaran');
+  XLSX.writeFile(wb, 'Template_Import_Pelanggaran_SITAMU.xlsx');
+};
+
+export const importViolationsFromExcel = async (
+  file: File,
+  students: Student[],
+  violationRules: ViolationRule[] = []
+): Promise<ViolationRecord[]> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+        if (!rows || rows.length === 0) {
+          throw new Error('File excel kosong atau format tidak sesuai.');
+        }
+
+        let headerRowIdx = -1;
+        for (let i = 0; i < Math.min(rows.length, 15); i++) {
+          const rowStr = (rows[i] || []).map(c => String(c || '').toLowerCase().trim()).join(' ');
+          if (rowStr.includes('nisn') || rowStr.includes('nama') || rowStr.includes('pelanggaran') || rowStr.includes('aturan') || rowStr.includes('poin') || rowStr.includes('tanggal')) {
+            headerRowIdx = i;
+            break;
+          }
+        }
+
+        let colDate = -1;
+        let colNisn = -1;
+        let colName = -1;
+        let colClass = -1;
+        let colRule = -1;
+        let colCategory = -1;
+        let colPoints = -1;
+        let colLocation = -1;
+        let colReporter = -1;
+        let colDescription = -1;
+
+        if (headerRowIdx !== -1) {
+          const headers = (rows[headerRowIdx] || []).map(c => String(c || '').toLowerCase().trim());
+          headers.forEach((h, idx) => {
+            if (!h) return;
+            if (h.includes('tanggal') || h.includes('date') || h === 'tgl') {
+              colDate = idx;
+            } else if (h.includes('nisn') || h === 'nis') {
+              colNisn = idx;
+            } else if ((h.includes('nama siswa') || h === 'nama' || h.includes('murid')) && !h.includes('guru') && !h.includes('saksi') && !h.includes('pencatat')) {
+              colName = idx;
+            } else if (h.includes('kelas') || h.includes('rombel')) {
+              colClass = idx;
+            } else if (h.includes('pelanggaran') || h.includes('aturan') || h.includes('jenis') || h.includes('nama pelanggaran')) {
+              colRule = idx;
+            } else if (h.includes('kategori') || h.includes('tingkat')) {
+              colCategory = idx;
+            } else if (h.includes('poin') || h.includes('bobot') || h.includes('skor')) {
+              colPoints = idx;
+            } else if (h.includes('lokasi') || h.includes('tempat')) {
+              colLocation = idx;
+            } else if (h.includes('guru') || h.includes('pencatat') || h.includes('saksi') || h.includes('pelapor')) {
+              colReporter = idx;
+            } else if (h.includes('catatan') || h.includes('kronologi') || h.includes('keterangan') || h.includes('deskripsi')) {
+              colDescription = idx;
+            }
+          });
+        }
+
+        const dataRows = headerRowIdx !== -1 ? rows.slice(headerRowIdx + 1) : rows;
+
+        const studentByNisnMap = new Map<string, Student>();
+        const studentByNameMap = new Map<string, Student>();
+        students.forEach(s => {
+          if (s.nisn) studentByNisnMap.set(String(s.nisn).trim().toLowerCase(), s);
+          if (s.name) studentByNameMap.set(String(s.name).trim().toLowerCase(), s);
+        });
+
+        const parsedViolations: ViolationRecord[] = [];
+
+        dataRows.forEach((row, index) => {
+          if (!row || row.length === 0) return;
+
+          const dateRaw = colDate !== -1 && row[colDate] !== undefined ? String(row[colDate]).trim() : '';
+          const nisnRaw = colNisn !== -1 && row[colNisn] !== undefined ? String(row[colNisn]).replace(/^'/, '').trim() : '';
+          const nameRaw = colName !== -1 && row[colName] !== undefined ? String(row[colName]).trim() : '';
+          const ruleRaw = colRule !== -1 && row[colRule] !== undefined ? String(row[colRule]).trim() : '';
+
+          if (!nisnRaw && !nameRaw && !ruleRaw) return;
+          if (nameRaw.toLowerCase().includes('nama siswa') || ruleRaw.toLowerCase().includes('jenis pelanggaran')) return;
+
+          // Find student match
+          let student = (nisnRaw ? studentByNisnMap.get(nisnRaw.toLowerCase()) : undefined) ||
+                        (nameRaw ? studentByNameMap.get(nameRaw.toLowerCase()) : undefined);
+
+          const studentName = student ? student.name : (nameRaw || 'Siswa');
+          const studentClass = student ? student.class : (colClass !== -1 && row[colClass] ? String(row[colClass]).trim() : 'Kelas 1');
+          const studentId = student ? student.id : (`STU-${nisnRaw || nameRaw.replace(/\s+/g, '_')}`);
+
+          // Match violation rule or fallback
+          let ruleName = ruleRaw || 'Pelanggaran Tata Tertib';
+          let categoryRaw = colCategory !== -1 && row[colCategory] ? String(row[colCategory]).trim().toLowerCase() : '';
+          let pointsRaw = colPoints !== -1 && row[colPoints] !== undefined ? Number(row[colPoints]) : NaN;
+
+          const matchedRule = violationRules.find(r =>
+            r.name.toLowerCase() === ruleName.toLowerCase() || ruleName.toLowerCase().includes(r.name.toLowerCase())
+          );
+
+          if (matchedRule) {
+            if (!categoryRaw) categoryRaw = matchedRule.category;
+            if (isNaN(pointsRaw)) pointsRaw = matchedRule.points;
+          }
+
+          let category: ViolationCategoryType = 'ringan';
+          if (categoryRaw.includes('berat')) category = 'berat';
+          else if (categoryRaw.includes('sedang')) category = 'sedang';
+          else if (categoryRaw.includes('khusus')) category = 'khusus';
+
+          if (isNaN(pointsRaw) || pointsRaw <= 0) {
+            pointsRaw = category === 'berat' ? 25 : category === 'sedang' ? 10 : 5;
+          }
+
+          const location = colLocation !== -1 && row[colLocation] ? String(row[colLocation]).trim() : 'Lingkungan Sekolah';
+          const reporterName = colReporter !== -1 && row[colReporter] ? String(row[colReporter]).trim() : 'Guru Piket';
+          const description = colDescription !== -1 && row[colDescription] ? String(row[colDescription]).trim() : ruleName;
+
+          let validDate = dateRaw;
+          if (!validDate || !/^\d{4}-\d{2}-\d{2}$/.test(validDate)) {
+            validDate = new Date().toISOString().slice(0, 10);
+          }
+
+          parsedViolations.push({
+            id: `VIO-IMP-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 6)}`,
+            studentId,
+            studentName,
+            studentClass,
+            ruleId: matchedRule ? matchedRule.id : `rule_${Date.now()}`,
+            ruleName,
+            category,
+            points: pointsRaw,
+            date: validDate,
+            location,
+            reporterName,
+            description,
+            whatsappSent: false,
+            createdAt: new Date().toISOString()
+          });
+        });
+
+        if (parsedViolations.length === 0) {
+          throw new Error('Tidak ada data pelanggaran yang valid ditemukan dalam file.');
+        }
+
+        resolve(parsedViolations);
+      } catch (err: any) {
+        reject(new Error(err?.message || 'Gagal membaca file Excel pelanggaran.'));
+      }
+    };
+
+    reader.onerror = () => reject(new Error('Gagal membuka file.'));
+    reader.readAsArrayBuffer(file);
+  });
+};
+
+export const downloadRewardTemplate = () => {
+  const templateData = [
+    {
+      'Tanggal (YYYY-MM-DD)': new Date().toISOString().slice(0, 10),
+      'NISN Siswa': '0089123410',
+      'Nama Siswa': 'Contoh Siswa',
+      'Kelas': 'Kelas 1',
+      'Nama Kejuaraan / Prestasi': 'Olimpiade Matematika Tingkat Kabupaten',
+      'Tingkat (Nasional/Provinsi/Kota/Kab/Sekolah/Umum)': 'Kota/Kab',
+      'Capaian / Peringkat (Juara I/II/III/Peserta/Apresiasi)': 'Juara I',
+      'Bobot Poin': 15,
+      'Penyelenggara': 'Dinas Pendidikan Kabupaten',
+      'No. Sertifikat / Piagam': '421/089/SERT/2026',
+      'Guru Pembina / Pelapor': 'Ahmad Fauzi, M.Pd.',
+      'Catatan': 'Meraih medali emas kategori SD/MI.'
+    },
+    {
+      'Tanggal (YYYY-MM-DD)': new Date().toISOString().slice(0, 10),
+      'NISN Siswa': '0089123411',
+      'Nama Siswa': 'Contoh Siswi',
+      'Kelas': 'Kelas 2',
+      'Nama Kejuaraan / Prestasi': 'Lomba Dokter Kecil Sekolah',
+      'Tingkat (Nasional/Provinsi/Kota/Kab/Sekolah/Umum)': 'Sekolah',
+      'Capaian / Peringkat (Juara I/II/III/Peserta/Apresiasi)': 'Juara II',
+      'Bobot Poin': 10,
+      'Penyelenggara': 'Puskesmas Kecamatan',
+      'No. Sertifikat / Piagam': '421/090/SERT/2026',
+      'Guru Pembina / Pelapor': 'Siti Rahmah, S.Pd.',
+      'Catatan': 'Aktif dalam kegiatan UKS.'
+    }
+  ];
+
+  const ws = XLSX.utils.json_to_sheet(templateData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Template_Reward');
+  XLSX.writeFile(wb, 'Template_Import_Reward_SITAMU.xlsx');
+};
+
+export const importRewardsFromExcel = async (
+  file: File,
+  students: Student[]
+): Promise<RewardRecord[]> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+        if (!rows || rows.length === 0) {
+          throw new Error('File excel kosong atau format tidak sesuai.');
+        }
+
+        let headerRowIdx = -1;
+        for (let i = 0; i < Math.min(rows.length, 15); i++) {
+          const rowStr = (rows[i] || []).map(c => String(c || '').toLowerCase().trim()).join(' ');
+          if (rowStr.includes('nisn') || rowStr.includes('nama') || rowStr.includes('prestasi') || rowStr.includes('kejuaraan') || rowStr.includes('poin') || rowStr.includes('tanggal')) {
+            headerRowIdx = i;
+            break;
+          }
+        }
+
+        let colDate = -1;
+        let colNisn = -1;
+        let colName = -1;
+        let colClass = -1;
+        let colCompetition = -1;
+        let colLevel = -1;
+        let colRank = -1;
+        let colPoints = -1;
+        let colOrganizer = -1;
+        let colCertNumber = -1;
+        let colReporter = -1;
+        let colNotes = -1;
+
+        if (headerRowIdx !== -1) {
+          const headers = (rows[headerRowIdx] || []).map(c => String(c || '').toLowerCase().trim());
+          headers.forEach((h, idx) => {
+            if (!h) return;
+            if (h.includes('tanggal') || h.includes('date') || h === 'tgl') {
+              colDate = idx;
+            } else if (h.includes('nisn') || h === 'nis') {
+              colNisn = idx;
+            } else if ((h.includes('nama siswa') || h === 'nama' || h.includes('murid')) && !h.includes('guru') && !h.includes('pembina') && !h.includes('pelapor')) {
+              colName = idx;
+            } else if (h.includes('kelas') || h.includes('rombel')) {
+              colClass = idx;
+            } else if (h.includes('kejuaraan') || h.includes('prestasi') || h.includes('lomba') || h.includes('capaian')) {
+              colCompetition = idx;
+            } else if (h.includes('tingkat') || h.includes('level')) {
+              colLevel = idx;
+            } else if (h.includes('peringkat') || h.includes('juara') || h.includes('rank')) {
+              colRank = idx;
+            } else if (h.includes('poin') || h.includes('bobot') || h.includes('skor')) {
+              colPoints = idx;
+            } else if (h.includes('penyelenggara') || h.includes('organizer')) {
+              colOrganizer = idx;
+            } else if (h.includes('sertifikat') || h.includes('piagam') || h.includes('no.')) {
+              colCertNumber = idx;
+            } else if (h.includes('guru') || h.includes('pembina') || h.includes('pelapor')) {
+              colReporter = idx;
+            } else if (h.includes('catatan') || h.includes('keterangan') || h.includes('notes')) {
+              colNotes = idx;
+            }
+          });
+        }
+
+        const dataRows = headerRowIdx !== -1 ? rows.slice(headerRowIdx + 1) : rows;
+
+        const studentByNisnMap = new Map<string, Student>();
+        const studentByNameMap = new Map<string, Student>();
+        students.forEach(s => {
+          if (s.nisn) studentByNisnMap.set(String(s.nisn).trim().toLowerCase(), s);
+          if (s.name) studentByNameMap.set(String(s.name).trim().toLowerCase(), s);
+        });
+
+        const parsedRewards: RewardRecord[] = [];
+
+        dataRows.forEach((row, index) => {
+          if (!row || row.length === 0) return;
+
+          const dateRaw = colDate !== -1 && row[colDate] !== undefined ? String(row[colDate]).trim() : '';
+          const nisnRaw = colNisn !== -1 && row[colNisn] !== undefined ? String(row[colNisn]).replace(/^'/, '').trim() : '';
+          const nameRaw = colName !== -1 && row[colName] !== undefined ? String(row[colName]).trim() : '';
+          const compRaw = colCompetition !== -1 && row[colCompetition] !== undefined ? String(row[colCompetition]).trim() : '';
+
+          if (!nisnRaw && !nameRaw && !compRaw) return;
+          if (nameRaw.toLowerCase().includes('nama siswa') || compRaw.toLowerCase().includes('nama kejuaraan')) return;
+
+          let student = (nisnRaw ? studentByNisnMap.get(nisnRaw.toLowerCase()) : undefined) ||
+                        (nameRaw ? studentByNameMap.get(nameRaw.toLowerCase()) : undefined);
+
+          const studentName = student ? student.name : (nameRaw || 'Siswa');
+          const studentClass = student ? student.class : (colClass !== -1 && row[colClass] ? String(row[colClass]).trim() : 'Kelas 1');
+          const studentId = student ? student.id : (`STU-${nisnRaw || nameRaw.replace(/\s+/g, '_')}`);
+
+          const competitionName = compRaw || 'Prestasi & Apresiasi Siswa';
+          const level = colLevel !== -1 && row[colLevel] ? String(row[colLevel]).trim() : 'Kota/Kab';
+          const rank = colRank !== -1 && row[colRank] ? String(row[colRank]).trim() : 'Juara I';
+          let pointsRaw = colPoints !== -1 && row[colPoints] !== undefined ? Number(row[colPoints]) : 10;
+          if (isNaN(pointsRaw) || pointsRaw <= 0) pointsRaw = 10;
+
+          const organizer = colOrganizer !== -1 && row[colOrganizer] ? String(row[colOrganizer]).trim() : 'Sekolah';
+          const certificateNumber = colCertNumber !== -1 && row[colCertNumber] ? String(row[colCertNumber]).trim() : '';
+          const reporterName = colReporter !== -1 && row[colReporter] ? String(row[colReporter]).trim() : 'Wali Kelas';
+          const notes = colNotes !== -1 && row[colNotes] ? String(row[colNotes]).trim() : '';
+
+          let validDate = dateRaw;
+          if (!validDate || !/^\d{4}-\d{2}-\d{2}$/.test(validDate)) {
+            validDate = new Date().toISOString().slice(0, 10);
+          }
+
+          parsedRewards.push({
+            id: `REW-IMP-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 6)}`,
+            studentId,
+            studentName,
+            studentClass,
+            ruleId: `rule_reward_${Date.now()}`,
+            ruleName: competitionName,
+            rank,
+            level,
+            points: pointsRaw,
+            date: validDate,
+            competitionName,
+            organizer,
+            certificateNumber,
+            reporterName,
+            notes,
+            whatsappSent: false,
+            createdAt: new Date().toISOString()
+          });
+        });
+
+        if (parsedRewards.length === 0) {
+          throw new Error('Tidak ada data reward/prestasi yang valid ditemukan dalam file.');
+        }
+
+        resolve(parsedRewards);
+      } catch (err: any) {
+        reject(new Error(err?.message || 'Gagal membaca file Excel reward.'));
+      }
+    };
+
+    reader.onerror = () => reject(new Error('Gagal membuka file.'));
+    reader.readAsArrayBuffer(file);
+  });
+};
+

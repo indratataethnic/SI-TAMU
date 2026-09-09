@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { ViolationRecord, Student, StudentScoreSummary, SchoolSettings, Teacher, PiketSchedule, ViolationRule } from '../types';
 import {
   AlertTriangle,
@@ -13,13 +13,15 @@ import {
   Edit,
   Pencil,
   FileSpreadsheet,
+  Upload,
+  FileText,
   Calendar,
   CheckCircle2,
   Clock,
   MapPin,
   X
 } from 'lucide-react';
-import { exportViolationsToExcel } from '../utils/excel';
+import { exportViolationsToExcel, downloadViolationTemplate, importViolationsFromExcel } from '../utils/excel';
 import { openWhatsApp, generateViolationWAMessage, sendViaGateway } from '../utils/whatsapp';
 import { normalizeRecordDate } from '../utils/storage';
 import { EditPelanggaranModal } from './EditPelanggaranModal';
@@ -34,6 +36,7 @@ interface DataPelanggaranViewProps {
   settings: SchoolSettings;
   onDeleteViolation: (id: string) => void;
   onUpdateViolation: (updated: ViolationRecord) => void;
+  onImportViolations?: (imported: ViolationRecord[]) => void;
   onNavigateToInput: () => void;
   onOpenSurat: (summary: StudentScoreSummary) => void;
 }
@@ -48,6 +51,7 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
   settings,
   onDeleteViolation,
   onUpdateViolation,
+  onImportViolations,
   onNavigateToInput,
   onOpenSurat
 }) => {
@@ -57,6 +61,27 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
   const [detailRecord, setDetailRecord] = useState<ViolationRecord | null>(null);
   const [editingRecord, setEditingRecord] = useState<ViolationRecord | null>(null);
   const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setNotificationStatus('Membaca dan memproses file Excel pelanggaran...');
+      const imported = await importViolationsFromExcel(file, students, violationRules);
+      if (onImportViolations) {
+        onImportViolations(imported);
+      }
+      setNotificationStatus(`Berhasil mengimpor ${imported.length} data pelanggaran!`);
+      setTimeout(() => setNotificationStatus(null), 5000);
+    } catch (err: any) {
+      alert(err?.message || 'Gagal mengimpor file Excel pelanggaran.');
+      setNotificationStatus(null);
+    } finally {
+      if (e.target) e.target.value = '';
+    }
+  };
 
   const studentMap = useMemo(() => {
     const map = new Map<string, Student>();
@@ -144,12 +169,37 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
 
         <div className="flex flex-wrap items-center gap-2">
           <button
+            onClick={downloadViolationTemplate}
+            title="Unduh Format Excel Template Import Pelanggaran"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 text-slate-500" />
+            Template Excel
+          </button>
+          
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold transition cursor-pointer"
+          >
+            <Upload className="w-3.5 h-3.5 text-emerald-600" />
+            Import Excel
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImportFile}
+            accept=".xlsx, .xls, .csv"
+            className="hidden"
+          />
+
+          <button
             onClick={() => exportViolationsToExcel(violations)}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <FileSpreadsheet className="w-3.5 h-3.5 text-slate-600" />
             Export Excel
           </button>
+
           <button
             onClick={onNavigateToInput}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition shadow cursor-pointer"
