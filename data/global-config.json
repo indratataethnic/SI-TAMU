@@ -1,5 +1,26 @@
 {
-  "googleSheetsWebhook": "https://script.google.com/macros/s/AKfycbyBJJxFH7yOZLtD1IB61Gfi9LvZc0MnpPc0FdV7GjdxIuCx4tRrOOfE5fD7FqyLwys/exec",
+  "googleSheetsWebhook": "https://script.google.com/macros/s/AKfycbzfi6UuJ0WRhDrtSqcdIGbpmJlwiqZJHqz91fQSR2p8VyP6NV38TVd5wTlD_Fo7zn8/exec",
   "googleSheetsUrl": "https://docs.google.com/spreadsheets/d/1yWlVlC9-lP_X4lD-1bI6q2H9gU9vH8f7rZ3g9t3e5fA/edit",
-  "googleSheetsWebhookUrl": "https://script.google.com/macros/s/AKfycbyBJJxFH7yOZLtD1IB61Gfi9LvZc0MnpPc0FdV7GjdxIuCx4tRrOOfE5fD7FqyLwys/exec"
+  "settings": {
+    "schoolName": "UPT SDN KARANGANYAR",
+    "schoolSubtitle": "Sekar Melati - Sekolah Berkarakter Melayani Sepenuh Hati",
+    "schoolAddress": "Jalan Hasanudin no 38  Kelurahan Karanganyar Kecamatan Panggungrejo Kota Pasuruan",
+    "schoolPhone": "-",
+    "schoolEmail": "sdnkaranganyarsekarmelati@gmail.com",
+    "schoolWebsite": "https://smpn1teladan.sch.id",
+    "principalName": "Indartha Meiputra, S.Pd.",
+    "principalNip": "199005302019031004",
+    "bkCoordinatorName": "Koordinator BK",
+    "bkCoordinatorNip": "19820715 200801 2 007",
+    "staffPin": "sekarmelati",
+    "googleSheetsUrl": "https://docs.google.com/spreadsheets/d/1yWlVlC9-lP_X4lD-1bI6q2H9gU9vH8f7rZ3g9t3e5fA/edit",
+    "googleSheetsWebhook": "https://script.google.com/macros/s/AKfycbzfi6UuJ0WRhDrtSqcdIGbpmJlwiqZJHqz91fQSR2p8VyP6NV38TVd5wTlD_Fo7zn8/exec",
+    "googleSheetsWebhookUrl": "https://script.google.com/macros/s/AKfycbzfi6UuJ0WRhDrtSqcdIGbpmJlwiqZJHqz91fQSR2p8VyP6NV38TVd5wTlD_Fo7zn8/exec",
+    "waGatewayApiKey": "",
+    "waGatewayDevice": "",
+    "letterNumberPrefix": "421.2/SD/SI-TAMU",
+    "academicYear": "2026/2027",
+    "headmasterName": "",
+    "headmasterNip": ""
+  }
 }

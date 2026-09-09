@@ -12,7 +12,7 @@ const CONFIG_DIR = path.join(process.cwd(), "data");
 const CONFIG_FILE = path.join(CONFIG_DIR, "global-config.json");
 const DB_FILE = path.join(CONFIG_DIR, "app-db.json");
 
-const DEFAULT_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxcDTgBEIYtGe4OmQWIb2cfhB-azDL2XuVsGllxRWiikEQB_TTMGR2tcTge9k69mLk/exec";
+const DEFAULT_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzfi6UuJ0WRhDrtSqcdIGbpmJlwiqZJHqz91fQSR2p8VyP6NV38TVd5wTlD_Fo7zn8/exec";
 
 // Ensure data folder exists
 if (!fs.existsSync(CONFIG_DIR)) {
