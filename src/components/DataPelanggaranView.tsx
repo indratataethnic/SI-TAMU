@@ -111,9 +111,15 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
   const classesList = ['ALL', ...Array.from(new Set(violations.map(v => v.studentClass).filter(Boolean))).sort()];
 
   const filteredViolations = violations.filter(v => {
-    const matchesCat = selectedCategory === 'ALL' || v.category === selectedCategory;
-    const matchesCls = selectedClass === 'ALL' || v.studentClass === selectedClass;
-    const q = searchQuery.toLowerCase();
+    const vCat = String(v.category || 'ringan').toLowerCase().trim();
+    const sCat = selectedCategory.toLowerCase().trim();
+    const matchesCat = sCat === 'all' || vCat === sCat;
+
+    const vCls = String(v.studentClass || '').toLowerCase().trim();
+    const sCls = selectedClass.toLowerCase().trim();
+    const matchesCls = sCls === 'all' || vCls === sCls;
+
+    const q = searchQuery.toLowerCase().trim();
     const vRule = String(v.ruleName || (v as any).description || (v as any).pelanggaran || '').toLowerCase();
     const vReporter = String(v.reporterName || (v as any).reporter || '').toLowerCase();
     const vLocation = String(v.location || (v as any).lokasi || '').toLowerCase();
@@ -121,11 +127,13 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
     const sName = String(v.studentName || '').toLowerCase();
 
     const matchesSearch =
+      !q ||
       sName.includes(q) ||
       vRule.includes(q) ||
       vReporter.includes(q) ||
       vLocation.includes(q) ||
       vDesc.includes(q);
+
     return matchesCat && matchesCls && matchesSearch;
   });
 

@@ -78,14 +78,27 @@ export const DataRewardView: React.FC<DataRewardViewProps> = ({
   const classesList = ['ALL', ...Array.from(new Set(rewards.map(r => r.studentClass))).sort()];
 
   const filteredRewards = rewards.filter(r => {
-    const matchesLvl = selectedLevel === 'ALL' || r.level === selectedLevel;
-    const matchesCls = selectedClass === 'ALL' || r.studentClass === selectedClass;
-    const q = searchQuery.toLowerCase();
+    const rLvl = String(r.level || '').toLowerCase().trim();
+    const sLvl = selectedLevel.toLowerCase().trim();
+    const matchesLvl = sLvl === 'all' || rLvl === sLvl;
+
+    const rCls = String(r.studentClass || '').toLowerCase().trim();
+    const sCls = selectedClass.toLowerCase().trim();
+    const matchesCls = sCls === 'all' || rCls === sCls;
+
+    const q = searchQuery.toLowerCase().trim();
+    const sName = String(r.studentName || '').toLowerCase();
+    const cName = String(r.competitionName || r.ruleName || '').toLowerCase();
+    const rRank = String(r.rank || '').toLowerCase();
+    const rOrg = String(r.organizer || '').toLowerCase();
+
     const matchesSearch =
-      r.studentName.toLowerCase().includes(q) ||
-      r.competitionName.toLowerCase().includes(q) ||
-      r.rank.toLowerCase().includes(q) ||
-      (r.organizer && r.organizer.toLowerCase().includes(q));
+      !q ||
+      sName.includes(q) ||
+      cName.includes(q) ||
+      rRank.includes(q) ||
+      rOrg.includes(q);
+
     return matchesLvl && matchesCls && matchesSearch;
   });
 
