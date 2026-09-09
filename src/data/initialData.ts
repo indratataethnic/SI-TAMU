@@ -520,7 +520,7 @@ export const initialRewards: RewardRecord[] = [
 
 export const initialCompensations: CompensationRecord[] = [];
 
-export const OFFICIAL_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxcDTgBEIYtGe4OmQWIb2cfhB-azDL2XuVsGllxRWiikEQB_TTMGR2tcTge9k69mLk/exec';
+export const OFFICIAL_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzfi6UuJ0WRhDrtSqcdIGbpmJlwiqZJHqz91fQSR2p8VyP6NV38TVd5wTlD_Fo7zn8/exec';
 
 export const initialSettings: SchoolSettings = {
   schoolName: '',
