@@ -462,6 +462,50 @@ app.post("/api/sheets/fetch", async (req, res) => {
   }
 });
 
+// POST API: Push full state or single update to Google Spreadsheet webhook via server proxy
+app.post("/api/sheets/sync", async (req, res) => {
+  try {
+    const webhookUrl = (req.body?.webhookUrl || cachedConfig.googleSheetsWebhook || DEFAULT_WEBHOOK_URL).trim();
+    if (!webhookUrl) {
+      return res.status(400).json({ success: false, message: "URL Webhook Google Sheets belum dikonfigurasi." });
+    }
+
+    const payload = req.body?.payload || req.body;
+    const bodyString = JSON.stringify({
+      action: payload.action || "SYNC_ALL",
+      settings: payload.settings || cachedDb?.settings || null,
+      students: payload.students || cachedDb?.students || [],
+      teachers: payload.teachers || cachedDb?.teachers || [],
+      piketSchedules: payload.piketSchedules || cachedDb?.piketSchedules || [],
+      violations: payload.violations || cachedDb?.violations || [],
+      rewards: payload.rewards || cachedDb?.rewards || [],
+      compensations: payload.compensations || cachedDb?.compensations || [],
+      summaries: payload.summaries || [],
+      sentAt: new Date().toISOString()
+    });
+
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: bodyString,
+      redirect: "follow"
+    });
+
+    if (!response.ok) {
+      return res.status(502).json({ success: false, message: `HTTP status dari Google: ${response.status}` });
+    }
+
+    const json: any = await response.json();
+    return res.json({
+      success: json.status === "success",
+      message: json.message || "Data berhasil disinkronkan ke Google Spreadsheet"
+    });
+  } catch (err: any) {
+    console.error("Error in /api/sheets/sync:", err);
+    return res.status(500).json({ success: false, message: err.message || "Gagal menghubungi Google Apps Script." });
+  }
+});
+
 // Helper function to fetch latest from Google Sheets silently in the background
 async function backgroundFetchGoogleSheets() {
   try {

@@ -154,6 +154,7 @@ export default function App() {
   useEffect(() => { saveUserRole(role); }, [role]);
 
   const [isLoadingSpreadsheet, setIsLoadingSpreadsheet] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
 
   // Automatically load data from Google Spreadsheet when the page mounts or on user request
   const fetchSpreadsheetData = async (silent = false): Promise<boolean> => {
@@ -164,7 +165,11 @@ export default function App() {
 
     try {
       lastSpreadsheetFetchRef.current = Date.now();
-      if (!silent) setIsLoadingSpreadsheet(true);
+      setIsLoadingSpreadsheet(true);
+      if (!silent) {
+        setSheetsSyncStatus('🔄 Sedang menyinkronkan data dengan Google Spreadsheet...');
+      }
+
       const res = await fetch('/api/sheets/fetch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -188,24 +193,31 @@ export default function App() {
           lastViolationsCountRef.current = violationCount;
           lastRewardsCountRef.current = rewardCount;
 
+          const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          setLastSyncTime(timeStr);
+
           if (!silent) {
             setSheetsSyncStatus(
-              `✓ Sinkronisasi selesai: ${studentCount} Siswa, ${violationCount} Pelanggaran${teacherCount > 0 ? `, ${teacherCount} Guru` : ''}`
+              `✓ Sinkronisasi selesai (${timeStr}): ${studentCount} Siswa, ${violationCount} Pelanggaran${teacherCount > 0 ? `, ${teacherCount} Guru` : ''}`
             );
-            setTimeout(() => setSheetsSyncStatus(null), 5000);
+            setTimeout(() => setSheetsSyncStatus(null), 4500);
           } else if (isNewViolations || isNewRewards) {
             setSheetsSyncStatus(
-              `✓ Data baru otomatis termuat dari perangkat lain (${violationCount} Pelanggaran${rewardCount > 0 ? `, ${rewardCount} Apresiasi` : ''})`
+              `✓ Data baru otomatis termuat (${timeStr}): ${violationCount} Pelanggaran${rewardCount > 0 ? `, ${rewardCount} Apresiasi` : ''}`
             );
-            setTimeout(() => setSheetsSyncStatus(null), 6000);
+            setTimeout(() => setSheetsSyncStatus(null), 5000);
           }
           return true;
         }
       }
     } catch (err) {
       console.log('Automated Google Sheets load error:', err);
+      if (!silent) {
+        setSheetsSyncStatus('⚠️ Gagal terhubung ke Google Sheets, menggunakan data database lokal.');
+        setTimeout(() => setSheetsSyncStatus(null), 4000);
+      }
     } finally {
-      if (!silent) setIsLoadingSpreadsheet(false);
+      setIsLoadingSpreadsheet(false);
     }
     return false;
   };
@@ -387,7 +399,7 @@ export default function App() {
       .finally(() => {
         isInitialLoadingRef.current = false;
         // 2. Automatically load data from Google Spreadsheet when the page mounts!
-        fetchSpreadsheetData(true);
+        fetchSpreadsheetData(false);
       });
 
     // 3. Global settings sync
@@ -1107,6 +1119,7 @@ export default function App() {
         urgentAlertCount={urgentAlertCount}
         isSyncing={isLoadingSpreadsheet}
         onManualSync={() => fetchSpreadsheetData(false)}
+        lastSyncTime={lastSyncTime}
       />
 
       {/* Main Body Layout */}

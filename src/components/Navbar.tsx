@@ -12,6 +12,7 @@ interface NavbarProps {
   urgentAlertCount: number;
   isSyncing?: boolean;
   onManualSync?: () => void;
+  lastSyncTime?: string | null;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -23,7 +24,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleMobileSidebar,
   urgentAlertCount,
   isSyncing = false,
-  onManualSync
+  onManualSync,
+  lastSyncTime
 }) => {
   const currentDate = new Intl.DateTimeFormat('id-ID', {
     weekday: 'long',
@@ -80,7 +82,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               title="Data otomatis sinkron setiap 15 detik & saat layar HP/laptop dibuka. Klik untuk sinkronkan sekarang."
             >
               <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isSyncing ? 'animate-spin text-amber-400' : ''}`} />
-              <span className="hidden lg:inline">{isSyncing ? 'Menyinkronkan...' : 'Auto-Sync Aktif'}</span>
+              <span className="hidden lg:inline">
+                {isSyncing ? 'Menyinkronkan...' : lastSyncTime ? `Sinkron: ${lastSyncTime}` : 'Auto-Sync Aktif'}
+              </span>
               <span className="lg:hidden">{isSyncing ? 'Sync...' : 'Sync'}</span>
               {!isSyncing && (
                 <span className="relative flex h-2 w-2">

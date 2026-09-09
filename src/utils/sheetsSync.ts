@@ -1108,7 +1108,39 @@ export const syncAllToGoogleSheets = async (
       sentAt: new Date().toISOString()
     });
 
-    // Use text/plain for universal compatibility with Google Apps Script Web Apps without CORS preflight failures
+    // Try server proxy first for reliable execution without CORS or redirects issues
+    try {
+      const serverRes = await fetch('/api/sheets/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          webhookUrl: webhookUrl.trim(),
+          payload: {
+            action: 'SYNC_ALL',
+            sheetUrl: payload.sheetUrl,
+            settings: payload.settings || null,
+            students: payload.students || [],
+            teachers: payload.teachers || [],
+            piketSchedules: payload.piketSchedules || [],
+            violations: enrichedViolations,
+            rewards: enrichedRewards,
+            compensations: enrichedCompensations,
+            summaries: payload.summaries || []
+          }
+        })
+      });
+      if (serverRes.ok) {
+        const json = await serverRes.json();
+        return {
+          success: json.success,
+          message: json.message || `Data berhasil dikirim ke Google Spreadsheet (${payload.students?.length || 0} siswa, ${payload.violations?.length || 0} pelanggaran).`
+        };
+      }
+    } catch {
+      // Fallback to direct client fetch
+    }
+
+    // Direct fallback
     await fetch(webhookUrl.trim(), {
       method: 'POST',
       mode: 'no-cors',
