@@ -42,6 +42,29 @@ interface DataPelanggaranViewProps {
   onOpenSurat: (summary: StudentScoreSummary) => void;
 }
 
+const isIdString = (str?: string): boolean => {
+  if (!str) return false;
+  const s = str.trim().toUpperCase();
+  return s.startsWith('VIOL-') || s.startsWith('REW-') || s.startsWith('STU-') || s.startsWith('ID-') || s.startsWith('RULE-') || /^V-\d+/.test(s);
+};
+
+const getDisplayRuleName = (v: ViolationRecord, rules: ViolationRule[] = []): string => {
+  if (v.ruleName && !isIdString(v.ruleName)) return v.ruleName;
+  if ((v as any).pelanggaran && !isIdString((v as any).pelanggaran)) return (v as any).pelanggaran;
+  if ((v as any).violationName && !isIdString((v as any).violationName)) return (v as any).violationName;
+  if (v.ruleId) {
+    const matched = rules.find(r => r.id === v.ruleId || r.code === v.ruleId);
+    if (matched && matched.name) return matched.name;
+  }
+  return 'Pelanggaran Tata Tertib';
+};
+
+const getDisplayDescription = (v: ViolationRecord): string | null => {
+  const desc = v.description || (v as any).note || (v as any).notes || '';
+  if (!desc || isIdString(desc)) return null;
+  return desc;
+};
+
 export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
   violations,
   students,
@@ -62,6 +85,8 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
   const [selectedClass, setSelectedClass] = useState<string>('ALL');
   const [detailRecord, setDetailRecord] = useState<ViolationRecord | null>(null);
   const [editingRecord, setEditingRecord] = useState<ViolationRecord | null>(null);
+  const [deleteRecord, setDeleteRecord] = useState<ViolationRecord | null>(null);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState<boolean>(false);
   const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -203,7 +228,7 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
           />
 
           <button
-            onClick={() => exportViolationsToExcel(violations)}
+            onClick={() => exportViolationsToExcel(violations, violationRules)}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-slate-600" />
@@ -212,13 +237,7 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
 
           {onDeleteAllViolations && violations.length > 0 && (
             <button
-              onClick={() => {
-                if (window.confirm(`Apakah Anda yakin ingin menghapus SELURUH (${violations.length}) data pelanggaran? Aksi ini akan mengosongkan seluruh data pelanggaran.`)) {
-                  onDeleteAllViolations();
-                  setNotificationStatus('Semua data pelanggaran berhasil dikosongkan.');
-                  setTimeout(() => setNotificationStatus(null), 3000);
-                }
-              }}
+              onClick={() => setShowDeleteAllModal(true)}
               title="Kosongkan Semua Data Pelanggaran"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-semibold transition cursor-pointer"
             >
@@ -319,6 +338,9 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
                 filteredViolations.map((v, idx) => {
                   const student = getStudentForViolation(v);
                   const summary = student ? summaryMap.get(student.id) : summaryMap.get(v.studentId);
+                  const displayRuleName = getDisplayRuleName(v, violationRules);
+                  const displayDesc = getDisplayDescription(v);
+                  const showDesc = Boolean(displayDesc && displayDesc !== displayRuleName);
 
                   return (
                     <tr key={`${v.id || 'v'}-${idx}`} className="hover:bg-slate-50/80 transition">
@@ -350,8 +372,13 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
                       </td>
                       <td className="py-3 px-4 font-medium text-slate-800 max-w-xs" title={v.description || v.ruleName}>
                         <div className="font-semibold text-slate-900 leading-snug">
-                          {v.ruleName || (v as any).description || (v as any).pelanggaran || 'Pelanggaran Tata Tertib'}
+                          {displayRuleName}
                         </div>
+                        {showDesc && (
+                          <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-2 italic">
+                            "{displayDesc}"
+                          </div>
+                        )}
                         <div className="flex items-center gap-1.5 mt-1">
                           <span className="inline-flex items-center gap-1 text-[10px] text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/80 font-medium">
                             <MapPin className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
@@ -412,11 +439,7 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
 
                           {/* Hapus */}
                           <button
-                            onClick={() => {
-                              if (window.confirm(`Hapus catatan pelanggaran ${v.ruleName} untuk ${v.studentName}?`)) {
-                                onDeleteViolation(v.id);
-                              }
-                            }}
+                            onClick={() => setDeleteRecord(v)}
                             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
                             title="Hapus Catatan"
                           >
@@ -461,7 +484,7 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
               <div className="space-y-2">
                 <div>
                   <span className="text-slate-400 block text-[10px] uppercase font-bold">Jenis Pelanggaran</span>
-                  <span className="font-bold text-slate-800 text-sm">{detailRecord.ruleName}</span>
+                  <span className="font-bold text-slate-800 text-sm">{getDisplayRuleName(detailRecord, violationRules)}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   <div>
@@ -489,7 +512,7 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
               <div>
                 <span className="text-slate-400 block text-[10px] uppercase font-bold mb-1">Kronologi / Catatan Kejadian</span>
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 leading-relaxed">
-                  "{detailRecord.description}"
+                  "{getDisplayDescription(detailRecord) || getDisplayRuleName(detailRecord, violationRules)}"
                 </div>
               </div>
 
@@ -547,6 +570,124 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
           setTimeout(() => setNotificationStatus(null), 4000);
         }}
       />
+
+      {/* Delete Single Record Modal */}
+      {deleteRecord && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex justify-center items-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 text-xs">
+            <div className="bg-rose-900 text-white px-6 py-4 flex items-center justify-between border-b border-rose-800">
+              <h3 className="font-bold text-sm text-rose-100 flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-rose-300" />
+                Konfirmasi Hapus Catatan
+              </h3>
+              <button
+                onClick={() => setDeleteRecord(null)}
+                className="p-1 text-slate-300 hover:text-white rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-slate-700 text-sm">
+                Apakah Anda yakin ingin menghapus catatan pelanggaran untuk <span className="font-bold text-slate-900">{deleteRecord.studentName}</span>?
+              </p>
+
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+                <div className="font-semibold text-slate-900">
+                  {getDisplayRuleName(deleteRecord, violationRules)}
+                </div>
+                <div className="text-slate-500 text-[11px]">
+                  Tanggal: {normalizeRecordDate(deleteRecord.date)} • Poin: +{deleteRecord.points}
+                </div>
+              </div>
+
+              <p className="text-[11px] text-rose-600 font-medium">
+                Tindakan ini tidak dapat dibatalkan dan akumulasi poin siswa akan otomatis dihitung ulang.
+              </p>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setDeleteRecord(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const recordId = deleteRecord.id || (deleteRecord as any)._id;
+                    if (recordId) {
+                      onDeleteViolation(recordId);
+                      setNotificationStatus(`Catatan pelanggaran ${deleteRecord.studentName} berhasil dihapus.`);
+                      setTimeout(() => setNotificationStatus(null), 3500);
+                    }
+                    setDeleteRecord(null);
+                  }}
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold transition shadow cursor-pointer"
+                >
+                  Ya, Hapus Catatan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete All Records Modal */}
+      {showDeleteAllModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex justify-center items-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 text-xs">
+            <div className="bg-rose-950 text-white px-6 py-4 flex items-center justify-between border-b border-rose-800">
+              <h3 className="font-bold text-sm text-rose-100 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-400" />
+                Kosongkan Seluruh Data Pelanggaran
+              </h3>
+              <button
+                onClick={() => setShowDeleteAllModal(false)}
+                className="p-1 text-slate-300 hover:text-white rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-slate-700 text-sm leading-relaxed">
+                Apakah Anda yakin ingin menghapus <span className="font-bold text-rose-700">SELURUH ({violations.length})</span> data pelanggaran?
+              </p>
+
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-[11px] leading-relaxed">
+                Peringatan: Aksi ini akan mengosongkan seluruh riwayat kasus pelanggaran siswa dari sistem.
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteAllModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onDeleteAllViolations) {
+                      onDeleteAllViolations();
+                      setNotificationStatus('Semua data pelanggaran berhasil dikosongkan.');
+                      setTimeout(() => setNotificationStatus(null), 3500);
+                    }
+                    setShowDeleteAllModal(false);
+                  }}
+                  className="px-5 py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-lg font-bold transition shadow cursor-pointer"
+                >
+                  Ya, Kosongkan Semua
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

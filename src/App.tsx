@@ -721,16 +721,29 @@ export default function App() {
     const sNameMap = new Map(finalStudents.map(s => [s.name.toLowerCase().replace(/\s+/g, ' ').trim(), s]));
 
     if (Array.isArray(imported.violations)) {
+      const isIdStr = (s?: string) => Boolean(s && (s.trim().toUpperCase().startsWith('VIOL-') || s.trim().toUpperCase().startsWith('REW-') || s.trim().toUpperCase().startsWith('ID-') || s.trim().toUpperCase().startsWith('RULE-') || /^V-\d+/.test(s.trim())));
+      const rulesCatalog = (Array.isArray(imported.violationRules) && imported.violationRules.length > 0) ? imported.violationRules : violationRules;
+
       const mappedViolations = sanitizeRecords<ViolationRecord>(imported.violations.map(v => {
         const vNisn = (v as any).studentNisn ? String((v as any).studentNisn).trim().toLowerCase() : '';
         const vName = v.studentName ? String(v.studentName).toLowerCase().replace(/\s+/g, ' ').trim() : '';
         const student = (v.studentId ? sMapById.get(v.studentId) : null) ||
                         (vNisn && vNisn.length >= 8 ? sMapByNisn.get(vNisn) : null) ||
                         (vName ? sNameMap.get(vName) : null);
-        const vRule = v.ruleName || (v as any).pelanggaran || (v as any).violationName || (v as any).description || 'Pelanggaran Tata Tertib';
+
+        let vRule = v.ruleName || (v as any).pelanggaran || (v as any).violationName || '';
+        if (!vRule || isIdStr(vRule)) {
+          const matchedRule = rulesCatalog.find(r => r.id === v.ruleId || r.code === v.ruleId);
+          vRule = matchedRule ? matchedRule.name : 'Pelanggaran Tata Tertib';
+        }
+
+        let vDesc = v.description || (v as any).note || (v as any).notes || '';
+        if (!vDesc || isIdStr(vDesc)) {
+          vDesc = vRule;
+        }
+
         const vReporter = v.reporterName || (v as any).reporter || (v as any).reporterTeacherName || 'Guru Piket';
         const vLocation = v.location || (v as any).lokasi || 'Lingkungan Sekolah';
-        const vDesc = v.description || vRule;
 
         return {
           ...v,
@@ -1023,8 +1036,14 @@ export default function App() {
   };
 
   const handleDeleteViolation = (id: string) => {
+    if (!id) return;
     lastLocalActionRef.current = Date.now();
-    const updated = violations.filter(v => v.id !== id);
+    lastLocalSaveTimestampRef.current = Date.now();
+    const targetId = String(id).trim();
+    const updated = violations.filter(v => {
+      const vId = String(v.id || (v as any)._id || '').trim();
+      return vId !== targetId && v.id !== id;
+    });
     setViolations(updated);
     saveViolations(updated);
     triggerSheetsSync({ violations: updated });
@@ -1444,12 +1463,13 @@ export default function App() {
       {/* Official Letter Modal (Panggilan Ortu, Skorsing, Pembinaan di Rumah) */}
       {suratModalData.open && suratModalData.summary && (
         <SuratModal
-          isOpen={suratModalData.open}
-          onClose={() => setSuratModalData(prev => ({ ...prev, open: false }))}
           summary={suratModalData.summary}
           violations={violations.filter(v => v.studentId === suratModalData.summary?.student.id)}
+          teachers={teachers}
+          violationRules={violationRules}
           settings={settings}
-          initialType={suratModalData.type}
+          suratType={suratModalData.type || 'panggilan_100'}
+          onClose={() => setSuratModalData(prev => ({ ...prev, open: false }))}
         />
       )}
 

@@ -325,20 +325,28 @@ function writeViolationsSheet(ss, violations) {
   if (!violations || violations.length === 0) return;
 
   var rows = violations.map(function(v) {
+    var rName = v.ruleName || v.violationName || v.pelanggaran || "";
+    if (/^viol-/i.test(rName) || /^id-/i.test(rName)) {
+      rName = "";
+    }
+    var desc = v.description || v.note || "";
+    if (/^viol-/i.test(desc) || /^id-/i.test(desc)) {
+      desc = "";
+    }
     return [
       v.date || "",
       "'" + (v.studentNisn || ""),
       v.studentName || "",
       v.studentClass || "",
-      v.violationName || v.ruleName || v.pelanggaran || v.description || "",
-      v.category || "",
+      rName || "Pelanggaran Tata Tertib",
+      v.category || "ringan",
       v.points || 0,
-      v.reporterTeacherName || v.reporterName || v.reporter || "",
+      v.reporterTeacherName || v.reporterName || v.reporter || "Guru Piket",
       v.location || v.lokasi || "Lingkungan Sekolah",
       v.parentName || "",
       "'" + (v.parentPhone || ""),
-      v.note || v.description || "",
-      v.parentNotified ? "Sudah Terkirim" : "Belum",
+      desc || rName || "Pelanggaran Tata Tertib",
+      v.parentNotified || v.whatsappSent ? "Sudah Terkirim" : "Belum",
       v.id || ""
     ];
   });
@@ -881,7 +889,9 @@ function fetchAllData(ss) {
 
       headerRow.forEach(function(h, idx) {
         if (!h) return;
-        if (h === "no" || h === "no." || h === "nomor" || h === "#") {
+        if (h === "id" || h === "id catatan" || h === "id_catatan" || h === "id pelanggaran" || h === "id_pelanggaran" || h.indexOf("id catatan") !== -1 || h.indexOf("id pelanggaran") !== -1) {
+          colId = idx;
+        } else if (h === "no" || h === "no." || h === "nomor" || h === "#") {
           colNo = idx;
         } else if (h.indexOf("tanggal") !== -1 || h.indexOf("tgl") !== -1 || h.indexOf("waktu") !== -1 || h === "date" || h.indexOf("hari") !== -1) {
           colDate = idx;
@@ -891,10 +901,6 @@ function fetchAllData(ss) {
           colName = idx;
         } else if (h.indexOf("kelas") !== -1 || h.indexOf("rombel") !== -1 || h.indexOf("tingkat") !== -1) {
           colClass = idx;
-        } else if (h.indexOf("pelanggaran") !== -1 || h.indexOf("aturan") !== -1 || h.indexOf("kasus") !== -1 || h.indexOf("masalah") !== -1 || h.indexOf("uraian") !== -1 || h.indexOf("kejadian") !== -1 || h.indexOf("perilaku") !== -1 || h.indexOf("bentuk") !== -1) {
-          colRule = idx;
-        } else if (h.indexOf("kategori") !== -1 || h.indexOf("jenis") !== -1 || h.indexOf("tingkat") !== -1 || h.indexOf("klasifikasi") !== -1) {
-          colCat = idx;
         } else if (h.indexOf("poin") !== -1 || h.indexOf("bobot") !== -1 || h.indexOf("skor") !== -1 || h.indexOf("nilai") !== -1 || h.indexOf("points") !== -1) {
           colPts = idx;
         } else if (h.indexOf("pelapor") !== -1 || h.indexOf("guru") !== -1 || h.indexOf("pencatat") !== -1 || h.indexOf("petugas") !== -1 || h.indexOf("piket") !== -1 || h.indexOf("saksi") !== -1) {
@@ -905,12 +911,14 @@ function fetchAllData(ss) {
           colParentName = idx;
         } else if (h.indexOf("hp") !== -1 || h.indexOf("wa") !== -1 || h.indexOf("telepon") !== -1 || h.indexOf("kontak") !== -1 || h.indexOf("telp") !== -1 || h.indexOf("phone") !== -1) {
           colParentPhone = idx;
-        } else if (h.indexOf("keterangan") !== -1 || h.indexOf("catatan") !== -1 || h.indexOf("deskripsi") !== -1 || h.indexOf("kronologi") !== -1 || h.indexOf("tindak lanjut") !== -1) {
-          colNote = idx;
         } else if (h.indexOf("status") !== -1 || h.indexOf("notifikasi") !== -1 || h.indexOf("terkirim") !== -1) {
           colWa = idx;
-        } else if (h === "id" || h.indexOf("id catatan") !== -1 || h.indexOf("id pelanggaran") !== -1 || h.indexOf("kode") !== -1) {
-          colId = idx;
+        } else if (h.indexOf("keterangan") !== -1 || h.indexOf("catatan") !== -1 || h.indexOf("deskripsi") !== -1 || h.indexOf("kronologi") !== -1 || h.indexOf("tindak lanjut") !== -1) {
+          colNote = idx;
+        } else if (h.indexOf("pelanggaran") !== -1 || h.indexOf("aturan") !== -1 || h.indexOf("kasus") !== -1 || h.indexOf("masalah") !== -1 || h.indexOf("uraian") !== -1 || h.indexOf("perilaku") !== -1 || h.indexOf("bentuk") !== -1) {
+          colRule = idx;
+        } else if (h.indexOf("kategori") !== -1 || (h.indexOf("jenis") !== -1 && h.indexOf("pelanggaran") === -1) || h.indexOf("tingkat") !== -1 || h.indexOf("klasifikasi") !== -1) {
+          colCat = idx;
         }
       });
 
@@ -947,8 +955,19 @@ function fetchAllData(ss) {
         var rawLocation = colLocation !== -1 && row[colLocation] ? String(row[colLocation]).trim() : "Lingkungan Sekolah";
         var rawParentName = colParentName !== -1 && row[colParentName] ? String(row[colParentName]).trim() : "";
         var rawParentPhone = colParentPhone !== -1 && row[colParentPhone] ? String(row[colParentPhone]).replace(/^'/, '').trim() : "";
-        var rawNote = colNote !== -1 && row[colNote] ? String(row[colNote]).trim() : (rawRule || "Pelanggaran Tata Tertib");
+        var rawNote = colNote !== -1 && row[colNote] ? String(row[colNote]).trim() : "";
         var rawWa = colWa !== -1 ? (String(row[colWa]).toLowerCase().indexOf("terkirim") !== -1 || row[colWa] === true) : false;
+
+        // Clean rawRule and rawNote if they accidentally got an ID string like "VIOL-..."
+        if (/^viol-/i.test(rawRule) || /^id-/i.test(rawRule) || /^rew-/i.test(rawRule)) {
+          rawRule = "";
+        }
+        if (/^viol-/i.test(rawNote) || /^id-/i.test(rawNote) || /^rew-/i.test(rawNote)) {
+          rawNote = "";
+        }
+
+        var finalRuleName = rawRule || "Pelanggaran Tata Tertib";
+        var finalDescription = rawNote || finalRuleName;
 
         data.violations.push({
           id: rawId,
@@ -956,9 +975,9 @@ function fetchAllData(ss) {
           studentNisn: rawNisn,
           studentName: rawName,
           studentClass: rawClass,
-          ruleName: rawRule || "Pelanggaran Tata Tertib",
-          violationName: rawRule || "Pelanggaran Tata Tertib",
-          pelanggaran: rawRule || "Pelanggaran Tata Tertib",
+          ruleName: finalRuleName,
+          violationName: finalRuleName,
+          pelanggaran: finalRuleName,
           category: rawCat || "ringan",
           points: rawPoints,
           reporterName: rawReporter || "Guru Piket",
@@ -968,8 +987,8 @@ function fetchAllData(ss) {
           lokasi: rawLocation || "Lingkungan Sekolah",
           parentName: rawParentName,
           parentPhone: rawParentPhone,
-          description: rawNote || rawRule,
-          note: rawNote || rawRule,
+          description: finalDescription,
+          note: finalDescription,
           whatsappSent: rawWa,
           academicYear: "2026/2027",
           date: rawDate || formatDateVal(new Date()),

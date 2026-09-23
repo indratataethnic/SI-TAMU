@@ -77,11 +77,24 @@ export const EditPelanggaranModal: React.FC<EditPelanggaranModalProps> = ({
       setDate(violation.date || new Date().toISOString().slice(0, 10));
       setTime(violation.time || '');
       setLocation(violation.location || 'Ruang Kelas');
-      const initialRuleName = violation.ruleName || (violation as any).pelanggaran || (violation as any).violationName || (violation as any).description || '';
+
+      const isIdStr = (s?: string) => s && (s.trim().toUpperCase().startsWith('VIOL-') || s.trim().toUpperCase().startsWith('REW-') || s.trim().toUpperCase().startsWith('ID-'));
+
+      let initialRuleName = violation.ruleName || (violation as any).pelanggaran || (violation as any).violationName || '';
+      if (!initialRuleName || isIdStr(initialRuleName)) {
+        const matched = violationRules.find(r => r.id === violation.ruleId);
+        initialRuleName = matched ? matched.name : 'Pelanggaran Tata Tertib';
+      }
+
       setRuleName(initialRuleName);
       setCategory(violation.category || 'ringan');
       setPoints(violation.points || 5);
-      setDescription(violation.description || initialRuleName || '');
+
+      let initialDesc = violation.description || (violation as any).note || '';
+      if (!initialDesc || isIdStr(initialDesc)) {
+        initialDesc = initialRuleName;
+      }
+      setDescription(initialDesc);
       
       const initialReporter = violation.reporterName || (violation as any).reporter || (violation as any).reporterTeacherName || 'Guru Piket';
       setReporterTeacherId(violation.reporterId || '');
@@ -89,7 +102,7 @@ export const EditPelanggaranModal: React.FC<EditPelanggaranModalProps> = ({
       setReporterNip(violation.reporterNip || '');
 
       // Try finding rule in catalog
-      const matchedRule = violationRules.find(r => r.name.toLowerCase() === initialRuleName.toLowerCase());
+      const matchedRule = violationRules.find(r => r.name.toLowerCase() === initialRuleName.toLowerCase() || r.id === violation.ruleId);
       if (matchedRule) {
         setSelectedRuleId(matchedRule.id);
       } else {

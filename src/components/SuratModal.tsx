@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Student, Teacher, StudentScoreSummary, SchoolSettings, ViolationRecord } from '../types';
+import { Student, Teacher, StudentScoreSummary, SchoolSettings, ViolationRecord, ViolationRule } from '../types';
 import { Printer, X, MessageSquare, Download, ShieldAlert, Award, FileText } from 'lucide-react';
 import { openWhatsApp, generateThresholdWAMessage } from '../utils/whatsapp';
 
@@ -7,15 +7,30 @@ interface SuratModalProps {
   summary: StudentScoreSummary;
   violations?: ViolationRecord[];
   teachers?: Teacher[];
+  violationRules?: ViolationRule[];
   settings: SchoolSettings;
   suratType: 'panggilan_100' | 'skorsing_300' | 'pembinaan_500' | 'surat_teguran';
   onClose: () => void;
 }
 
+const isIdStr = (s?: string) => Boolean(s && (s.trim().toUpperCase().startsWith('VIOL-') || s.trim().toUpperCase().startsWith('REW-') || s.trim().toUpperCase().startsWith('ID-') || s.trim().toUpperCase().startsWith('RULE-') || /^V-\d+/.test(s.trim())));
+
+const getCleanRuleName = (v: ViolationRecord, rules: ViolationRule[] = []): string => {
+  if (v.ruleName && !isIdStr(v.ruleName)) return v.ruleName;
+  if ((v as any).pelanggaran && !isIdStr((v as any).pelanggaran)) return (v as any).pelanggaran;
+  if ((v as any).violationName && !isIdStr((v as any).violationName)) return (v as any).violationName;
+  if (v.ruleId) {
+    const matched = rules.find(r => r.id === v.ruleId || r.code === v.ruleId);
+    if (matched && matched.name) return matched.name;
+  }
+  return 'Pelanggaran Tata Tertib';
+};
+
 export const SuratModal: React.FC<SuratModalProps> = ({
   summary,
   violations = [],
   teachers = [],
+  violationRules = [],
   settings,
   suratType,
   onClose
@@ -212,7 +227,7 @@ export const SuratModal: React.FC<SuratModalProps> = ({
                     {studentViolations.slice(0, 4).map((v, i) => (
                       <div key={i} className="text-xs flex items-start justify-between bg-white p-2 rounded border border-slate-100">
                         <div>
-                          <span className="font-medium text-slate-900">{v.ruleName}</span>
+                          <span className="font-medium text-slate-900">{getCleanRuleName(v, violationRules)}</span>
                           <span className="text-slate-500 block text-[11px]">{v.date} • {v.location || 'Sekolah'} • Saksi: {v.reporterName}</span>
                         </div>
                         <span className="font-bold text-rose-600 shrink-0 ml-2">+{v.points} Poin</span>

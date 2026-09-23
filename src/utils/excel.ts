@@ -61,21 +61,44 @@ export const exportStudentsToExcel = (students: Student[], summaries: StudentSco
   XLSX.writeFile(wb, `Data_Siswa_SITAMU_${new Date().toISOString().slice(0, 10)}.xlsx`);
 };
 
-export const exportViolationsToExcel = (violations: ViolationRecord[]) => {
-  const rows = violations.map((v, idx) => ({
-    'No': idx + 1,
-    'Tanggal': v.date,
-    'Waktu': v.time || '-',
-    'Nama Siswa': v.studentName,
-    'Kelas': v.studentClass,
-    'Kategori': v.category.toUpperCase(),
-    'Jenis Pelanggaran': v.ruleName,
-    'Bobot Poin': v.points,
-    'Lokasi Kejadian': v.location || '-',
-    'Guru Pencatat / Saksi': v.reporterName,
-    'Catatan / Kronologi': v.description,
-    'Status Notifikasi WA': v.whatsappSent ? 'Terkirim' : 'Belum Terkirim'
-  }));
+export const exportViolationsToExcel = (violations: ViolationRecord[], rules: ViolationRule[] = []) => {
+  const isIdStr = (s?: string) => Boolean(s && (s.trim().toUpperCase().startsWith('VIOL-') || s.trim().toUpperCase().startsWith('REW-') || s.trim().toUpperCase().startsWith('ID-') || s.trim().toUpperCase().startsWith('RULE-') || /^V-\d+/.test(s.trim())));
+
+  const getCleanRule = (v: ViolationRecord): string => {
+    if (v.ruleName && !isIdStr(v.ruleName)) return v.ruleName;
+    if ((v as any).pelanggaran && !isIdStr((v as any).pelanggaran)) return (v as any).pelanggaran;
+    if ((v as any).violationName && !isIdStr((v as any).violationName)) return (v as any).violationName;
+    if (v.ruleId) {
+      const matched = rules.find(r => r.id === v.ruleId || r.code === v.ruleId);
+      if (matched && matched.name) return matched.name;
+    }
+    return 'Pelanggaran Tata Tertib';
+  };
+
+  const getCleanDesc = (v: ViolationRecord, rName: string): string => {
+    const desc = v.description || (v as any).note || (v as any).notes || '';
+    if (desc && !isIdStr(desc)) return desc;
+    return rName;
+  };
+
+  const rows = violations.map((v, idx) => {
+    const ruleName = getCleanRule(v);
+    const desc = getCleanDesc(v, ruleName);
+    return {
+      'No': idx + 1,
+      'Tanggal': v.date,
+      'Waktu': v.time || '-',
+      'Nama Siswa': v.studentName,
+      'Kelas': v.studentClass,
+      'Kategori': (v.category || 'ringan').toUpperCase(),
+      'Jenis Pelanggaran': ruleName,
+      'Bobot Poin': v.points,
+      'Lokasi Kejadian': v.location || '-',
+      'Guru Pencatat / Saksi': v.reporterName || 'Guru Piket',
+      'Catatan / Kronologi': desc,
+      'Status Notifikasi WA': v.whatsappSent ? 'Terkirim' : 'Belum Terkirim'
+    };
+  });
 
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();

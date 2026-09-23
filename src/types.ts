@@ -62,6 +62,7 @@ export interface RewardRule {
 export interface ViolationRecord {
   id: string;
   studentId: string;
+  studentNisn?: string;
   studentName: string;
   studentClass: string;
   ruleId: string;
@@ -84,6 +85,7 @@ export interface ViolationRecord {
 export interface RewardRecord {
   id: string;
   studentId: string;
+  studentNisn?: string;
   studentName: string;
   studentClass: string;
   ruleId: string;
@@ -107,6 +109,7 @@ export interface RewardRecord {
 export interface CompensationRecord {
   id: string;
   studentId: string;
+  studentNisn?: string;
   studentName: string;
   studentClass: string;
   taskName: string; // e.g. "Kerja Bakti Perpustakaan & Resume Buku 5 Judul"
