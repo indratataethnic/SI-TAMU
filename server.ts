@@ -71,26 +71,133 @@ function normalizeDateString(val: any): string {
   return s.slice(0, 10);
 }
 
+function isLocationValue(val?: string): boolean {
+  if (!val) return false;
+  const s = String(val).toLowerCase().trim();
+  return (
+    s === "lingkungan sekolah" ||
+    s === "ruang kelas" ||
+    s === "kantin" ||
+    s === "halaman" ||
+    s === "halaman sekolah" ||
+    s === "toilet" ||
+    s === "lapangan" ||
+    s === "perpustakaan" ||
+    s === "musholla" ||
+    s === "gerbang" ||
+    s === "gerbang sekolah" ||
+    s === "area sekolah"
+  );
+}
+
+function isIdValue(val?: string): boolean {
+  if (!val) return false;
+  const s = String(val).toUpperCase().trim();
+  return (
+    s.startsWith("VIOL-") ||
+    s.startsWith("ID-") ||
+    s.startsWith("REW-") ||
+    s.startsWith("STU-") ||
+    s.startsWith("RULE-") ||
+    /^V-\d+/.test(s)
+  );
+}
+
+function healViolationRecord(v: any, studentsList: any[] = [], rulesList: any[] = []): any {
+  if (!v) return v;
+  const studentMapByName = new Map<string, any>(studentsList.map((s: any) => [String(s.name || '').toLowerCase().replace(/\s+/g, ' ').trim(), s]));
+  const studentMapByNisn = new Map<string, any>(studentsList.filter((s: any) => s.nisn && String(s.nisn).length >= 8).map((s: any) => [String(s.nisn).trim().toLowerCase(), s]));
+  const studentMapById = new Map<string, any>(studentsList.map((s: any) => [String(s.id).trim(), s]));
+
+  const vNisn = (v.studentNisn ? String(v.studentNisn) : '').replace(/^'/, '').trim().toLowerCase();
+  const vName = String(v.studentName || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const student = (v.studentId ? studentMapById.get(String(v.studentId).trim()) : null) ||
+                  (vNisn && vNisn.length >= 8 ? studentMapByNisn.get(vNisn) : null) ||
+                  (vName ? studentMapByName.get(vName) : null);
+
+  let rName = String(v.ruleName || v.pelanggaran || v.violationName || '').trim();
+  let loc = String(v.location || v.lokasi || 'Lingkungan Sekolah').trim();
+
+  if (isLocationValue(rName)) {
+    if (!loc || loc === 'Lingkungan Sekolah') loc = rName;
+    rName = '';
+  }
+  if (isIdValue(rName)) {
+    rName = '';
+  }
+
+  if (!rName) {
+    if (v.ruleId && rulesList.length > 0) {
+      const match = rulesList.find((r: any) => r.id === v.ruleId || r.code === v.ruleId);
+      if (match && match.name) rName = match.name;
+    }
+    if (!rName) {
+      const pts = Number(v.points) || 10;
+      const cat = String(v.category || '').toLowerCase();
+      if (pts === 10 || cat === 'sedang') {
+        rName = 'Terlambat masuk sekolah';
+      } else if (pts === 5 || cat === 'ringan') {
+        rName = 'Seragam tidak rapi/tidak sesuai jadwal';
+      } else if (pts >= 20 || cat === 'berat') {
+        rName = 'Pelanggaran Tata Tertib Berat';
+      } else {
+        rName = 'Pelanggaran Tata Tertib';
+      }
+    }
+  }
+
+  let pName = String(v.parentName || '').trim();
+  let pPhone = String(v.parentPhone || '').replace(/^'/, '').trim();
+
+  if (/^08\d+/.test(pName) || /^\+62\d+/.test(pName) || /^\d{9,}$/.test(pName)) {
+    if (!pPhone || pPhone === 'Belum') pPhone = pName;
+    pName = student?.parentName || '';
+  }
+  if (pName === 'Belum' || pName === 'Sudah Terkirim' || isIdValue(pName)) {
+    pName = student?.parentName || '';
+  }
+  if ((!pPhone || pPhone === 'Belum' || pPhone === 'Sudah Terkirim') && student?.parentPhone) {
+    pPhone = student.parentPhone;
+  } else if (pPhone === 'Belum' || pPhone === 'Sudah Terkirim') {
+    pPhone = '';
+  }
+
+  let desc = String(v.description || v.note || '').trim();
+  if (isIdValue(desc) || isLocationValue(desc) || !desc) {
+    desc = rName;
+  }
+
+  const vReporter = String(v.reporterName || v.reporter || v.reporterTeacherName || 'Guru Piket').trim();
+
+  return {
+    ...v,
+    studentId: student ? student.id : (v.studentId || ''),
+    studentName: student ? student.name : (v.studentName || ''),
+    studentClass: student ? student.class : (v.studentClass || ''),
+    studentNisn: student ? student.nisn : (v.studentNisn ? String(v.studentNisn).replace(/^'/, '').trim() : ''),
+    ruleName: rName,
+    violationName: rName,
+    pelanggaran: rName,
+    reporterName: vReporter,
+    reporter: vReporter,
+    reporterTeacherName: vReporter,
+    location: loc,
+    lokasi: loc,
+    parentName: pName,
+    parentPhone: pPhone,
+    description: desc,
+    note: desc,
+    date: normalizeDateString(v.date)
+  };
+}
+
 function normalizeDbRecords(db: any) {
   if (!db) return db;
+  const studentsList = Array.isArray(db.students) ? db.students : [];
+  const rulesList = Array.isArray(db.violationRules) ? db.violationRules : [];
+
   if (Array.isArray(db.violations)) {
-    db.violations = db.violations.map((v: any) => {
-      const vRule = v.ruleName || v.pelanggaran || v.violationName || v.description || "Pelanggaran Tata Tertib";
-      const vReporter = v.reporterName || v.reporter || v.reporterTeacherName || "Guru Piket";
-      const vLocation = v.location || v.lokasi || "Lingkungan Sekolah";
-      return {
-        ...v,
-        ruleName: vRule,
-        violationName: vRule,
-        pelanggaran: vRule,
-        reporterName: vReporter,
-        reporter: vReporter,
-        reporterTeacherName: vReporter,
-        location: vLocation,
-        lokasi: vLocation,
-        date: normalizeDateString(v.date)
-      };
-    });
+    db.violations = db.violations.map((v: any) => healViolationRecord(v, studentsList, rulesList));
   }
   if (Array.isArray(db.rewards)) {
     db.rewards = db.rewards.map((r: any) => {
@@ -238,25 +345,11 @@ app.post("/api/data", (req, res) => {
     const incoming = req.body || {};
     if (!cachedDb) cachedDb = {};
 
-    // 1. Violations: save exact list from client
+    // 1. Violations: save exact list from client with deep healing
     if (Array.isArray(incoming.violations)) {
-      cachedDb.violations = incoming.violations.map((v: any) => {
-        const vRule = v.ruleName || v.pelanggaran || v.violationName || v.description || "Pelanggaran Tata Tertib";
-        const vReporter = v.reporterName || v.reporter || v.reporterTeacherName || "Guru Piket";
-        const vLocation = v.location || v.lokasi || "Lingkungan Sekolah";
-        return {
-          ...v,
-          ruleName: vRule,
-          violationName: vRule,
-          pelanggaran: vRule,
-          reporterName: vReporter,
-          reporter: vReporter,
-          reporterTeacherName: vReporter,
-          location: vLocation,
-          lokasi: vLocation,
-          date: normalizeDateString(v.date)
-        };
-      });
+      const activeStudents = Array.isArray(incoming.students) ? incoming.students : (cachedDb?.students || []);
+      const activeRules = Array.isArray(incoming.violationRules) ? incoming.violationRules : (cachedDb?.violationRules || []);
+      cachedDb.violations = incoming.violations.map((v: any) => healViolationRecord(v, activeStudents, activeRules));
     }
 
     // 2. Rewards: save exact list from client
@@ -384,32 +477,9 @@ app.post("/api/sheets/fetch", async (req, res) => {
       const studentMapById = new Map<string, any>((cachedDb.students || []).map((s: any) => [String(s.id).trim(), s]));
 
       if (Array.isArray(json.data.violations)) {
-        cachedDb.violations = json.data.violations.map((v: any) => {
-          const vNisn = (v.studentNisn ? String(v.studentNisn) : '').replace(/^'/, '').trim().toLowerCase();
-          const vName = String(v.studentName || '').toLowerCase().replace(/\s+/g, ' ').trim();
-          const student = (v.studentId ? studentMapById.get(String(v.studentId).trim()) : null) ||
-                          (vNisn && vNisn.length >= 8 ? studentMapByNisn.get(vNisn) : null) ||
-                          (vName ? studentMapByName.get(vName) : null);
-          const vRule = v.ruleName || v.pelanggaran || v.violationName || v.description || "Pelanggaran Tata Tertib";
-          const vReporter = v.reporterName || v.reporter || v.reporterTeacherName || "Guru Piket";
-          const vLocation = v.location || v.lokasi || "Lingkungan Sekolah";
-          return {
-            ...v,
-            studentId: student ? student.id : (v.studentId || ''),
-            studentName: student ? student.name : (v.studentName || ''),
-            studentClass: student ? student.class : (v.studentClass || ''),
-            studentNisn: student ? student.nisn : (v.studentNisn ? String(v.studentNisn).replace(/^'/, '').trim() : ''),
-            ruleName: vRule,
-            violationName: vRule,
-            pelanggaran: vRule,
-            reporterName: vReporter,
-            reporter: vReporter,
-            reporterTeacherName: vReporter,
-            location: vLocation,
-            lokasi: vLocation,
-            date: normalizeDateString(v.date)
-          };
-        });
+        const studentList = cachedDb.students || [];
+        const ruleList = cachedDb.violationRules || [];
+        cachedDb.violations = json.data.violations.map((v: any) => healViolationRecord(v, studentList, ruleList));
         json.data.violations = cachedDb.violations;
       }
       if (Array.isArray(json.data.rewards)) {
@@ -494,14 +564,19 @@ app.post("/api/sheets/sync", async (req, res) => {
     }
 
     const payload = req.body?.payload || req.body;
+    const activeStudents = payload.students || cachedDb?.students || [];
+    const activeRules = payload.violationRules || cachedDb?.violationRules || [];
+    const rawViolations = payload.violations || cachedDb?.violations || [];
+    const healedViolations = Array.isArray(rawViolations) ? rawViolations.map((v: any) => healViolationRecord(v, activeStudents, activeRules)) : [];
+
     const bodyString = JSON.stringify({
       action: payload.action || "SYNC_ALL",
       settings: payload.settings || cachedDb?.settings || null,
-      students: payload.students || cachedDb?.students || [],
+      students: activeStudents,
       teachers: payload.teachers || cachedDb?.teachers || [],
       piketSchedules: payload.piketSchedules || cachedDb?.piketSchedules || [],
-      violationRules: payload.violationRules || cachedDb?.violationRules || [],
-      violations: payload.violations || cachedDb?.violations || [],
+      violationRules: activeRules,
+      violations: healedViolations,
       rewards: payload.rewards || cachedDb?.rewards || [],
       compensations: payload.compensations || cachedDb?.compensations || [],
       summaries: payload.summaries || [],
@@ -613,32 +688,8 @@ async function checkSpreadsheetBackground() {
           const existingViolations = Array.isArray(cachedDb?.violations) ? cachedDb.violations : [];
           const existingRewards = Array.isArray(cachedDb?.rewards) ? cachedDb.rewards : [];
 
-          const mappedViolations = fetchedViolations.map((v: any) => {
-            const vNisn = (v.studentNisn ? String(v.studentNisn) : '').trim().toLowerCase();
-            const vName = String(v.studentName || '').toLowerCase().replace(/\s+/g, ' ').trim();
-            const student = (v.studentId ? studentMapById.get(String(v.studentId).trim()) : null) ||
-                            (vNisn && vNisn.length >= 8 ? studentMapByNisn.get(vNisn) : null) ||
-                            (vName ? studentMapByName.get(vName) : null);
-            const vRule = v.ruleName || v.pelanggaran || v.violationName || v.description || "Pelanggaran Tata Tertib";
-            const vReporter = v.reporterName || v.reporter || v.reporterTeacherName || "Guru Piket";
-            const vLocation = v.location || v.lokasi || "Lingkungan Sekolah";
-            return {
-              ...v,
-              studentId: student ? student.id : (v.studentId || ''),
-              studentName: student ? student.name : (v.studentName || ''),
-              studentClass: student ? student.class : (v.studentClass || ''),
-              studentNisn: student ? student.nisn : ((v as any).studentNisn || ''),
-              ruleName: vRule,
-              violationName: vRule,
-              pelanggaran: vRule,
-              reporterName: vReporter,
-              reporter: vReporter,
-              reporterTeacherName: vReporter,
-              location: vLocation,
-              lokasi: vLocation,
-              date: normalizeDateString(v.date)
-            };
-          });
+          const ruleList = (json.data.violationRules && json.data.violationRules.length > 0) ? json.data.violationRules : (cachedDb?.violationRules || []);
+          const mappedViolations = fetchedViolations.map((v: any) => healViolationRecord(v, studentList, ruleList));
 
           const mappedRewards = fetchedRewards.map((r: any) => {
             const rNisn = (r.studentNisn ? String(r.studentNisn) : '').trim().toLowerCase();

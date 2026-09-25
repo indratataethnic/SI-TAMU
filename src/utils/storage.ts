@@ -416,12 +416,143 @@ export const saveRewardRules = (rules: RewardRule[]): void => {
   localStorage.setItem(STORAGE_KEYS.REWARD_RULES, JSON.stringify(rules));
 };
 
+export const isLocationValue = (val?: string): boolean => {
+  if (!val) return false;
+  const s = val.trim().toLowerCase();
+  return (
+    s === 'lingkungan sekolah' ||
+    s === 'ruang kelas' ||
+    s === 'kantin' ||
+    s === 'halaman' ||
+    s === 'halaman sekolah' ||
+    s === 'toilet' ||
+    s === 'lapangan' ||
+    s === 'perpustakaan' ||
+    s === 'musholla' ||
+    s === 'gerbang' ||
+    s === 'gerbang sekolah' ||
+    s === 'area sekolah'
+  );
+};
+
+export const isIdValue = (val?: string): boolean => {
+  if (!val) return false;
+  const s = val.trim().toUpperCase();
+  return (
+    s.startsWith('VIOL-') ||
+    s.startsWith('ID-') ||
+    s.startsWith('REW-') ||
+    s.startsWith('STU-') ||
+    s.startsWith('RULE-') ||
+    /^V-\d+/.test(s)
+  );
+};
+
+export const sanitizeViolations = (
+  records: ViolationRecord[],
+  rulesList?: ViolationRule[],
+  studentsList?: Student[]
+): ViolationRecord[] => {
+  const seenIds = new Set<string>();
+  const rules = rulesList && rulesList.length > 0 ? rulesList : initialViolationRules;
+  const students = studentsList && studentsList.length > 0 ? studentsList : initialStudents;
+
+  const studentMapByNisn = new Map<string, Student>();
+  const studentMapByName = new Map<string, Student>();
+  students.forEach(s => {
+    if (s.nisn) studentMapByNisn.set(String(s.nisn).trim(), s);
+    if (s.name) studentMapByName.set(String(s.name).trim().toLowerCase(), s);
+  });
+
+  return (records || []).map((v, idx) => {
+    let cleanId = v.id ? String(v.id).trim() : '';
+    if (!cleanId || seenIds.has(cleanId) || /^(\+?62|08)\d+$/.test(cleanId)) {
+      cleanId = `VIOL-${idx}-${Math.random().toString(36).substring(2, 6)}`;
+    }
+    seenIds.add(cleanId);
+
+    let rName = v.ruleName || (v as any).violationName || (v as any).pelanggaran || '';
+    let loc = v.location || (v as any).lokasi || 'Lingkungan Sekolah';
+    let pName = v.parentName || '';
+    let pPhone = v.parentPhone || '';
+    let desc = v.description || (v as any).note || '';
+
+    // Student match
+    const st = (v.studentNisn ? studentMapByNisn.get(String(v.studentNisn).trim()) : null) ||
+               (v.studentName ? studentMapByName.get(String(v.studentName).trim().toLowerCase()) : null);
+
+    // If rName is a location name, move it to loc
+    if (isLocationValue(rName)) {
+      loc = rName;
+      rName = '';
+    }
+
+    // If rName is an ID string, clear it
+    if (isIdValue(rName)) {
+      rName = '';
+    }
+
+    // Recover ruleName if empty
+    if (!rName) {
+      if (v.ruleId) {
+        const match = rules.find(r => r.id === v.ruleId || r.code === v.ruleId);
+        if (match && match.name) rName = match.name;
+      }
+      if (!rName) {
+        if (v.points === 10 || String(v.category).toLowerCase() === 'sedang') {
+          rName = 'Terlambat masuk sekolah';
+        } else if (v.points === 5 || String(v.category).toLowerCase() === 'ringan') {
+          rName = 'Seragam tidak rapi/tidak sesuai jadwal';
+        } else if (v.points >= 20 || String(v.category).toLowerCase() === 'berat') {
+          rName = 'Pelanggaran Tata Tertib Berat';
+        } else {
+          rName = 'Pelanggaran Tata Tertib';
+        }
+      }
+    }
+
+    // Fix parentName containing phone number
+    if (/^08\d+/.test(pName) || /^\+62\d+/.test(pName) || /^\d{9,}$/.test(pName)) {
+      if (!pPhone || pPhone === 'Belum' || pPhone === 'Sudah Terkirim') {
+        pPhone = pName;
+      }
+      pName = st?.parentName || '';
+    } else if (pName === 'Belum' || pName === 'Sudah Terkirim' || isIdValue(pName)) {
+      pName = st?.parentName || '';
+    }
+
+    if ((!pPhone || pPhone === 'Belum' || pPhone === 'Sudah Terkirim') && st?.parentPhone) {
+      pPhone = st.parentPhone;
+    }
+
+    // Fix description containing ID string
+    if (isIdValue(desc)) {
+      desc = rName;
+    }
+
+    return {
+      ...v,
+      id: cleanId,
+      date: normalizeRecordDate(v.date),
+      ruleName: rName,
+      violationName: rName,
+      pelanggaran: rName,
+      location: loc,
+      lokasi: loc,
+      parentName: pName,
+      parentPhone: pPhone,
+      description: desc || rName,
+      note: desc || rName
+    };
+  });
+};
+
 export const getStoredViolations = (): ViolationRecord[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.VIOLATIONS);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? sanitizeRecords(parsed, 'VIOL') : [];
+    return Array.isArray(parsed) ? sanitizeViolations(parsed) : [];
   } catch (e) {
     return [];
   }
@@ -430,7 +561,7 @@ export const getStoredViolations = (): ViolationRecord[] => {
 export const loadViolations = getStoredViolations;
 
 export const saveViolations = (records: ViolationRecord[]): void => {
-  localStorage.setItem(STORAGE_KEYS.VIOLATIONS, JSON.stringify(sanitizeRecords(records, 'VIOL')));
+  localStorage.setItem(STORAGE_KEYS.VIOLATIONS, JSON.stringify(sanitizeViolations(records)));
 };
 
 export const getStoredRewards = (): RewardRecord[] => {

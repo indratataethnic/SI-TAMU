@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   Clock,
   MapPin,
+  RefreshCw,
   X
 } from 'lucide-react';
 import { exportViolationsToExcel, downloadViolationTemplate, importViolationsFromExcel } from '../utils/excel';
@@ -40,6 +41,8 @@ interface DataPelanggaranViewProps {
   onImportViolations?: (imported: ViolationRecord[]) => void;
   onNavigateToInput: () => void;
   onOpenSurat: (summary: StudentScoreSummary) => void;
+  onSyncSheets?: () => Promise<boolean | void> | void;
+  isSyncingSheets?: boolean;
 }
 
 const isIdString = (str?: string): boolean => {
@@ -48,20 +51,50 @@ const isIdString = (str?: string): boolean => {
   return s.startsWith('VIOL-') || s.startsWith('REW-') || s.startsWith('STU-') || s.startsWith('ID-') || s.startsWith('RULE-') || /^V-\d+/.test(s);
 };
 
+const isLocationName = (str?: string): boolean => {
+  if (!str) return false;
+  const s = str.trim().toLowerCase();
+  return (
+    s === 'lingkungan sekolah' ||
+    s === 'ruang kelas' ||
+    s === 'kantin' ||
+    s === 'halaman' ||
+    s === 'halaman sekolah' ||
+    s === 'toilet' ||
+    s === 'lapangan' ||
+    s === 'perpustakaan' ||
+    s === 'musholla' ||
+    s === 'gerbang' ||
+    s === 'gerbang sekolah' ||
+    s === 'area sekolah'
+  );
+};
+
 const getDisplayRuleName = (v: ViolationRecord, rules: ViolationRule[] = []): string => {
-  if (v.ruleName && !isIdString(v.ruleName)) return v.ruleName;
-  if ((v as any).pelanggaran && !isIdString((v as any).pelanggaran)) return (v as any).pelanggaran;
-  if ((v as any).violationName && !isIdString((v as any).violationName)) return (v as any).violationName;
+  let name = v.ruleName || (v as any).pelanggaran || (v as any).violationName || '';
+  if (name && !isIdString(name) && !isLocationName(name) && name !== 'Pelanggaran Tata Tertib') {
+    return name;
+  }
   if (v.ruleId) {
     const matched = rules.find(r => r.id === v.ruleId || r.code === v.ruleId);
     if (matched && matched.name) return matched.name;
   }
-  return 'Pelanggaran Tata Tertib';
+  // Fallback heuristics based on points / category
+  if (v.points === 10 || String(v.category).toLowerCase() === 'sedang') {
+    return 'Terlambat masuk sekolah';
+  }
+  if (v.points === 5 || String(v.category).toLowerCase() === 'ringan') {
+    return 'Seragam tidak rapi/tidak sesuai jadwal';
+  }
+  if (v.points >= 20 || String(v.category).toLowerCase() === 'berat') {
+    return 'Pelanggaran Tata Tertib Berat';
+  }
+  return name && !isIdString(name) && !isLocationName(name) ? name : 'Pelanggaran Tata Tertib';
 };
 
 const getDisplayDescription = (v: ViolationRecord): string | null => {
   const desc = v.description || (v as any).note || (v as any).notes || '';
-  if (!desc || isIdString(desc)) return null;
+  if (!desc || isIdString(desc) || isLocationName(desc)) return null;
   return desc;
 };
 
@@ -78,7 +111,9 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
   onUpdateViolation,
   onImportViolations,
   onNavigateToInput,
-  onOpenSurat
+  onOpenSurat,
+  onSyncSheets,
+  isSyncingSheets = false
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -88,7 +123,24 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
   const [deleteRecord, setDeleteRecord] = useState<ViolationRecord | null>(null);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState<boolean>(false);
   const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
+  const [localSyncing, setLocalSyncing] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleManualSync = async () => {
+    if (onSyncSheets) {
+      setLocalSyncing(true);
+      setNotificationStatus('Sedang menyinkronkan data pelanggaran ke Google Spreadsheet...');
+      try {
+        await onSyncSheets();
+        setNotificationStatus(`Data ${violations.length} pelanggaran berhasil disinkronkan ke Google Spreadsheet!`);
+        setTimeout(() => setNotificationStatus(null), 5000);
+      } catch (err: any) {
+        setNotificationStatus(`Gagal menyinkronkan: ${err?.message || 'Periksa koneksi'}`);
+      } finally {
+        setLocalSyncing(false);
+      }
+    }
+  };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -203,6 +255,18 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {onSyncSheets && (
+            <button
+              onClick={handleManualSync}
+              disabled={isSyncingSheets || localSyncing}
+              title="Sinkronkan data pelanggaran ini ke Kolom Pelanggaran Google Spreadsheet sekarang"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-900/60 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingSheets || localSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncingSheets || localSyncing ? 'Menyinkronkan...' : 'Sinkronkan Spreadsheet'}</span>
+            </button>
+          )}
+
           <button
             onClick={downloadViolationTemplate}
             title="Unduh Format Excel Template Import Pelanggaran"
@@ -271,7 +335,7 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari Siswa, Jenis Pelanggaran, Guru..."
+            placeholder="Cari Siswa, Pelanggaran, Guru..."
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none"
           />
         </div>
@@ -321,7 +385,7 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
                 <th className="py-3 px-4 font-semibold">Nama Siswa</th>
                 <th className="py-3 px-4 font-semibold">Kelas</th>
                 <th className="py-3 px-4 font-semibold">Kategori</th>
-                <th className="py-3 px-4 font-semibold">Jenis Pelanggaran</th>
+                <th className="py-3 px-4 font-semibold">Pelanggaran</th>
                 <th className="py-3 px-4 font-semibold text-center">Poin</th>
                 <th className="py-3 px-4 font-semibold">Pencatat / Saksi</th>
                 <th className="py-3 px-4 font-semibold text-center">Menu Aksi</th>
@@ -483,7 +547,7 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
 
               <div className="space-y-2">
                 <div>
-                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Jenis Pelanggaran</span>
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Pelanggaran</span>
                   <span className="font-bold text-slate-800 text-sm">{getDisplayRuleName(detailRecord, violationRules)}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 pt-1">

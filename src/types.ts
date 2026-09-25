@@ -76,6 +76,8 @@ export interface ViolationRecord {
   reporterId?: string; // ID unik guru pencatat
   reporterNip?: string; // NIP guru pencatat
   description: string;
+  parentName?: string;
+  parentPhone?: string;
   evidenceNote?: string;
   whatsappSent?: boolean;
   academicYear?: string; // e.g. "2026/2027"

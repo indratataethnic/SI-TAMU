@@ -78,12 +78,27 @@ export const EditPelanggaranModal: React.FC<EditPelanggaranModalProps> = ({
       setTime(violation.time || '');
       setLocation(violation.location || 'Ruang Kelas');
 
-      const isIdStr = (s?: string) => s && (s.trim().toUpperCase().startsWith('VIOL-') || s.trim().toUpperCase().startsWith('REW-') || s.trim().toUpperCase().startsWith('ID-'));
+      const isIdStr = (s?: string) => s && (s.trim().toUpperCase().startsWith('VIOL-') || s.trim().toUpperCase().startsWith('REW-') || s.trim().toUpperCase().startsWith('ID-') || s.trim().toUpperCase().startsWith('STU-'));
+      const isLocStr = (s?: string) => {
+        if (!s) return false;
+        const lower = s.trim().toLowerCase();
+        return lower === 'lingkungan sekolah' || lower === 'ruang kelas' || lower === 'kantin' || lower === 'halaman' || lower === 'toilet';
+      };
 
       let initialRuleName = violation.ruleName || (violation as any).pelanggaran || (violation as any).violationName || '';
-      if (!initialRuleName || isIdStr(initialRuleName)) {
+      if (!initialRuleName || isIdStr(initialRuleName) || isLocStr(initialRuleName) || initialRuleName === 'Pelanggaran Tata Tertib') {
         const matched = violationRules.find(r => r.id === violation.ruleId);
-        initialRuleName = matched ? matched.name : 'Pelanggaran Tata Tertib';
+        if (matched) {
+          initialRuleName = matched.name;
+        } else if (violation.points === 10 || violation.category === 'sedang') {
+          initialRuleName = 'Terlambat masuk sekolah';
+        } else if (violation.points === 5 || violation.category === 'ringan') {
+          initialRuleName = 'Seragam tidak rapi/tidak sesuai jadwal';
+        } else if (violation.points >= 20 || violation.category === 'berat') {
+          initialRuleName = 'Pelanggaran Tata Tertib Berat';
+        } else {
+          initialRuleName = 'Pelanggaran Tata Tertib';
+        }
       }
 
       setRuleName(initialRuleName);

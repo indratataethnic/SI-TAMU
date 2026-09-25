@@ -272,6 +272,47 @@ export default function App() {
     return false;
   };
 
+  // Push all local table data (specifically clean violation rule names and records) to Google Spreadsheet
+  const handlePushToSpreadsheet = async (): Promise<boolean> => {
+    const cleanWebhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || OFFICIAL_WEBHOOK_URL).trim();
+    if (!cleanWebhook) {
+      setSheetsSyncStatus('⚠️ URL Webhook Google Sheets belum diatur di Pengaturan.');
+      return false;
+    }
+    setIsLoadingSpreadsheet(true);
+    setSheetsSyncStatus('🔄 Menyinkronkan seluruh data & kolom pelanggaran ke Google Spreadsheet...');
+    try {
+      const res = await syncFullStateToSheets(
+        cleanWebhook,
+        students,
+        violations,
+        rewards,
+        compensations,
+        summaries,
+        settings.googleSheetsUrl,
+        teachers,
+        piketSchedules,
+        settings,
+        violationRules
+      );
+      const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setLastSyncTime(timeStr);
+      if (res.success) {
+        setSheetsSyncStatus(`✓ Kolom pelanggaran & data berhasil disinkronkan ke Google Spreadsheet (${timeStr}): ${violations.length} Pelanggaran.`);
+      } else {
+        setSheetsSyncStatus(`⚠️ Sinkronisasi: ${res.message}`);
+      }
+      setTimeout(() => setSheetsSyncStatus(null), 5000);
+      return !!res.success;
+    } catch (err: any) {
+      setSheetsSyncStatus(`⚠️ Gagal menyinkronkan: ${err?.message || 'Periksa koneksi'}`);
+      setTimeout(() => setSheetsSyncStatus(null), 5000);
+      return false;
+    } finally {
+      setIsLoadingSpreadsheet(false);
+    }
+  };
+
   // Fast background fetch from centralized server cache
   const fetchServerData = async (silent = true): Promise<boolean> => {
     try {
@@ -1371,6 +1412,8 @@ export default function App() {
               onImportViolations={handleImportViolations}
               onNavigateToInput={() => setCurrentTab('input_pelanggaran')}
               onOpenSurat={(sum) => handleOpenSuratModal(sum, 'panggilan_100')}
+              onSyncSheets={handlePushToSpreadsheet}
+              isSyncingSheets={isLoadingSpreadsheet}
             />
           )}
 

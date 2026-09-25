@@ -324,15 +324,47 @@ function writeViolationsSheet(ss, violations) {
 
   if (!violations || violations.length === 0) return;
 
+  var isLoc = function(s) {
+    if (!s) return false;
+    var str = String(s).toLowerCase().trim();
+    return str === "lingkungan sekolah" || str === "ruang kelas" || str === "kantin" || str === "halaman" || str === "toilet" || str === "lapangan";
+  };
+
   var rows = violations.map(function(v) {
     var rName = v.ruleName || v.violationName || v.pelanggaran || "";
-    if (/^viol-/i.test(rName) || /^id-/i.test(rName)) {
+    if (/^viol-/i.test(rName) || /^id-/i.test(rName) || /^stu-/i.test(rName)) {
       rName = "";
     }
-    var desc = v.description || v.note || "";
-    if (/^viol-/i.test(desc) || /^id-/i.test(desc)) {
-      desc = "";
+    if (isLoc(rName)) {
+      rName = "";
     }
+    if (!rName) {
+      if (v.points === 10 || String(v.category).toLowerCase() === "sedang") {
+        rName = "Terlambat masuk sekolah";
+      } else if (v.points === 5 || String(v.category).toLowerCase() === "ringan") {
+        rName = "Seragam tidak rapi/tidak sesuai jadwal";
+      } else if (v.points >= 20 || String(v.category).toLowerCase() === "berat") {
+        rName = "Pelanggaran Tata Tertib Berat";
+      } else {
+        rName = "Pelanggaran Tata Tertib";
+      }
+    }
+
+    var desc = v.description || v.note || "";
+    if (/^viol-/i.test(desc) || /^id-/i.test(desc) || /^stu-/i.test(desc) || isLoc(desc)) {
+      desc = rName;
+    }
+
+    var pName = v.parentName || "";
+    var pPhone = v.parentPhone || "";
+    if (/^08\d+/.test(pName) || /^\+62\d+/.test(pName) || /^\d{9,}$/.test(pName)) {
+      if (!pPhone || pPhone === "Belum") pPhone = pName;
+      pName = "";
+    }
+    if (pPhone === "Belum" || pPhone === "Sudah Terkirim") {
+      pPhone = "";
+    }
+
     return [
       v.date || "",
       "'" + (v.studentNisn || ""),
@@ -343,8 +375,8 @@ function writeViolationsSheet(ss, violations) {
       v.points || 0,
       v.reporterTeacherName || v.reporterName || v.reporter || "Guru Piket",
       v.location || v.lokasi || "Lingkungan Sekolah",
-      v.parentName || "",
-      "'" + (v.parentPhone || ""),
+      pName,
+      "'" + (pPhone || ""),
       desc || rName || "Pelanggaran Tata Tertib",
       v.parentNotified || v.whatsappSent ? "Sudah Terkirim" : "Belum",
       v.id || ""
@@ -959,15 +991,52 @@ function fetchAllData(ss) {
         var rawWa = colWa !== -1 ? (String(row[colWa]).toLowerCase().indexOf("terkirim") !== -1 || row[colWa] === true) : false;
 
         // Clean rawRule and rawNote if they accidentally got an ID string like "VIOL-..."
-        if (/^viol-/i.test(rawRule) || /^id-/i.test(rawRule) || /^rew-/i.test(rawRule)) {
+        if (/^viol-/i.test(rawRule) || /^id-/i.test(rawRule) || /^rew-/i.test(rawRule) || /^stu-/i.test(rawRule)) {
           rawRule = "";
         }
-        if (/^viol-/i.test(rawNote) || /^id-/i.test(rawNote) || /^rew-/i.test(rawNote)) {
+        if (/^viol-/i.test(rawNote) || /^id-/i.test(rawNote) || /^rew-/i.test(rawNote) || /^stu-/i.test(rawNote)) {
           rawNote = "";
         }
 
+        // Detect if rawRule is actually a location name (e.g. Lingkungan Sekolah / Ruang Kelas)
+        var isLocName = function(str) {
+          if (!str) return false;
+          var s = String(str).toLowerCase().trim();
+          return s === "lingkungan sekolah" || s === "ruang kelas" || s === "kantin" || s === "halaman" || s === "toilet" || s === "lapangan";
+        };
+
+        if (isLocName(rawRule)) {
+          if (!rawLocation || rawLocation === "Lingkungan Sekolah") {
+            rawLocation = rawRule;
+          }
+          rawRule = "";
+        }
+
+        if (!rawRule) {
+          if (rawPoints === 10 || rawCat === "sedang") {
+            rawRule = "Terlambat masuk sekolah";
+          } else if (rawPoints === 5 || rawCat === "ringan") {
+            rawRule = "Seragam tidak rapi/tidak sesuai jadwal";
+          } else if (rawPoints >= 20 || rawCat === "berat") {
+            rawRule = "Pelanggaran Tata Tertib Berat";
+          } else {
+            rawRule = "Pelanggaran Tata Tertib";
+          }
+        }
+
+        // Heal parent phone / name if swapped
+        if (/^08\d+/.test(rawParentName) || /^\+62\d+/.test(rawParentName) || /^\d{9,}$/.test(rawParentName)) {
+          if (!rawParentPhone || rawParentPhone === "Belum") {
+            rawParentPhone = rawParentName;
+          }
+          rawParentName = "";
+        }
+        if (rawParentPhone === "Belum" || rawParentPhone === "Sudah Terkirim") {
+          rawParentPhone = "";
+        }
+
         var finalRuleName = rawRule || "Pelanggaran Tata Tertib";
-        var finalDescription = rawNote || finalRuleName;
+        var finalDescription = (rawNote && !isLocName(rawNote)) ? rawNote : finalRuleName;
 
         data.violations.push({
           id: rawId,
@@ -1266,12 +1335,69 @@ export const syncAllToGoogleSheets = async (
     // Map data to ensure perfect Apps Script schema compatibility
     const studentMap = new Map(payload.students?.map(s => [s.id, s]) || []);
 
+    const isLoc = (s?: string) => {
+      if (!s) return false;
+      const str = String(s).toLowerCase().trim();
+      return str === 'lingkungan sekolah' || str === 'ruang kelas' || str === 'kantin' || str === 'halaman' || str === 'toilet' || str === 'lapangan' || str === 'perpustakaan';
+    };
+
+    const isId = (s?: string) => {
+      if (!s) return false;
+      const str = String(s).toUpperCase().trim();
+      return str.startsWith('VIOL-') || str.startsWith('ID-') || str.startsWith('STU-') || str.startsWith('RULE-') || /^V-\d+/.test(str);
+    };
+
     const enrichedViolations = (payload.violations || []).map(v => {
       const student = studentMap.get(v.studentId) || (payload.students || []).find((s: any) => s.nisn === (v as any).studentNisn || s.name === v.studentName);
-      const vRule = String(v.ruleName || (v as any).violationName || (v as any).pelanggaran || (v as any).description || 'Pelanggaran Tata Tertib').trim();
+      let vRule = String(v.ruleName || (v as any).violationName || (v as any).pelanggaran || '').trim();
+      let vLocation = String(v.location || (v as any).lokasi || 'Lingkungan Sekolah').trim();
+
+      if (isLoc(vRule)) {
+        if (!vLocation || vLocation === 'Lingkungan Sekolah') vLocation = vRule;
+        vRule = '';
+      }
+      if (isId(vRule)) {
+        vRule = '';
+      }
+
+      if (!vRule) {
+        if (v.ruleId && payload.violationRules) {
+          const match = payload.violationRules.find((r: any) => r.id === v.ruleId || r.code === v.ruleId);
+          if (match && match.name) vRule = match.name;
+        }
+        if (!vRule) {
+          const pts = Number(v.points) || 10;
+          const cat = String(v.category || '').toLowerCase();
+          if (pts === 10 || cat === 'sedang') {
+            vRule = 'Terlambat masuk sekolah';
+          } else if (pts === 5 || cat === 'ringan') {
+            vRule = 'Seragam tidak rapi/tidak sesuai jadwal';
+          } else if (pts >= 20 || cat === 'berat') {
+            vRule = 'Pelanggaran Tata Tertib Berat';
+          } else {
+            vRule = 'Pelanggaran Tata Tertib';
+          }
+        }
+      }
+
       const vReporter = String(v.reporterName || (v as any).reporter || (v as any).reporterTeacherName || 'Guru Piket').trim();
-      const vLocation = String(v.location || (v as any).lokasi || 'Lingkungan Sekolah').trim();
-      const vDesc = String(v.description || vRule).trim();
+      let vDesc = String(v.description || (v as any).note || '').trim();
+      if (isId(vDesc) || isLoc(vDesc) || !vDesc) {
+        vDesc = vRule;
+      }
+
+      let pName = String(student?.parentName || (v as any).parentName || '').trim();
+      let pPhone = String(student?.parentPhone || (v as any).parentPhone || '').replace(/^'/, '').trim();
+      if (/^08\d+/.test(pName) || /^\+62\d+/.test(pName) || /^\d{9,}$/.test(pName)) {
+        if (!pPhone || pPhone === 'Belum') pPhone = pName;
+        pName = student?.parentName || '';
+      }
+      if (pName === 'Belum' || isId(pName)) {
+        pName = student?.parentName || '';
+      }
+      if (pPhone === 'Belum' || pPhone === 'Sudah Terkirim') {
+        pPhone = student?.parentPhone || '';
+      }
 
       return {
         ...v,
@@ -1287,8 +1413,8 @@ export const syncAllToGoogleSheets = async (
         reporter: vReporter,
         reporterName: vReporter,
         reporterTeacherName: vReporter,
-        parentName: student?.parentName || (v as any).parentName || '',
-        parentPhone: student?.parentPhone || (v as any).parentPhone || '',
+        parentName: pName,
+        parentPhone: pPhone,
         note: vDesc,
         parentNotified: !!v.whatsappSent
       };
