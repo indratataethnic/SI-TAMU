@@ -43,8 +43,15 @@ import {
   isCorruptedNisn,
   isCorruptedAccessCode
 } from './utils/storage';
-import { syncFullStateToSheets, fetchFullStateFromSheets } from './utils/sheetsSync';
 import { OFFICIAL_WEBHOOK_URL, initialTeachers, initialPiketSchedules } from './data/initialData';
+import {
+  testConnection,
+  saveFirestoreDoc,
+  deleteFirestoreDoc,
+  syncCollectionToFirestore,
+  subscribeFirestoreCollection,
+  seedFirestoreIfEmpty
+} from './firebase';
 
 // Components & Views
 import { Navbar } from './components/Navbar';
@@ -65,7 +72,6 @@ import { PublicPortalView } from './components/PublicPortalView';
 import { SuratModal } from './components/SuratModal';
 import { SertifikatModal } from './components/SertifikatModal';
 import { JurnalPiketModal } from './components/JurnalPiketModal';
-import { GoogleSheetsModal } from './components/GoogleSheetsModal';
 import { PinLoginModal } from './components/PinLoginModal';
 import { PengaturanModal } from './components/PengaturanModal';
 
@@ -115,7 +121,6 @@ export default function App() {
     dutyTeachers: Teacher[];
   } | null>(null);
 
-  const [sheetsModalOpen, setSheetsModalOpen] = useState(false);
   const [sheetsSyncStatus, setSheetsSyncStatus] = useState<string | null>(null);
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
@@ -137,7 +142,6 @@ export default function App() {
   const lastLocalActionRef = useRef<number>(0);
   const lastKnownVersionRef = useRef<number>(0);
   const lastLocalSaveTimestampRef = useRef<number>(0);
-  const lastSpreadsheetFetchRef = useRef<number>(0);
   const lastViolationsCountRef = useRef<number>(0);
   const lastRewardsCountRef = useRef<number>(0);
 
@@ -155,158 +159,37 @@ export default function App() {
 
   const [isLoadingSpreadsheet, setIsLoadingSpreadsheet] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const [isSyncPaused, setIsSyncPaused] = useState(false);
+  const isSyncPausedRef = useRef(false);
 
-  // Automatically load data from Google Spreadsheet when the page mounts or on user request
-  const fetchSpreadsheetData = async (silent = false): Promise<boolean> => {
-    // Avoid overwriting if this device just saved locally within 1.2s
-    if (silent && Date.now() - lastLocalSaveTimestampRef.current < 1200) {
-      return false;
-    }
-
-    const cleanWebhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || OFFICIAL_WEBHOOK_URL).trim();
-    if (!cleanWebhook) return false;
-
-    try {
-      lastSpreadsheetFetchRef.current = Date.now();
-      setIsLoadingSpreadsheet(true);
-      if (!silent) {
-        setSheetsSyncStatus('🔄 Sedang memuat pengaturan dan data dari Google Spreadsheet...');
-      }
-
-      let resData: any = null;
-      try {
-        const res = await fetch('/api/sheets/fetch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ webhookUrl: cleanWebhook })
-        });
-        if (res.ok) {
-          const json = await res.json();
-          if (json.success && json.data) {
-            resData = json.data;
-          }
-        }
-      } catch (err) {
-        console.warn('Server proxy fetch failed, falling back to direct client fetch:', err);
-      }
-
-      // Client-side fallback if server proxy did not return data
-      if (!resData) {
-        const clientRes = await fetchFullStateFromSheets(cleanWebhook);
-        if (clientRes.success && clientRes.data) {
-          resData = clientRes.data;
-        }
-      }
-
-      if (resData) {
-        const fetchedSettings = resData.settings || {};
-        const mergedSettings: SchoolSettings = {
-          ...settings,
-          schoolName: fetchedSettings.schoolName || settings.schoolName,
-          schoolSubtitle: fetchedSettings.schoolSubtitle || settings.schoolSubtitle,
-          schoolAddress: fetchedSettings.schoolAddress || settings.schoolAddress,
-          schoolPhone: fetchedSettings.schoolPhone || settings.schoolPhone,
-          schoolEmail: fetchedSettings.schoolEmail || settings.schoolEmail,
-          schoolWebsite: fetchedSettings.schoolWebsite || settings.schoolWebsite,
-          principalName: fetchedSettings.principalName || fetchedSettings.headmasterName || settings.principalName,
-          principalNip: fetchedSettings.principalNip || fetchedSettings.headmasterNip || settings.principalNip,
-          headmasterName: fetchedSettings.headmasterName || fetchedSettings.principalName || settings.headmasterName,
-          headmasterNip: fetchedSettings.headmasterNip || fetchedSettings.principalNip || settings.headmasterNip,
-          bkCoordinatorName: fetchedSettings.bkCoordinatorName || settings.bkCoordinatorName,
-          bkCoordinatorNip: fetchedSettings.bkCoordinatorNip || settings.bkCoordinatorNip,
-          staffPin: fetchedSettings.staffPin || settings.staffPin,
-          letterNumberPrefix: fetchedSettings.letterNumberPrefix || settings.letterNumberPrefix,
-          academicYear: fetchedSettings.academicYear || settings.academicYear || '2026/2027',
-          waGatewayApiKey: fetchedSettings.waGatewayApiKey || settings.waGatewayApiKey,
-          waGatewayDevice: fetchedSettings.waGatewayDevice || settings.waGatewayDevice,
-          googleSheetsWebhook: cleanWebhook,
-          googleSheetsWebhookUrl: cleanWebhook,
-          googleSheetsUrl: (fetchedSettings.googleSheetsUrl || settings.googleSheetsUrl || '').trim()
-        };
-
-        handleImportFullData({
-          settings: mergedSettings,
-          students: resData.students,
-          teachers: resData.teachers,
-          piketSchedules: resData.piketSchedules,
-          violations: resData.violations,
-          rewards: resData.rewards,
-          compensations: resData.compensations
-        });
-
-        const studentCount = resData.students?.length || students.length;
-        const teacherCount = resData.teachers?.length || teachers.length;
-        const violationCount = resData.violations?.length || 0;
-        const rewardCount = resData.rewards?.length || 0;
-
-        const isNewViolations = lastViolationsCountRef.current > 0 && violationCount > lastViolationsCountRef.current;
-        const isNewRewards = lastRewardsCountRef.current > 0 && rewardCount > lastRewardsCountRef.current;
-        lastViolationsCountRef.current = violationCount;
-        lastRewardsCountRef.current = rewardCount;
-
-        const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        setLastSyncTime(timeStr);
-
-        if (!silent) {
-          setSheetsSyncStatus(
-            `✓ Pengaturan dan data berhasil dimuat (${timeStr}): ${studentCount} Siswa, ${violationCount} Pelanggaran, ${rewardCount} Apresiasi`
-          );
-          setTimeout(() => setSheetsSyncStatus(null), 4500);
-        } else if (isNewViolations || isNewRewards) {
-          setSheetsSyncStatus(
-            `✓ Data baru otomatis termuat (${timeStr}): ${violationCount} Pelanggaran${rewardCount > 0 ? `, ${rewardCount} Apresiasi` : ''}`
-          );
-          setTimeout(() => setSheetsSyncStatus(null), 5000);
-        }
-        return true;
-      }
-    } catch (err) {
-      console.log('Automated Google Sheets load error:', err);
-      if (!silent) {
-        setSheetsSyncStatus('⚠️ Gagal terhubung ke Google Sheets, menggunakan data database lokal.');
-        setTimeout(() => setSheetsSyncStatus(null), 4000);
-      }
-    } finally {
-      setIsLoadingSpreadsheet(false);
-    }
-    return false;
+  const setSyncPausedState = (paused: boolean) => {
+    isSyncPausedRef.current = paused;
+    setIsSyncPaused(paused);
   };
 
-  // Push all local table data (specifically clean violation rule names and records) to Google Spreadsheet
+  // Push all local table data to Firebase Cloud Firestore
   const handlePushToSpreadsheet = async (): Promise<boolean> => {
-    const cleanWebhook = (settings.googleSheetsWebhook || settings.googleSheetsWebhookUrl || OFFICIAL_WEBHOOK_URL).trim();
-    if (!cleanWebhook) {
-      setSheetsSyncStatus('⚠️ URL Webhook Google Sheets belum diatur di Pengaturan.');
-      return false;
-    }
     setIsLoadingSpreadsheet(true);
-    setSheetsSyncStatus('🔄 Menyinkronkan seluruh data & kolom pelanggaran ke Google Spreadsheet...');
+    setSheetsSyncStatus('🔄 Menyinkronkan seluruh data ke Firebase Cloud Firestore...');
     try {
-      const res = await syncFullStateToSheets(
-        cleanWebhook,
-        students,
-        violations,
-        rewards,
-        compensations,
-        summaries,
-        settings.googleSheetsUrl,
-        teachers,
-        piketSchedules,
-        settings,
-        violationRules
-      );
+      if (students.length > 0) await syncCollectionToFirestore('students', students);
+      if (teachers.length > 0) await syncCollectionToFirestore('teachers', teachers);
+      if (violations.length > 0) await syncCollectionToFirestore('violations', violations);
+      if (rewards.length > 0) await syncCollectionToFirestore('rewards', rewards);
+      if (compensations.length > 0) await syncCollectionToFirestore('compensations', compensations);
+      if (piketSchedules.length > 0) await syncCollectionToFirestore('piketSchedules', piketSchedules);
+      if (violationRules.length > 0) await syncCollectionToFirestore('violationRules', violationRules);
+      if (rewardRules.length > 0) await syncCollectionToFirestore('rewardRules', rewardRules);
+      await saveFirestoreDoc('settings', 'config', settings);
+
       const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       setLastSyncTime(timeStr);
-      if (res.success) {
-        setSheetsSyncStatus(`✓ Kolom pelanggaran & data berhasil disinkronkan ke Google Spreadsheet (${timeStr}): ${violations.length} Pelanggaran.`);
-      } else {
-        setSheetsSyncStatus(`⚠️ Sinkronisasi: ${res.message}`);
-      }
-      setTimeout(() => setSheetsSyncStatus(null), 5000);
-      return !!res.success;
+      setSheetsSyncStatus(`✓ Seluruh data berhasil tersinkron ke Firebase Cloud Firestore (${timeStr}).`);
+      setTimeout(() => setSheetsSyncStatus(null), 4000);
+      return true;
     } catch (err: any) {
       setSheetsSyncStatus(`⚠️ Gagal menyinkronkan: ${err?.message || 'Periksa koneksi'}`);
-      setTimeout(() => setSheetsSyncStatus(null), 5000);
+      setTimeout(() => setSheetsSyncStatus(null), 4000);
       return false;
     } finally {
       setIsLoadingSpreadsheet(false);
@@ -315,6 +198,9 @@ export default function App() {
 
   // Fast background fetch from centralized server cache
   const fetchServerData = async (silent = true): Promise<boolean> => {
+    if (silent && isSyncPausedRef.current) {
+      return false;
+    }
     try {
       const res = await fetch('/api/data');
       if (!res.ok) return false;
@@ -350,7 +236,7 @@ export default function App() {
         eventSource = new EventSource('/api/stream');
 
         eventSource.onmessage = (event) => {
-          if (!isSubscribed) return;
+          if (!isSubscribed || isSyncPausedRef.current) return;
           try {
             const payload = JSON.parse(event.data);
             if (payload.type === 'DATA_UPDATED') {
@@ -415,30 +301,17 @@ export default function App() {
             }
           })
           .catch(() => {});
-
-        // 2. Also check Google Spreadsheet if at least 4s since last fetch
-        if (Date.now() - lastSpreadsheetFetchRef.current > 4000) {
-          fetchSpreadsheetData(true);
-        }
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityOrFocus);
     window.addEventListener('focus', handleVisibilityOrFocus);
 
-    // Background Google Sheets auto-check every 12 seconds (keeps HP & PC synchronized)
-    const sheetsInterval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        fetchSpreadsheetData(true);
-      }
-    }, 12000);
-
     return () => {
       isSubscribed = false;
       if (eventSource) eventSource.close();
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       clearInterval(pollInterval);
-      clearInterval(sheetsInterval);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
       window.removeEventListener('focus', handleVisibilityOrFocus);
     };
@@ -489,8 +362,18 @@ export default function App() {
       .catch(() => {})
       .finally(() => {
         isInitialLoadingRef.current = false;
-        // 2. Automatically load data from Google Spreadsheet when the page mounts!
-        fetchSpreadsheetData(false);
+        // Seed initial data to Firebase Firestore if empty
+        seedFirestoreIfEmpty({
+          students: loadStudents(),
+          teachers: loadTeachers(),
+          violations: loadViolations(),
+          rewards: loadRewards(),
+          compensations: loadCompensations(),
+          piketSchedules: loadPiketSchedules(),
+          violationRules: loadViolationRules(),
+          rewardRules: loadRewardRules(),
+          settings: loadSettings()
+        });
       });
 
     // 3. Global settings sync
@@ -521,8 +404,100 @@ export default function App() {
       .catch(err => console.log('Error loading global configuration:', err));
   }, []);
 
+  // 0. Test connection to Firestore on initial boot
+  useEffect(() => {
+    testConnection().then(connected => {
+      if (connected) {
+        console.log('⚡ Firebase Cloud Firestore Connected Successfully');
+      }
+    });
+  }, []);
+
+  // 1. Real-Time Sync with Cloud Firestore
+  useEffect(() => {
+    let unsubStudents: (() => void) | undefined;
+    let unsubTeachers: (() => void) | undefined;
+    let unsubViolations: (() => void) | undefined;
+    let unsubRewards: (() => void) | undefined;
+    let unsubCompensations: (() => void) | undefined;
+    let unsubPiket: (() => void) | undefined;
+    let unsubRules: (() => void) | undefined;
+    let unsubRewardRules: (() => void) | undefined;
+
+    try {
+      unsubStudents = subscribeFirestoreCollection<Student>('students', (items) => {
+        if (items && items.length > 0 && !isSyncPausedRef.current) {
+          setStudents(items);
+          saveStudents(items);
+        }
+      });
+
+      unsubTeachers = subscribeFirestoreCollection<Teacher>('teachers', (items) => {
+        if (items && items.length > 0 && !isSyncPausedRef.current) {
+          setTeachers(items);
+          saveTeachers(items);
+        }
+      });
+
+      unsubViolations = subscribeFirestoreCollection<ViolationRecord>('violations', (items) => {
+        if (items && !isSyncPausedRef.current) {
+          setViolations(items);
+          saveViolations(items);
+        }
+      });
+
+      unsubRewards = subscribeFirestoreCollection<RewardRecord>('rewards', (items) => {
+        if (items && !isSyncPausedRef.current) {
+          setRewards(items);
+          saveRewards(items);
+        }
+      });
+
+      unsubCompensations = subscribeFirestoreCollection<CompensationRecord>('compensations', (items) => {
+        if (items && !isSyncPausedRef.current) {
+          setCompensations(items);
+          saveCompensations(items);
+        }
+      });
+
+      unsubPiket = subscribeFirestoreCollection<PiketSchedule>('piketSchedules', (items) => {
+        if (items && items.length > 0 && !isSyncPausedRef.current) {
+          setPiketSchedules(items);
+          savePiketSchedules(items);
+        }
+      });
+
+      unsubRules = subscribeFirestoreCollection<ViolationRule>('violationRules', (items) => {
+        if (items && items.length > 0 && !isSyncPausedRef.current) {
+          setViolationRules(items);
+          saveViolationRules(items);
+        }
+      });
+
+      unsubRewardRules = subscribeFirestoreCollection<RewardRule>('rewardRules', (items) => {
+        if (items && items.length > 0 && !isSyncPausedRef.current) {
+          setRewardRules(items);
+          saveRewardRules(items);
+        }
+      });
+    } catch (err) {
+      console.warn('Firestore subscription initialized:', err);
+    }
+
+    return () => {
+      if (unsubStudents) unsubStudents();
+      if (unsubTeachers) unsubTeachers();
+      if (unsubViolations) unsubViolations();
+      if (unsubRewards) unsubRewards();
+      if (unsubCompensations) unsubCompensations();
+      if (unsubPiket) unsubPiket();
+      if (unsubRules) unsubRules();
+      if (unsubRewardRules) unsubRewardRules();
+    };
+  }, []);
+
   // Background Google Sheets & Multi-Device Real-Time Sync Helper
-  const triggerSheetsSync = (override?: {
+  const triggerSheetsSync = async (override?: {
     students?: Student[];
     teachers?: Teacher[];
     piketSchedules?: PiketSchedule[];
@@ -546,6 +521,21 @@ export default function App() {
     const compensationsToSync = override?.compensations ?? compensations;
     const settingsToSync = override?.settings ?? settings;
 
+    // 0. Instant Batch Save to Firebase Cloud Firestore
+    try {
+      if (studentsToSync && studentsToSync.length > 0) syncCollectionToFirestore('students', studentsToSync);
+      if (teachersToSync && teachersToSync.length > 0) syncCollectionToFirestore('teachers', teachersToSync);
+      if (violationsToSync) syncCollectionToFirestore('violations', violationsToSync);
+      if (rewardsToSync) syncCollectionToFirestore('rewards', rewardsToSync);
+      if (compensationsToSync) syncCollectionToFirestore('compensations', compensationsToSync);
+      if (piketSchedulesToSync && piketSchedulesToSync.length > 0) syncCollectionToFirestore('piketSchedules', piketSchedulesToSync);
+      if (violationRulesToSync && violationRulesToSync.length > 0) syncCollectionToFirestore('violationRules', violationRulesToSync);
+      if (rewardRulesToSync && rewardRulesToSync.length > 0) syncCollectionToFirestore('rewardRules', rewardRulesToSync);
+      if (settingsToSync) saveFirestoreDoc('settings', 'config', settingsToSync);
+    } catch (err) {
+      console.log('Background Firestore sync error:', err);
+    }
+
     // 1. Instant POST to central server (/api/data) to trigger Real-Time SSE broadcast to all other open devices!
     const serverPayload = {
       students: studentsToSync,
@@ -559,34 +549,19 @@ export default function App() {
       settings: settingsToSync
     };
 
-    fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(serverPayload)
-    })
-      .then(res => res.json())
-      .then(json => {
+    try {
+      const res = await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(serverPayload)
+      });
+      if (res.ok) {
+        const json = await res.json();
         if (json?.version) lastKnownVersionRef.current = json.version;
-      })
-      .catch(err => console.log('Background server sync error:', err));
-
-    // 2. Push to Google Spreadsheet via Webhook (Background backup)
-    const webhook = (settingsToSync.googleSheetsWebhook || settingsToSync.googleSheetsWebhookUrl || '').trim();
-    if (!webhook) return;
-
-    syncFullStateToSheets(
-      webhook,
-      studentsToSync,
-      violationsToSync,
-      rewardsToSync,
-      compensationsToSync,
-      summaries,
-      settingsToSync.googleSheetsUrl,
-      teachersToSync,
-      piketSchedulesToSync,
-      settingsToSync,
-      violationRulesToSync
-    ).catch(err => console.log('Background sheets sync error:', err));
+      }
+    } catch (err) {
+      console.log('Background server sync error:', err);
+    }
   };
 
   const handleImportFullData = (imported: {
@@ -893,6 +868,7 @@ export default function App() {
 
   const handleDeleteStudent = (id: string) => {
     lastLocalActionRef.current = Date.now();
+    deleteFirestoreDoc('students', id);
     const updatedStudents = students.filter(s => s.id !== id);
     const updatedViolations = violations.filter(v => v.studentId !== id);
     const updatedRewards = rewards.filter(r => r.studentId !== id);
@@ -971,6 +947,7 @@ export default function App() {
   };
 
   const handleDeleteTeacher = (id: string) => {
+    deleteFirestoreDoc('teachers', id);
     const updated = teachers.filter(t => t.id !== id);
     setTeachers(updated);
     saveTeachers(updated);
@@ -1049,16 +1026,30 @@ export default function App() {
     triggerSheetsSync({ violations: updated });
   };
 
-  const handleUpdateViolation = (updatedViolation: ViolationRecord) => {
+  const handleUpdateViolation = async (updatedViolation: ViolationRecord) => {
     lastLocalActionRef.current = Date.now();
+    lastLocalSaveTimestampRef.current = Date.now();
+
+    // 1. Pause auto-sync temporarily while saving & syncing
+    setSyncPausedState(true);
+
     const finalRule = String(updatedViolation.ruleName || (updatedViolation as any).pelanggaran || (updatedViolation as any).violationName || (updatedViolation as any).description || 'Pelanggaran Tata Tertib').trim();
     const finalReporter = String(updatedViolation.reporterName || (updatedViolation as any).reporter || (updatedViolation as any).reporterTeacherName || 'Guru Piket').trim();
     const finalLocation = String(updatedViolation.location || (updatedViolation as any).lokasi || 'Lingkungan Sekolah').trim();
     const finalDesc = String(updatedViolation.description || finalRule).trim();
 
+    const matchedStudent = students.find(s => s.id === updatedViolation.studentId) || 
+                           students.find(s => s.name.trim().toLowerCase() === String(updatedViolation.studentName || '').trim().toLowerCase());
+
     const cleanViolation: ViolationRecord = {
       ...updatedViolation,
       date: normalizeRecordDate(updatedViolation.date),
+      studentId: matchedStudent?.id || updatedViolation.studentId,
+      studentNisn: matchedStudent?.nisn || (updatedViolation as any).studentNisn || '',
+      studentName: matchedStudent?.name || updatedViolation.studentName,
+      studentClass: matchedStudent?.class || updatedViolation.studentClass,
+      parentName: matchedStudent?.parentName || (updatedViolation as any).parentName || '',
+      parentPhone: matchedStudent?.parentPhone || (updatedViolation as any).parentPhone || '',
       ruleName: finalRule,
       description: finalDesc,
       location: finalLocation,
@@ -1070,14 +1061,45 @@ export default function App() {
       pelanggaran: finalRule,
       note: finalDesc
     } as any;
-    const updated = violations.map(v => v.id === cleanViolation.id ? cleanViolation : v);
+
+    const targetId = String(cleanViolation.id || '').trim();
+    let found = false;
+    let updated = violations.map(v => {
+      const vid = String(v.id || '').trim();
+      if (vid && targetId && vid === targetId) {
+        found = true;
+        return cleanViolation;
+      }
+      return v;
+    });
+
+    if (!found) {
+      updated = violations.map(v => {
+        if (!found && v.studentId === cleanViolation.studentId && v.date === cleanViolation.date) {
+          found = true;
+          return { ...cleanViolation, id: v.id || cleanViolation.id };
+        }
+        return v;
+      });
+    }
+
     setViolations(updated);
     saveViolations(updated);
-    triggerSheetsSync({ violations: updated });
+
+    // 2. Save directly to Cloud Firestore
+    setSheetsSyncStatus('🔄 Menyimpan editan ke Firebase Cloud Firestore...');
+    saveFirestoreDoc('violations', cleanViolation.id, cleanViolation);
+    await triggerSheetsSync({ violations: updated });
+
+    // 3. Complete and notify
+    setSheetsSyncStatus('✓ Data berhasil disimpan ke Firebase Cloud Firestore.');
+    setSyncPausedState(false);
+    setTimeout(() => setSheetsSyncStatus(null), 3000);
   };
 
   const handleDeleteViolation = (id: string) => {
     if (!id) return;
+    deleteFirestoreDoc('violations', id);
     lastLocalActionRef.current = Date.now();
     lastLocalSaveTimestampRef.current = Date.now();
     const targetId = String(id).trim();
@@ -1131,9 +1153,13 @@ export default function App() {
     triggerSheetsSync({ rewards: updated });
   };
 
-  const handleUpdateReward = (updatedReward: RewardRecord) => {
+  const handleUpdateReward = async (updatedReward: RewardRecord) => {
     lastLocalActionRef.current = Date.now();
     lastLocalSaveTimestampRef.current = Date.now();
+
+    // 1. Pause auto-sync temporarily while saving & syncing
+    setSyncPausedState(true);
+
     const finalTitle = String(updatedReward.competitionName || updatedReward.ruleName || (updatedReward as any).title || (updatedReward as any).prestasi || 'Prestasi Siswa').trim();
     const finalReporter = String(updatedReward.reporterName || (updatedReward as any).recordedBy || (updatedReward as any).reporter || (updatedReward as any).reporterTeacherName || 'Wali Kelas').trim();
 
@@ -1151,10 +1177,20 @@ export default function App() {
     const updated = rewards.map(r => r.id === cleanReward.id ? cleanReward : r);
     setRewards(updated);
     saveRewards(updated);
-    triggerSheetsSync({ rewards: updated });
+
+    // 2. Save directly to Cloud Firestore
+    setSheetsSyncStatus('🔄 Menyimpan editan prestasi ke Firebase Cloud Firestore...');
+    saveFirestoreDoc('rewards', cleanReward.id, cleanReward);
+    await triggerSheetsSync({ rewards: updated });
+
+    // 3. Complete and notify
+    setSheetsSyncStatus('✓ Data prestasi berhasil disimpan ke Firebase Cloud Firestore.');
+    setSyncPausedState(false);
+    setTimeout(() => setSheetsSyncStatus(null), 3000);
   };
 
   const handleDeleteReward = (id: string) => {
+    deleteFirestoreDoc('rewards', id);
     lastLocalActionRef.current = Date.now();
     lastLocalSaveTimestampRef.current = Date.now();
     const updated = rewards.filter(r => r.id !== id);
@@ -1194,6 +1230,7 @@ export default function App() {
   };
 
   const handleDeleteCompensation = (id: string) => {
+    deleteFirestoreDoc('compensations', id);
     lastLocalActionRef.current = Date.now();
     const updated = compensations.filter(c => c.id !== id);
     setCompensations(updated);
@@ -1296,12 +1333,11 @@ export default function App() {
         role={role}
         settings={settings}
         onToggleRole={handleToggleRole}
-        onOpenSheetsModal={() => setSheetsModalOpen(true)}
         onOpenSettingsModal={() => setSettingsModalOpen(true)}
         onToggleMobileSidebar={() => setMobileSidebarOpen(prev => !prev)}
         urgentAlertCount={urgentAlertCount}
         isSyncing={isLoadingSpreadsheet}
-        onManualSync={() => fetchSpreadsheetData(false)}
+        onManualSync={handlePushToSpreadsheet}
         lastSyncTime={lastSyncTime}
       />
 
@@ -1391,9 +1427,6 @@ export default function App() {
               onUpdateAllPiketSchedules={handleUpdateAllPiketSchedules}
               onOpenJurnalPiket={handleOpenJurnalPiket}
               onImportTeachers={handleImportTeachers}
-              onOpenSheetsModal={() => setSheetsModalOpen(true)}
-              onFetchFromSheets={() => fetchSpreadsheetData(false)}
-              isLoadingSheets={isLoadingSpreadsheet}
             />
           )}
 
@@ -1414,6 +1447,8 @@ export default function App() {
               onOpenSurat={(sum) => handleOpenSuratModal(sum, 'panggilan_100')}
               onSyncSheets={handlePushToSpreadsheet}
               isSyncingSheets={isLoadingSpreadsheet}
+              onStartEdit={() => setSyncPausedState(true)}
+              onCancelEdit={() => setSyncPausedState(false)}
             />
           )}
 
@@ -1430,6 +1465,8 @@ export default function App() {
               onImportRewards={handleImportRewards}
               onNavigateToInput={() => setCurrentTab('input_reward')}
               onOpenSertifikat={handleOpenSertifikatModal}
+              onStartEdit={() => setSyncPausedState(true)}
+              onCancelEdit={() => setSyncPausedState(false)}
             />
           )}
 
@@ -1525,26 +1562,6 @@ export default function App() {
           settings={settings}
         />
       )}
-
-      {/* Google Sheets Sync Integration Modal */}
-      {sheetsModalOpen && (
-        <GoogleSheetsModal
-          isOpen={sheetsModalOpen}
-          onClose={() => setSheetsModalOpen(false)}
-          settings={settings}
-          students={students}
-          teachers={teachers}
-          piketSchedules={piketSchedules}
-          violations={violations}
-          violationRules={violationRules}
-          rewards={rewards}
-          compensations={compensations}
-          summaries={summaries}
-          onSaveSettings={handleSaveSettings}
-          onImportFullData={handleImportFullData}
-        />
-      )}
-
       {/* Jurnal Piket Harian Modal */}
       {jurnalPiketModalOpen && jurnalPiketData && (
         <JurnalPiketModal

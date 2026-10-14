@@ -43,6 +43,8 @@ interface DataPelanggaranViewProps {
   onOpenSurat: (summary: StudentScoreSummary) => void;
   onSyncSheets?: () => Promise<boolean | void> | void;
   isSyncingSheets?: boolean;
+  onStartEdit?: () => void;
+  onCancelEdit?: () => void;
 }
 
 const isIdString = (str?: string): boolean => {
@@ -72,7 +74,7 @@ const isLocationName = (str?: string): boolean => {
 
 const getDisplayRuleName = (v: ViolationRecord, rules: ViolationRule[] = []): string => {
   let name = v.ruleName || (v as any).pelanggaran || (v as any).violationName || '';
-  if (name && !isIdString(name) && !isLocationName(name) && name !== 'Pelanggaran Tata Tertib') {
+  if (name && !isIdString(name) && !isLocationName(name)) {
     return name;
   }
   if (v.ruleId) {
@@ -113,7 +115,9 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
   onNavigateToInput,
   onOpenSurat,
   onSyncSheets,
-  isSyncingSheets = false
+  isSyncingSheets = false,
+  onStartEdit,
+  onCancelEdit
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -259,11 +263,11 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
             <button
               onClick={handleManualSync}
               disabled={isSyncingSheets || localSyncing}
-              title="Sinkronkan data pelanggaran ini ke Kolom Pelanggaran Google Spreadsheet sekarang"
+              title="Perbarui dan sinkronkan seluruh data ke Cloud Firestore sekarang"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-900/60 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncingSheets || localSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncingSheets || localSyncing ? 'Menyinkronkan...' : 'Sinkronkan Spreadsheet'}</span>
+              <span>{isSyncingSheets || localSyncing ? 'Menyinkronkan...' : 'Sinkronkan Firestore'}</span>
             </button>
           )}
 
@@ -485,7 +489,10 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
 
                           {/* Edit / Koreksi */}
                           <button
-                            onClick={() => setEditingRecord(v)}
+                            onClick={() => {
+                              onStartEdit?.();
+                              setEditingRecord(v);
+                            }}
                             className="p-1.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition cursor-pointer"
                             title="Edit / Koreksi Data Pelanggaran"
                           >
@@ -598,6 +605,7 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
                     onClick={() => {
                       const toEdit = detailRecord;
                       setDetailRecord(null);
+                      onStartEdit?.();
                       setEditingRecord(toEdit);
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition cursor-pointer"
@@ -622,7 +630,10 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
       {/* Edit Pelanggaran Modal */}
       <EditPelanggaranModal
         isOpen={!!editingRecord}
-        onClose={() => setEditingRecord(null)}
+        onClose={() => {
+          setEditingRecord(null);
+          onCancelEdit?.();
+        }}
         violation={editingRecord}
         students={students}
         teachers={teachers}

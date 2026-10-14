@@ -33,6 +33,8 @@ interface DataRewardViewProps {
   onImportRewards?: (imported: RewardRecord[]) => void;
   onNavigateToInput: () => void;
   onOpenSertifikat: (reward: RewardRecord) => void;
+  onStartEdit?: () => void;
+  onCancelEdit?: () => void;
 }
 
 export const DataRewardView: React.FC<DataRewardViewProps> = ({
@@ -46,7 +48,9 @@ export const DataRewardView: React.FC<DataRewardViewProps> = ({
   onUpdateReward,
   onImportRewards,
   onNavigateToInput,
-  onOpenSertifikat
+  onOpenSertifikat,
+  onStartEdit,
+  onCancelEdit
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLevel, setSelectedLevel] = useState('ALL');
@@ -328,7 +332,10 @@ export const DataRewardView: React.FC<DataRewardViewProps> = ({
 
                           {/* Edit / Koreksi */}
                           <button
-                            onClick={() => setEditingRecord(r)}
+                            onClick={() => {
+                              onStartEdit?.();
+                              setEditingRecord(r);
+                            }}
                             className="p-1.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition cursor-pointer"
                             title="Edit / Koreksi Catatan Prestasi"
                           >
@@ -361,7 +368,10 @@ export const DataRewardView: React.FC<DataRewardViewProps> = ({
       {/* Edit Reward Modal */}
       <EditRewardModal
         isOpen={!!editingRecord}
-        onClose={() => setEditingRecord(null)}
+        onClose={() => {
+          setEditingRecord(null);
+          onCancelEdit?.();
+        }}
         reward={editingRecord}
         students={students}
         teachers={teachers}

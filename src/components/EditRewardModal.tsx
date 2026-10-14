@@ -60,6 +60,7 @@ export const EditRewardModal: React.FC<EditRewardModalProps> = ({
   const [organizer, setOrganizer] = useState<string>(reward.organizer || '');
   const [points, setPoints] = useState<number>(reward.points || 3);
   const [notes, setNotes] = useState<string>(reward.notes || '');
+  const [selectedRuleId, setSelectedRuleId] = useState<string>('custom');
 
   const [reporterTeacherId, setReporterTeacherId] = useState<string>(reward.reporterId || '');
   const [reporterName, setReporterName] = useState<string>(reward.reporterName || 'Koordinator Prestasi & Kesiswaan');
@@ -83,8 +84,25 @@ export const EditRewardModal: React.FC<EditRewardModalProps> = ({
       setReporterTeacherId(reward.reporterId || '');
       setReporterName(initialReporter);
       setReporterNip(reward.reporterNip || '');
+
+      const matchedRule = rewardRules.find(r => r.name.toLowerCase() === initialTitle.toLowerCase() || r.id === (reward as any).ruleId);
+      if (matchedRule) {
+        setSelectedRuleId(matchedRule.id);
+      } else {
+        setSelectedRuleId('custom');
+      }
     }
-  }, [reward]);
+  }, [reward, rewardRules]);
+
+  const handleRuleSelect = (ruleId: string) => {
+    setSelectedRuleId(ruleId);
+    if (ruleId === 'custom') return;
+    const found = rewardRules.find(r => r.id === ruleId);
+    if (found) {
+      setCompetitionName(found.name);
+      if (found.points) setPoints(found.points);
+    }
+  };
 
   const filteredStudents = useMemo(() => {
     if (selectedClassFilter === 'ALL') return students;
@@ -252,13 +270,41 @@ export const EditRewardModal: React.FC<EditRewardModalProps> = ({
           <div className="bg-amber-50/50 p-3.5 rounded-xl border border-amber-200/80 space-y-3">
             <label className="block font-bold text-amber-950 text-xs">2. Informasi Ajang & Capaian Juara</label>
             
+            {rewardRules.length > 0 && (
+              <div>
+                <span className="text-[10px] text-slate-500 block mb-1">Pilih dari Master Prestasi / Penghargaan:</span>
+                <select
+                  value={selectedRuleId}
+                  onChange={(e) => handleRuleSelect(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-medium text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                >
+                  <option value="custom">✏️ Masukkan Prestasi Manual / Khusus</option>
+                  {rewardRules.map(r => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} (+{r.points} Poin)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div>
               <span className="text-[10px] text-slate-500 block mb-1">Nama Ajang / Lomba / Kegiatan Prestasi:</span>
               <input
                 type="text"
                 required
                 value={competitionName}
-                onChange={(e) => setCompetitionName(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCompetitionName(val);
+                  const matched = rewardRules.find(r => r.name.toLowerCase() === val.trim().toLowerCase());
+                  if (matched) {
+                    setSelectedRuleId(matched.id);
+                    if (matched.points) setPoints(matched.points);
+                  } else {
+                    setSelectedRuleId('custom');
+                  }
+                }}
                 placeholder="Contoh: Olimpiade Sains Nasional (OSN) Matematika..."
                 className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-bold text-xs text-slate-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
               />

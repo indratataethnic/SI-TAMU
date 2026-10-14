@@ -86,7 +86,7 @@ export const EditPelanggaranModal: React.FC<EditPelanggaranModalProps> = ({
       };
 
       let initialRuleName = violation.ruleName || (violation as any).pelanggaran || (violation as any).violationName || '';
-      if (!initialRuleName || isIdStr(initialRuleName) || isLocStr(initialRuleName) || initialRuleName === 'Pelanggaran Tata Tertib') {
+      if (!initialRuleName || isIdStr(initialRuleName) || isLocStr(initialRuleName)) {
         const matched = violationRules.find(r => r.id === violation.ruleId);
         if (matched) {
           initialRuleName = matched.name;
@@ -149,10 +149,7 @@ export const EditPelanggaranModal: React.FC<EditPelanggaranModalProps> = ({
       setRuleName(found.name);
       setCategory(found.category);
       setPoints(found.points);
-      // Synchronize description if it was empty or matched the old rule name
-      if (!description.trim() || description.trim() === ruleName.trim()) {
-        setDescription(found.name);
-      }
+      setDescription(found.name);
     }
   };
 
@@ -188,11 +185,16 @@ export const EditPelanggaranModal: React.FC<EditPelanggaranModalProps> = ({
     const updated: ViolationRecord = {
       ...violation,
       studentId: selectedStudent.id,
+      studentNisn: selectedStudent.nisn || (violation as any).studentNisn || '',
       studentName: selectedStudent.name,
       studentClass: selectedStudent.class,
+      parentName: selectedStudent.parentName || (violation as any).parentName || '',
+      parentPhone: selectedStudent.parentPhone || (violation as any).parentPhone || '',
       date,
       time: time || undefined,
       location: location.trim() || undefined,
+      lokasi: location.trim() || undefined,
+      ruleId: selectedRuleId !== 'custom' ? selectedRuleId : undefined,
       ruleName: finalRuleName,
       category,
       points: Number(points) || 1,
@@ -359,7 +361,18 @@ export const EditPelanggaranModal: React.FC<EditPelanggaranModalProps> = ({
                   type="text"
                   required
                   value={ruleName}
-                  onChange={(e) => setRuleName(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setRuleName(val);
+                    const matched = violationRules.find(r => r.name.toLowerCase() === val.trim().toLowerCase());
+                    if (matched) {
+                      setSelectedRuleId(matched.id);
+                      setCategory(matched.category);
+                      setPoints(matched.points);
+                    } else {
+                      setSelectedRuleId('custom');
+                    }
+                  }}
                   placeholder="Nama pelanggaran..."
                   className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-bold text-xs text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                 />

@@ -6,7 +6,7 @@ interface NavbarProps {
   role: UserRole;
   settings: SchoolSettings;
   onToggleRole: () => void;
-  onOpenSheetsModal: () => void;
+  onOpenSheetsModal?: () => void;
   onOpenSettingsModal: () => void;
   onToggleMobileSidebar: () => void;
   urgentAlertCount: number;
@@ -19,7 +19,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   role,
   settings,
   onToggleRole,
-  onOpenSheetsModal,
   onOpenSettingsModal,
   onToggleMobileSidebar,
   urgentAlertCount,
@@ -108,22 +107,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-amber-400' : 'text-emerald-300'}`} />
             </button>
 
+            {/* Firebase Cloud Firestore Real-time Badge */}
+            <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-emerald-900/60 border border-emerald-700/60 text-emerald-300 shadow-sm" title="Database terhubung langsung dengan Google Firebase Cloud Firestore">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+              </span>
+              <span>Firestore Real-Time</span>
+            </div>
+
             {/* Live date badge */}
             <div className="hidden md:flex items-center text-xs text-emerald-300 bg-emerald-900/60 px-3 py-1.5 rounded-lg border border-emerald-800">
               <span>{currentDate}</span>
             </div>
-
-            {/* Google Sheets Sync Button */}
-            {role === 'staff' && (
-              <button
-                onClick={onOpenSheetsModal}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 hover:text-white rounded-lg text-xs font-semibold border border-emerald-700/60 transition shadow-sm cursor-pointer"
-                title="Integrasi Database Google Spreadsheet"
-              >
-                <Table className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="hidden sm:inline">Google Sheets</span>
-              </button>
-            )}
 
             {/* Role Badge & Switcher */}
             <button

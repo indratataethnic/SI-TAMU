@@ -1,0 +1,95 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Koleksi Siswa
+    match /students/{studentId} {
+      allow read: if true;
+      allow write: if isValidId(studentId) &&
+        incoming().name is string && incoming().name.size() > 0 && incoming().name.size() <= 200 &&
+        incoming().nisn is string && incoming().nisn.size() <= 30 &&
+        incoming().class is string && incoming().class.size() <= 50;
+    }
+
+    // Koleksi Guru & Tenaga Kependidikan
+    match /teachers/{teacherId} {
+      allow read: if true;
+      allow write: if isValidId(teacherId) &&
+        incoming().name is string && incoming().name.size() > 0 && incoming().name.size() <= 200;
+    }
+
+    // Koleksi Pelanggaran
+    match /violations/{violationId} {
+      allow read: if true;
+      allow write: if isValidId(violationId) &&
+        incoming().studentId is string && incoming().studentId.size() > 0 &&
+        incoming().ruleName is string && incoming().ruleName.size() > 0 && incoming().ruleName.size() <= 300 &&
+        incoming().points is number && incoming().points >= 0 && incoming().points <= 150 &&
+        incoming().date is string && incoming().date.size() >= 8 && incoming().date.size() <= 30;
+    }
+
+    // Koleksi Reward / Prestasi
+    match /rewards/{rewardId} {
+      allow read: if true;
+      allow write: if isValidId(rewardId) &&
+        incoming().studentId is string && incoming().studentId.size() > 0 &&
+        incoming().competitionName is string && incoming().competitionName.size() > 0 && incoming().competitionName.size() <= 300 &&
+        incoming().points is number && incoming().points >= 0 && incoming().points <= 100 &&
+        incoming().date is string && incoming().date.size() >= 8 && incoming().date.size() <= 30;
+    }
+
+    // Koleksi Kompensasi
+    match /compensations/{compensationId} {
+      allow read: if true;
+      allow write: if isValidId(compensationId) &&
+        incoming().studentId is string && incoming().studentId.size() > 0 &&
+        incoming().pointsReduced is number && incoming().pointsReduced >= 0 &&
+        incoming().date is string;
+    }
+
+    // Koleksi Jadwal Piket
+    match /piketSchedules/{piketId} {
+      allow read: if true;
+      allow write: if isValidId(piketId);
+    }
+
+    // Master Tata Tertib
+    match /violationRules/{ruleId} {
+      allow read: if true;
+      allow write: if isValidId(ruleId) &&
+        incoming().name is string && incoming().name.size() > 0 &&
+        incoming().points is number && incoming().points >= 0;
+    }
+
+    // Master Penghargaan
+    match /rewardRules/{ruleId} {
+      allow read: if true;
+      allow write: if isValidId(ruleId) &&
+        incoming().name is string && incoming().name.size() > 0 &&
+        incoming().points is number && incoming().points >= 0;
+    }
+
+    // Konfigurasi Pengaturan Sekolah
+    match /settings/{settingsId} {
+      allow read: if true;
+      allow write: if isValidId(settingsId);
+    }
+  }
+}

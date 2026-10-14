@@ -51,9 +51,6 @@ interface DataGuruViewProps {
   onUpdateAllPiketSchedules?: (schedules: PiketSchedule[]) => void;
   onOpenJurnalPiket?: (dayName: DayOfWeek, dutyTeachers: Teacher[]) => void;
   onImportTeachers: (teachers: Teacher[]) => void;
-  onOpenSheetsModal?: () => void;
-  onFetchFromSheets?: () => Promise<boolean | void> | void;
-  isLoadingSheets?: boolean;
 }
 
 export const DataGuruView: React.FC<DataGuruViewProps> = ({
@@ -70,10 +67,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
   onUpdatePiketSchedule,
   onUpdateAllPiketSchedules,
   onOpenJurnalPiket,
-  onImportTeachers,
-  onOpenSheetsModal,
-  onFetchFromSheets,
-  isLoadingSheets = false
+  onImportTeachers
 }) => {
   const [activeTab, setActiveTab] = useState<'daftar_guru' | 'pengaturan_piket'>('daftar_guru');
   const [searchTerm, setSearchTerm] = useState('');
@@ -462,15 +456,6 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Load fresh from Google Spreadsheet
-  const handleFetchSheets = () => {
-    if (onFetchFromSheets) {
-      onFetchFromSheets();
-    } else if (onOpenSheetsModal) {
-      onOpenSheetsModal();
-    }
-  };
-
   const getRoleLabel = (role: string) => {
     switch (role) {
       case 'wali_kelas': return 'Wali Kelas';
@@ -542,27 +527,6 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>Ekspor Excel</span>
           </button>
-          {onFetchFromSheets && (
-            <button
-              onClick={handleFetchSheets}
-              disabled={isLoadingSheets}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer disabled:opacity-50"
-              title="Muat Data Guru & Jadwal Piket dari Google Spreadsheet"
-            >
-              <RotateCcw className={`w-3.5 h-3.5 ${isLoadingSheets ? 'animate-spin' : ''}`} />
-              <span>{isLoadingSheets ? 'Memuat Sheets...' : 'Muat dari Spreadsheet'}</span>
-            </button>
-          )}
-          {onOpenSheetsModal && (
-            <button
-              onClick={onOpenSheetsModal}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-xl text-xs font-semibold transition cursor-pointer"
-              title="Buka Pengaturan Sinkronisasi Google Spreadsheet"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
-              <span>Sinkron Spreadsheet</span>
-            </button>
-          )}
           <button
             onClick={() => setDeleteAllModalOpen(true)}
             disabled={teachers.length === 0}
@@ -723,19 +687,9 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
                           </div>
                           <h3 className="font-bold text-slate-800 text-sm">Belum Ada Data Guru / GTK</h3>
                           <p className="text-xs text-slate-500 leading-relaxed">
-                            Data Guru & GTK serta Jadwal Piket disinkronkan langsung dari Google Spreadsheet atau dapat diinput manual.
+                            Data Guru & GTK serta Jadwal Piket tersimpan aman di Firebase Cloud Firestore atau dapat diimpor via Excel / input manual.
                           </p>
                           <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-                            {onFetchFromSheets && (
-                              <button
-                                onClick={handleFetchSheets}
-                                disabled={isLoadingSheets}
-                                className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
-                              >
-                                <RotateCcw className={`w-3.5 h-3.5 ${isLoadingSheets ? 'animate-spin' : ''}`} />
-                                <span>{isLoadingSheets ? 'Memuat Sheets...' : 'Muat dari Spreadsheet'}</span>
-                              </button>
-                            )}
                             <button
                               onClick={() => fileInputRef.current?.click()}
                               className="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer"

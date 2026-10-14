@@ -1,0 +1,175 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "Profil data siswa di sekolah",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID unik siswa" },
+        "name": { "type": "string", "description": "Nama lengkap siswa" },
+        "nisn": { "type": "string", "description": "Nomor Induk Siswa Nasional" },
+        "class": { "type": "string", "description": "Kelas siswa" },
+        "gender": { "type": "string", "enum": ["L", "P"], "description": "Jenis kelamin" },
+        "parentName": { "type": "string", "description": "Nama orang tua / wali" },
+        "parentPhone": { "type": "string", "description": "Nomor WhatsApp orang tua" }
+      },
+      "required": ["id", "name", "nisn", "class"]
+    },
+    "Teacher": {
+      "title": "Teacher",
+      "description": "Profil data guru dan staf piket",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID unik guru" },
+        "name": { "type": "string", "description": "Nama lengkap guru beserta gelar" },
+        "nip": { "type": "string", "description": "NIP atau NUPTK guru" },
+        "phone": { "type": "string", "description": "Nomor kontak WhatsApp" },
+        "role": { "type": "string", "description": "Tugas atau jabatan guru" }
+      },
+      "required": ["id", "name"]
+    },
+    "ViolationRecord": {
+      "title": "ViolationRecord",
+      "description": "Catatan pelanggaran tata tertib siswa",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID unik pelanggaran" },
+        "studentId": { "type": "string", "description": "ID siswa yang bersangkutan" },
+        "studentName": { "type": "string", "description": "Nama siswa saat dicatat" },
+        "studentClass": { "type": "string", "description": "Kelas siswa saat dicatat" },
+        "ruleId": { "type": "string", "description": "ID aturan master tata tertib jika ada" },
+        "ruleName": { "type": "string", "description": "Nama jenis pelanggaran" },
+        "category": { "type": "string", "enum": ["ringan", "sedang", "berat"], "description": "Kategori pelanggaran" },
+        "points": { "type": "number", "description": "Bobot poin pelanggaran" },
+        "date": { "type": "string", "description": "Tanggal kejadian (YYYY-MM-DD)" },
+        "time": { "type": "string", "description": "Waktu kejadian" },
+        "location": { "type": "string", "description": "Lokasi kejadian" },
+        "reporterName": { "type": "string", "description": "Nama guru pelapor atau piket" },
+        "description": { "type": "string", "description": "Kronologi atau uraian pelanggaran" }
+      },
+      "required": ["id", "studentId", "ruleName", "points", "date"]
+    },
+    "RewardRecord": {
+      "title": "RewardRecord",
+      "description": "Catatan apresiasi dan prestasi siswa",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID unik prestasi" },
+        "studentId": { "type": "string", "description": "ID siswa yang berprestasi" },
+        "studentName": { "type": "string", "description": "Nama siswa" },
+        "studentClass": { "type": "string", "description": "Kelas siswa" },
+        "competitionName": { "type": "string", "description": "Nama ajang atau jenis prestasi" },
+        "rank": { "type": "string", "description": "Capaian atau peringkat (Juara 1, dll)" },
+        "level": { "type": "string", "description": "Tingkat lomba (Sekolah, Kota/Kab, dll)" },
+        "points": { "type": "number", "description": "Poin reward positif" },
+        "date": { "type": "string", "description": "Tanggal prestasi" },
+        "reporterName": { "type": "string", "description": "Guru pembimbing / pencatat" }
+      },
+      "required": ["id", "studentId", "competitionName", "points", "date"]
+    },
+    "CompensationRecord": {
+      "title": "CompensationRecord",
+      "description": "Catatan kompensasi atau pemulihan poin pelanggaran",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID unik kompensasi" },
+        "studentId": { "type": "string", "description": "ID siswa yang melaksanakan kompensasi" },
+        "studentName": { "type": "string", "description": "Nama siswa" },
+        "violationId": { "type": "string", "description": "ID pelanggaran yang dikompensasi jika ada" },
+        "actionType": { "type": "string", "description": "Bentuk tindakan pembinaan atau kompensasi" },
+        "pointsReduced": { "type": "number", "description": "Jumlah poin yang dipulihkan/dikurangi" },
+        "date": { "type": "string", "description": "Tanggal pelaksanaan" },
+        "supervisorName": { "type": "string", "description": "Guru BK atau pembina" }
+      },
+      "required": ["id", "studentId", "pointsReduced", "date"]
+    },
+    "PiketSchedule": {
+      "title": "PiketSchedule",
+      "description": "Jadwal guru piket harian",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID jadwal" },
+        "day": { "type": "string", "description": "Nama hari (Senin, Selasa, dll)" },
+        "teacherIds": { "type": "array", "description": "Daftar ID guru piket pada hari tersebut" }
+      },
+      "required": ["id", "day"]
+    },
+    "ViolationRule": {
+      "title": "ViolationRule",
+      "description": "Katalog master tata tertib sekolah",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Kode atau ID aturan" },
+        "name": { "type": "string", "description": "Deskripsi atau nama pelanggaran" },
+        "category": { "type": "string", "enum": ["ringan", "sedang", "berat"], "description": "Kategori" },
+        "points": { "type": "number", "description": "Bobot poin default" }
+      },
+      "required": ["id", "name", "category", "points"]
+    },
+    "RewardRule": {
+      "title": "RewardRule",
+      "description": "Katalog master prestasi sekolah",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Kode atau ID aturan reward" },
+        "name": { "type": "string", "description": "Nama kategori prestasi" },
+        "points": { "type": "number", "description": "Bobot poin reward default" }
+      },
+      "required": ["id", "name", "points"]
+    },
+    "SchoolSettings": {
+      "title": "SchoolSettings",
+      "description": "Konfigurasi informasi sekolah dan sinkronisasi",
+      "type": "object",
+      "properties": {
+        "schoolName": { "type": "string", "description": "Nama sekolah" },
+        "schoolSubtitle": { "type": "string", "description": "Slogan atau subjudul sekolah" },
+        "schoolAddress": { "type": "string", "description": "Alamat sekolah" },
+        "academicYear": { "type": "string", "description": "Tahun ajaran aktif" },
+        "principalName": { "type": "string", "description": "Nama kepala sekolah" },
+        "principalNip": { "type": "string", "description": "NIP kepala sekolah" },
+        "bkCoordinatorName": { "type": "string", "description": "Koordinator BK" },
+        "googleSheetsWebhook": { "type": "string", "description": "URL Webhook cadangan Google Sheets" },
+        "googleSheetsUrl": { "type": "string", "description": "URL Tautan Google Spreadsheet" }
+      }
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Koleksi data seluruh siswa sekolah"
+    },
+    "/teachers/{teacherId}": {
+      "schema": "Teacher",
+      "description": "Koleksi data guru dan staf piket"
+    },
+    "/violations/{violationId}": {
+      "schema": "ViolationRecord",
+      "description": "Koleksi pencatatan pelanggaran siswa"
+    },
+    "/rewards/{rewardId}": {
+      "schema": "RewardRecord",
+      "description": "Koleksi pencatatan penghargaan dan prestasi siswa"
+    },
+    "/compensations/{compensationId}": {
+      "schema": "CompensationRecord",
+      "description": "Koleksi catatan kompensasi poin pelanggaran"
+    },
+    "/piketSchedules/{piketId}": {
+      "schema": "PiketSchedule",
+      "description": "Koleksi jadwal guru piket harian"
+    },
+    "/violationRules/{ruleId}": {
+      "schema": "ViolationRule",
+      "description": "Koleksi master tata tertib sekolah"
+    },
+    "/rewardRules/{ruleId}": {
+      "schema": "RewardRule",
+      "description": "Koleksi master penghargaan dan prestasi"
+    },
+    "/settings/{settingsId}": {
+      "schema": "SchoolSettings",
+      "description": "Dokumen konfigurasi dan informasi sekolah"
+    }
+  }
+}
