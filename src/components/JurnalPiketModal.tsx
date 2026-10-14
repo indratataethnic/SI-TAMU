@@ -31,8 +31,6 @@ export const JurnalPiketModal: React.FC<JurnalPiketModalProps> = ({
   rewards,
   settings
 }) => {
-  if (!isOpen) return null;
-
   // Filter records for the selected date
   const dayViolations = violations.filter(v => v.date === selectedDate);
   const dayRewards = rewards.filter(r => r.date === selectedDate);
@@ -59,6 +57,8 @@ export const JurnalPiketModal: React.FC<JurnalPiketModalProps> = ({
       return `${dayName}, ${selectedDate}`;
     }
   }, [selectedDate, dayName]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">

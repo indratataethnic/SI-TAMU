@@ -51,22 +51,20 @@ export const EditPelanggaranModal: React.FC<EditPelanggaranModalProps> = ({
   violationRules,
   onSave
 }) => {
-  if (!isOpen || !violation) return null;
-
-  const [studentId, setStudentId] = useState<string>(violation.studentId || '');
+  const [studentId, setStudentId] = useState<string>(violation?.studentId || '');
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>('ALL');
-  const [date, setDate] = useState<string>(violation.date || new Date().toISOString().slice(0, 10));
-  const [time, setTime] = useState<string>(violation.time || '');
-  const [location, setLocation] = useState<string>(violation.location || 'Ruang Kelas');
+  const [date, setDate] = useState<string>(violation?.date || new Date().toISOString().slice(0, 10));
+  const [time, setTime] = useState<string>(violation?.time || '');
+  const [location, setLocation] = useState<string>(violation?.location || 'Ruang Kelas');
   const [selectedRuleId, setSelectedRuleId] = useState<string>('');
-  const [ruleName, setRuleName] = useState<string>(violation.ruleName || '');
-  const [category, setCategory] = useState<'ringan' | 'sedang' | 'berat'>(violation.category || 'ringan');
-  const [points, setPoints] = useState<number>(violation.points || 5);
-  const [description, setDescription] = useState<string>(violation.description || '');
+  const [ruleName, setRuleName] = useState<string>(violation?.ruleName || '');
+  const [category, setCategory] = useState<'ringan' | 'sedang' | 'berat'>(violation?.category || 'ringan');
+  const [points, setPoints] = useState<number>(violation?.points || 5);
+  const [description, setDescription] = useState<string>(violation?.description || '');
 
-  const [reporterTeacherId, setReporterTeacherId] = useState<string>(violation.reporterId || '');
-  const [reporterName, setReporterName] = useState<string>(violation.reporterName || 'Guru Piket');
-  const [reporterNip, setReporterNip] = useState<string>(violation.reporterNip || '');
+  const [reporterTeacherId, setReporterTeacherId] = useState<string>(violation?.reporterId || '');
+  const [reporterName, setReporterName] = useState<string>(violation?.reporterName || 'Guru Piket');
+  const [reporterNip, setReporterNip] = useState<string>(violation?.reporterNip || '');
 
   const availableClasses = useMemo(() => getAvailableClasses(students), [students]);
 
@@ -213,6 +211,8 @@ export const EditPelanggaranModal: React.FC<EditPelanggaranModalProps> = ({
     onSave(updated);
     onClose();
   };
+
+  if (!isOpen || !violation) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex justify-center items-center p-4">

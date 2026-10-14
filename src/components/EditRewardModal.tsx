@@ -49,22 +49,20 @@ export const EditRewardModal: React.FC<EditRewardModalProps> = ({
   rewardRules = [],
   onSave
 }) => {
-  if (!isOpen || !reward) return null;
-
-  const [studentId, setStudentId] = useState<string>(reward.studentId || '');
+  const [studentId, setStudentId] = useState<string>(reward?.studentId || '');
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>('ALL');
-  const [date, setDate] = useState<string>(reward.date || new Date().toISOString().slice(0, 10));
-  const [competitionName, setCompetitionName] = useState<string>(reward.competitionName || '');
-  const [rank, setRank] = useState<string>(reward.rank || 'Juara 1');
-  const [level, setLevel] = useState<'Nasional' | 'Provinsi' | 'Kota/Kab' | 'Sekolah' | 'Umum'>(reward.level || 'Kota/Kab');
-  const [organizer, setOrganizer] = useState<string>(reward.organizer || '');
-  const [points, setPoints] = useState<number>(reward.points || 3);
-  const [notes, setNotes] = useState<string>(reward.notes || '');
+  const [date, setDate] = useState<string>(reward?.date || new Date().toISOString().slice(0, 10));
+  const [competitionName, setCompetitionName] = useState<string>(reward?.competitionName || '');
+  const [rank, setRank] = useState<string>(reward?.rank || 'Juara 1');
+  const [level, setLevel] = useState<'Nasional' | 'Provinsi' | 'Kota/Kab' | 'Sekolah' | 'Umum'>(reward?.level || 'Kota/Kab');
+  const [organizer, setOrganizer] = useState<string>(reward?.organizer || '');
+  const [points, setPoints] = useState<number>(reward?.points || 3);
+  const [notes, setNotes] = useState<string>(reward?.notes || '');
   const [selectedRuleId, setSelectedRuleId] = useState<string>('custom');
 
-  const [reporterTeacherId, setReporterTeacherId] = useState<string>(reward.reporterId || '');
-  const [reporterName, setReporterName] = useState<string>(reward.reporterName || 'Koordinator Prestasi & Kesiswaan');
-  const [reporterNip, setReporterNip] = useState<string>(reward.reporterNip || '');
+  const [reporterTeacherId, setReporterTeacherId] = useState<string>(reward?.reporterId || '');
+  const [reporterName, setReporterName] = useState<string>(reward?.reporterName || 'Koordinator Prestasi & Kesiswaan');
+  const [reporterNip, setReporterNip] = useState<string>(reward?.reporterNip || '');
 
   const availableClasses = useMemo(() => getAvailableClasses(students), [students]);
 
@@ -166,6 +164,8 @@ export const EditRewardModal: React.FC<EditRewardModalProps> = ({
     onSave(updated);
     onClose();
   };
+
+  if (!isOpen || !reward) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex justify-center items-center p-4">
