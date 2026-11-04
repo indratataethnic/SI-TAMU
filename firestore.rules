@@ -22,46 +22,51 @@ service cloud.firestore {
     // Koleksi Siswa
     match /students/{studentId} {
       allow read: if true;
-      allow write: if isValidId(studentId) &&
+      allow create, update: if isValidId(studentId) &&
         incoming().name is string && incoming().name.size() > 0 && incoming().name.size() <= 200 &&
         incoming().nisn is string && incoming().nisn.size() <= 30 &&
         incoming().class is string && incoming().class.size() <= 50;
+      allow delete: if isValidId(studentId);
     }
 
     // Koleksi Guru & Tenaga Kependidikan
     match /teachers/{teacherId} {
       allow read: if true;
-      allow write: if isValidId(teacherId) &&
+      allow create, update: if isValidId(teacherId) &&
         incoming().name is string && incoming().name.size() > 0 && incoming().name.size() <= 200;
+      allow delete: if isValidId(teacherId);
     }
 
     // Koleksi Pelanggaran
     match /violations/{violationId} {
       allow read: if true;
-      allow write: if isValidId(violationId) &&
+      allow create, update: if isValidId(violationId) &&
         incoming().studentId is string && incoming().studentId.size() > 0 &&
         incoming().ruleName is string && incoming().ruleName.size() > 0 && incoming().ruleName.size() <= 300 &&
         incoming().points is number && incoming().points >= 0 && incoming().points <= 150 &&
         incoming().date is string && incoming().date.size() >= 8 && incoming().date.size() <= 30;
+      allow delete: if isValidId(violationId);
     }
 
     // Koleksi Reward / Prestasi
     match /rewards/{rewardId} {
       allow read: if true;
-      allow write: if isValidId(rewardId) &&
+      allow create, update: if isValidId(rewardId) &&
         incoming().studentId is string && incoming().studentId.size() > 0 &&
         incoming().competitionName is string && incoming().competitionName.size() > 0 && incoming().competitionName.size() <= 300 &&
         incoming().points is number && incoming().points >= 0 && incoming().points <= 100 &&
         incoming().date is string && incoming().date.size() >= 8 && incoming().date.size() <= 30;
+      allow delete: if isValidId(rewardId);
     }
 
     // Koleksi Kompensasi
     match /compensations/{compensationId} {
       allow read: if true;
-      allow write: if isValidId(compensationId) &&
+      allow create, update: if isValidId(compensationId) &&
         incoming().studentId is string && incoming().studentId.size() > 0 &&
         incoming().pointsReduced is number && incoming().pointsReduced >= 0 &&
         incoming().date is string;
+      allow delete: if isValidId(compensationId);
     }
 
     // Koleksi Jadwal Piket
@@ -73,17 +78,19 @@ service cloud.firestore {
     // Master Tata Tertib
     match /violationRules/{ruleId} {
       allow read: if true;
-      allow write: if isValidId(ruleId) &&
+      allow create, update: if isValidId(ruleId) &&
         incoming().name is string && incoming().name.size() > 0 &&
         incoming().points is number && incoming().points >= 0;
+      allow delete: if isValidId(ruleId);
     }
 
     // Master Penghargaan
     match /rewardRules/{ruleId} {
       allow read: if true;
-      allow write: if isValidId(ruleId) &&
+      allow create, update: if isValidId(ruleId) &&
         incoming().name is string && incoming().name.size() > 0 &&
         incoming().points is number && incoming().points >= 0;
+      allow delete: if isValidId(ruleId);
     }
 
     // Konfigurasi Pengaturan Sekolah

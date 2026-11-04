@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { openWhatsApp } from '../utils/whatsapp';
 import { PRIMARY_SCHOOL_CLASSES, getAvailableClasses, matchClassFilter } from '../data/classOptions';
+import { sortViolationsByDateDesc } from '../utils/storage';
 
 interface PublicPortalViewProps {
   students: Student[];
@@ -94,7 +95,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
     : null;
 
   const studentViolations = selectedStudent
-    ? violations.filter(v => v.studentId === selectedStudent.id)
+    ? sortViolationsByDateDesc(violations.filter(v => v.studentId === selectedStudent.id))
     : [];
 
   const studentRewards = selectedStudent

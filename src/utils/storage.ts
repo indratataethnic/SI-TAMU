@@ -386,10 +386,22 @@ export const savePiketSchedules = (schedules: PiketSchedule[]): void => {
   localStorage.setItem(STORAGE_KEYS.PIKET_SCHEDULES, JSON.stringify(sanitizePiketSchedules(schedules, teachers)));
 };
 
+export const sanitizeViolationRules = (rules: ViolationRule[]): ViolationRule[] => {
+  if (!Array.isArray(rules) || rules.length === 0) return initialViolationRules;
+  const filtered = rules.filter(r => {
+    if (!r || !r.name) return false;
+    const name = String(r.name).trim().toLowerCase();
+    if (name === 'aaaaaaa' || name === 'aaaaaa' || /^a{3,}$/i.test(name)) return false;
+    if (r.id === 'rule_17' && name.includes('aaa')) return false;
+    return true;
+  });
+  return filtered.length > 0 ? filtered : initialViolationRules;
+};
+
 export const getStoredViolationRules = (): ViolationRule[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.VIOLATION_RULES);
-    return raw ? JSON.parse(raw) : initialViolationRules;
+    return raw ? sanitizeViolationRules(JSON.parse(raw)) : initialViolationRules;
   } catch (e) {
     return initialViolationRules;
   }
@@ -398,7 +410,7 @@ export const getStoredViolationRules = (): ViolationRule[] => {
 export const loadViolationRules = getStoredViolationRules;
 
 export const saveViolationRules = (rules: ViolationRule[]): void => {
-  localStorage.setItem(STORAGE_KEYS.VIOLATION_RULES, JSON.stringify(rules));
+  localStorage.setItem(STORAGE_KEYS.VIOLATION_RULES, JSON.stringify(sanitizeViolationRules(rules)));
 };
 
 export const getStoredRewardRules = (): RewardRule[] => {
@@ -547,12 +559,56 @@ export const sanitizeViolations = (
   });
 };
 
+export const compareViolationsByDate = (
+  a: ViolationRecord,
+  b: ViolationRecord,
+  order: 'desc' | 'asc' = 'desc'
+): number => {
+  const dateA = normalizeRecordDate(a.date);
+  const dateB = normalizeRecordDate(b.date);
+
+  // 1. Primary: Incident date (YYYY-MM-DD)
+  if (dateA !== dateB) {
+    return order === 'desc'
+      ? dateB.localeCompare(dateA)
+      : dateA.localeCompare(dateB);
+  }
+
+  // 2. Secondary: Incident time if present
+  const cleanTime = (t?: string) => (t ? t.replace('.', ':').trim() : '');
+  const timeA = cleanTime(a.time);
+  const timeB = cleanTime(b.time);
+  if (timeA && timeB && timeA !== timeB) {
+    return order === 'desc'
+      ? timeB.localeCompare(timeA)
+      : timeA.localeCompare(timeB);
+  }
+
+  // 3. Tertiary: Creation timestamp
+  const createdA = a.createdAt || '';
+  const createdB = b.createdAt || '';
+  if (createdA && createdB && createdA !== createdB) {
+    return order === 'desc'
+      ? createdB.localeCompare(createdA)
+      : createdA.localeCompare(createdB);
+  }
+
+  // 4. Quaternary: ID fallback
+  return order === 'desc'
+    ? (b.id || '').localeCompare(a.id || '')
+    : (a.id || '').localeCompare(b.id || '');
+};
+
+export const sortViolationsByDateDesc = (records: ViolationRecord[]): ViolationRecord[] => {
+  return [...records].sort((a, b) => compareViolationsByDate(a, b, 'desc'));
+};
+
 export const getStoredViolations = (): ViolationRecord[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.VIOLATIONS);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? sanitizeViolations(parsed) : [];
+    return Array.isArray(parsed) ? sortViolationsByDateDesc(sanitizeViolations(parsed)) : [];
   } catch (e) {
     return [];
   }
@@ -561,7 +617,7 @@ export const getStoredViolations = (): ViolationRecord[] => {
 export const loadViolations = getStoredViolations;
 
 export const saveViolations = (records: ViolationRecord[]): void => {
-  localStorage.setItem(STORAGE_KEYS.VIOLATIONS, JSON.stringify(sanitizeViolations(records)));
+  localStorage.setItem(STORAGE_KEYS.VIOLATIONS, JSON.stringify(sortViolationsByDateDesc(sanitizeViolations(records))));
 };
 
 export const getStoredRewards = (): RewardRecord[] => {

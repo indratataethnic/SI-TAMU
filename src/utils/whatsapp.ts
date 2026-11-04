@@ -69,7 +69,8 @@ _Sistem Informasi Tata Tertib Murid (SI TAMU) - ${settings.schoolName}_`;
 
 export const generateThresholdWAMessage = (
   summary: StudentScoreSummary,
-  settings: SchoolSettings
+  settings: SchoolSettings,
+  violations?: ViolationRecord[]
 ): string => {
   const student = summary.student;
   const points = summary.activeViolationPoints;
@@ -88,6 +89,15 @@ export const generateThresholdWAMessage = (
     levelDetail = `Akumulasi poin telah mencapai ${points} Poin. Mohon kesediaan Bapak/Ibu untuk hadir ke ruang Bimbingan Konseling (BK) guna koordinasi pembinaan.`;
   }
 
+  let violationsList = '';
+  if (violations && violations.length > 0) {
+    const list = violations.slice(0, 8).map((v, i) => {
+      const name = v.ruleName || (v as any).pelanggaran || 'Pelanggaran Tata Tertib';
+      return `${i + 1}. [${v.date}] ${name} (+${v.points} Pt)${v.location ? ` - Lokasi: ${v.location}` : ''}`;
+    }).join('\n');
+    violationsList = `\n📋 *Rincian Kasus Pelanggaran Terdaftar:*\n${list}${violations.length > 8 ? `\n_...dan ${violations.length - 8} catatan pelanggaran lainnya tercantum lengkap di lembar rincian rekam jejak surat resmi._` : ''}\n`;
+  }
+
   return `*${title}*
 *${settings.schoolName}*
 ----------------------------------------
@@ -97,10 +107,10 @@ Yth. Bapak/Ibu Wali Murid dari:
 🆔 *NISN:* ${student.nisn}
 
 📊 *Rincian Poin Siswa:*
-• Total Poin Pelanggaran: ${summary.totalViolationPoints}
-• Poin Pengurangan (Kompensasi): -${summary.totalCompensationPoints}
+• Total Poin Pelanggaran: ${summary.totalViolationPoints} Poin (${summary.violationsCount} Kasus)
+• Poin Pengurangan (Kompensasi): -${summary.totalCompensationPoints} Poin
 • *Total Poin Aktif Saat Ini:* ${points} Poin
-
+${violationsList}
 ⚠️ *Tindakan Sekolah:*
 ${levelDetail}
 

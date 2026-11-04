@@ -3,12 +3,27 @@
 @layer utilities {
   /* Print Optimization */
   @media print {
-    body {
+    @page {
+      size: A4 portrait;
+      margin: 10mm 12mm 12mm 12mm;
+    }
+    html, body {
       background-color: white !important;
       color: black !important;
+      overflow: visible !important;
+      height: auto !important;
     }
     .no-print {
       display: none !important;
+    }
+    .no-print-bg {
+      position: static !important;
+      background: transparent !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      overflow: visible !important;
+      inset: auto !important;
+      display: block !important;
     }
     .print-only {
       display: block !important;
@@ -26,7 +41,21 @@
       box-shadow: none !important;
       border: none !important;
       width: 100% !important;
-      padding: 15mm !important;
+      max-width: 100% !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      overflow: visible !important;
+    }
+    .print-expand {
+      max-height: none !important;
+      overflow: visible !important;
+    }
+    .print-table {
+      page-break-inside: auto;
+    }
+    .print-table tr {
+      page-break-inside: avoid;
+      page-break-after: auto;
     }
   }
 }

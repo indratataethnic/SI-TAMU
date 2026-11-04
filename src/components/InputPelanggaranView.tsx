@@ -128,14 +128,23 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
     }
   }, [preselectedStudent]);
 
+  // Filter out any dummy / test rules (such as 'aaaaaaa')
+  const validViolationRules = useMemo(() => {
+    return violationRules.filter(r => {
+      if (!r || !r.name) return false;
+      const n = String(r.name).trim().toLowerCase();
+      return n !== 'aaaaaaa' && n !== 'aaaaaa' && !/^a{3,}$/i.test(n) && r.id !== 'rule_17';
+    });
+  }, [violationRules]);
+
   useEffect(() => {
-    if (violationRules.length > 0) {
-      if (!selectedRuleId || !violationRules.some(r => r.id === selectedRuleId)) {
-        setSelectedRuleId(violationRules[0].id);
-        setCustomPoints(violationRules[0].points);
+    if (validViolationRules.length > 0) {
+      if (!selectedRuleId || !validViolationRules.some(r => r.id === selectedRuleId)) {
+        setSelectedRuleId(validViolationRules[0].id);
+        setCustomPoints(validViolationRules[0].points);
       }
     }
-  }, [violationRules]);
+  }, [validViolationRules]);
   
   const currentDayName = useMemo(() => getDayNameFromDate(date), [date]);
 
@@ -253,12 +262,12 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
   };
 
   const selectedStudent = students.find(s => s.id === selectedStudentId);
-  const selectedRule = violationRules.find(r => r.id === selectedRuleId);
+  const selectedRule = validViolationRules.find(r => r.id === selectedRuleId);
   const studentSummary = summaries.find(s => s.student.id === selectedStudentId);
 
   const handleRuleChange = (ruleId: string) => {
     setSelectedRuleId(ruleId);
-    const found = violationRules.find(r => r.id === ruleId);
+    const found = validViolationRules.find(r => r.id === ruleId);
     if (found) {
       setCustomPoints(found.points);
     }
@@ -771,23 +780,23 @@ export const InputPelanggaranView: React.FC<InputPelanggaranViewProps> = ({
             className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium text-slate-900"
           >
             <optgroup label="🔴 Pelanggaran Berat">
-              {violationRules.filter(r => (r.category || '').toLowerCase() === 'berat').map(r => (
+              {validViolationRules.filter(r => (r.category || '').toLowerCase() === 'berat').map(r => (
                 <option key={r.id} value={r.id}>{r.name} (+{r.points} Pt)</option>
               ))}
             </optgroup>
             <optgroup label="⚠️ Pelanggaran Sedang">
-              {violationRules.filter(r => (r.category || '').toLowerCase() === 'sedang').map(r => (
+              {validViolationRules.filter(r => (r.category || '').toLowerCase() === 'sedang').map(r => (
                 <option key={r.id} value={r.id}>{r.name} (+{r.points} Pt)</option>
               ))}
             </optgroup>
             <optgroup label="⚡ Pelanggaran Ringan">
-              {violationRules.filter(r => (r.category || '').toLowerCase() === 'ringan').map(r => (
+              {validViolationRules.filter(r => (r.category || '').toLowerCase() === 'ringan').map(r => (
                 <option key={r.id} value={r.id}>{r.name} (+{r.points} Pt)</option>
               ))}
             </optgroup>
-            {violationRules.filter(r => !['berat', 'sedang', 'ringan'].includes((r.category || '').toLowerCase())).length > 0 && (
+            {validViolationRules.filter(r => !['berat', 'sedang', 'ringan'].includes((r.category || '').toLowerCase())).length > 0 && (
               <optgroup label="📌 Pelanggaran Lainnya">
-                {violationRules.filter(r => !['berat', 'sedang', 'ringan'].includes((r.category || '').toLowerCase())).map(r => (
+                {validViolationRules.filter(r => !['berat', 'sedang', 'ringan'].includes((r.category || '').toLowerCase())).map(r => (
                   <option key={r.id} value={r.id}>{r.name} (+{r.points} Pt)</option>
                 ))}
               </optgroup>

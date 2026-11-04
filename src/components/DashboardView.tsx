@@ -44,6 +44,7 @@ import {
   Legend
 } from 'recharts';
 import { NavTab } from './Sidebar';
+import { sortViolationsByDateDesc } from '../utils/storage';
 
 interface DashboardViewProps {
   students: Student[];
@@ -105,11 +106,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const sedangCount = violations.filter(v => v.category === 'sedang').length;
   const ringanCount = violations.filter(v => v.category === 'ringan').length;
 
-  // Recent records
+  // Recent records (sorted by incident date descending)
   const recentViolations = useMemo(() => {
-    return [...violations]
-      .sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime())
-      .slice(0, 5);
+    return sortViolationsByDateDesc(violations).slice(0, 5);
   }, [violations]);
 
   const recentRewards = useMemo(() => {

@@ -20,11 +20,14 @@ import {
   Clock,
   MapPin,
   RefreshCw,
-  X
+  X,
+  ArrowUpDown,
+  ArrowDown,
+  ArrowUp
 } from 'lucide-react';
 import { exportViolationsToExcel, downloadViolationTemplate, importViolationsFromExcel } from '../utils/excel';
 import { openWhatsApp, generateViolationWAMessage, sendViaGateway } from '../utils/whatsapp';
-import { normalizeRecordDate } from '../utils/storage';
+import { normalizeRecordDate, compareViolationsByDate, sortViolationsByDateDesc } from '../utils/storage';
 import { EditPelanggaranModal } from './EditPelanggaranModal';
 
 interface DataPelanggaranViewProps {
@@ -122,6 +125,7 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [selectedClass, setSelectedClass] = useState<string>('ALL');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [detailRecord, setDetailRecord] = useState<ViolationRecord | null>(null);
   const [editingRecord, setEditingRecord] = useState<ViolationRecord | null>(null);
   const [deleteRecord, setDeleteRecord] = useState<ViolationRecord | null>(null);
@@ -220,6 +224,11 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
     return matchesCat && matchesCls && matchesSearch;
   });
 
+  // Sort violations by incident date (tanggal kejadian) - default descending (terbaru di atas)
+  const sortedViolations = useMemo(() => {
+    return [...filteredViolations].sort((a, b) => compareViolationsByDate(a, b, sortOrder));
+  }, [filteredViolations, sortOrder]);
+
   const handleSendWA = async (record: ViolationRecord) => {
     const student = getStudentForViolation(record);
     if (!student) {
@@ -296,7 +305,7 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
           />
 
           <button
-            onClick={() => exportViolationsToExcel(violations, violationRules)}
+            onClick={() => exportViolationsToExcel(sortedViolations.length > 0 ? sortedViolations : [...violations].sort((a, b) => compareViolationsByDate(a, b, sortOrder)), violationRules)}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-slate-600" />
@@ -376,6 +385,30 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
               ))}
             </select>
           </div>
+
+          {/* Sort Order Toggle */}
+          <button
+            type="button"
+            onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold border transition cursor-pointer ml-1 ${
+              sortOrder === 'desc'
+                ? 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100'
+                : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+            }`}
+            title="Klik untuk beralih antara Tanggal Terbaru atau Terlama"
+          >
+            {sortOrder === 'desc' ? (
+              <>
+                <ArrowDown className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Urutan: Tanggal Terbaru di Atas</span>
+              </>
+            ) : (
+              <>
+                <ArrowUp className="w-3.5 h-3.5 text-amber-700" />
+                <span>Urutan: Tanggal Terlama di Atas</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
@@ -385,7 +418,28 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-emerald-950 text-emerald-100 border-b border-emerald-900">
-                <th className="py-3 px-4 font-semibold">Tanggal</th>
+                <th
+                  onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                  className="py-3 px-4 font-semibold cursor-pointer select-none hover:bg-emerald-900 transition"
+                  title="Klik untuk mengubah urutan tanggal kejadian"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Tanggal Kejadian</span>
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-900/90 text-amber-300 border border-emerald-700 shadow-xs">
+                      {sortOrder === 'desc' ? (
+                        <>
+                          <ArrowDown className="w-3 h-3 text-amber-300" />
+                          <span>Terbaru</span>
+                        </>
+                      ) : (
+                        <>
+                          <ArrowUp className="w-3 h-3 text-amber-300" />
+                          <span>Terlama</span>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                </th>
                 <th className="py-3 px-4 font-semibold">Nama Siswa</th>
                 <th className="py-3 px-4 font-semibold">Kelas</th>
                 <th className="py-3 px-4 font-semibold">Kategori</th>
@@ -396,14 +450,14 @@ export const DataPelanggaranView: React.FC<DataPelanggaranViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredViolations.length === 0 ? (
+              {sortedViolations.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-10 text-slate-400">
                     Tidak ada catatan pelanggaran yang sesuai filter.
                   </td>
                 </tr>
               ) : (
-                filteredViolations.map((v, idx) => {
+                sortedViolations.map((v, idx) => {
                   const student = getStudentForViolation(v);
                   const summary = student ? summaryMap.get(student.id) : summaryMap.get(v.studentId);
                   const displayRuleName = getDisplayRuleName(v, violationRules);

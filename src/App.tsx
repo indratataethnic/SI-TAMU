@@ -41,7 +41,9 @@ import {
   sanitizeRecords,
   normalizeRecordDate,
   isCorruptedNisn,
-  isCorruptedAccessCode
+  isCorruptedAccessCode,
+  sortViolationsByDateDesc,
+  sanitizeViolationRules
 } from './utils/storage';
 import { OFFICIAL_WEBHOOK_URL, initialTeachers, initialPiketSchedules } from './data/initialData';
 import {
@@ -441,8 +443,9 @@ export default function App() {
 
       unsubViolations = subscribeFirestoreCollection<ViolationRecord>('violations', (items) => {
         if (items && !isSyncPausedRef.current) {
-          setViolations(items);
-          saveViolations(items);
+          const sorted = sortViolationsByDateDesc(items);
+          setViolations(sorted);
+          saveViolations(sorted);
         }
       });
 
@@ -469,8 +472,9 @@ export default function App() {
 
       unsubRules = subscribeFirestoreCollection<ViolationRule>('violationRules', (items) => {
         if (items && items.length > 0 && !isSyncPausedRef.current) {
-          setViolationRules(items);
-          saveViolationRules(items);
+          const cleanRules = sanitizeViolationRules(items);
+          setViolationRules(cleanRules);
+          saveViolationRules(cleanRules);
         }
       });
 
@@ -784,7 +788,7 @@ export default function App() {
         };
       }), 'VIOL');
 
-      const finalViolations = mappedViolations;
+      const finalViolations = sortViolationsByDateDesc(mappedViolations);
       setViolations(finalViolations);
       saveViolations(finalViolations);
     }
@@ -1020,7 +1024,7 @@ export default function App() {
       pelanggaran: finalRule,
       note: finalDesc
     } as any;
-    const updated = [cleanViolation, ...violations];
+    const updated = sortViolationsByDateDesc([cleanViolation, ...violations]);
     setViolations(updated);
     saveViolations(updated);
     triggerSheetsSync({ violations: updated });
@@ -1083,13 +1087,14 @@ export default function App() {
       });
     }
 
-    setViolations(updated);
-    saveViolations(updated);
+    const sortedUpdated = sortViolationsByDateDesc(updated);
+    setViolations(sortedUpdated);
+    saveViolations(sortedUpdated);
 
     // 2. Save directly to Cloud Firestore
     setSheetsSyncStatus('🔄 Menyimpan editan ke Firebase Cloud Firestore...');
     saveFirestoreDoc('violations', cleanViolation.id, cleanViolation);
-    await triggerSheetsSync({ violations: updated });
+    await triggerSheetsSync({ violations: sortedUpdated });
 
     // 3. Complete and notify
     setSheetsSyncStatus('✓ Data berhasil disimpan ke Firebase Cloud Firestore.');
@@ -1123,7 +1128,7 @@ export default function App() {
   const handleImportViolations = (importedViolations: ViolationRecord[]) => {
     lastLocalActionRef.current = Date.now();
     lastLocalSaveTimestampRef.current = Date.now();
-    const clean = sanitizeRecords<ViolationRecord>(importedViolations, 'VIOL');
+    const clean = sortViolationsByDateDesc(sanitizeRecords<ViolationRecord>(importedViolations, 'VIOL'));
     setViolations(clean);
     saveViolations(clean);
     triggerSheetsSync({ violations: clean });
@@ -1544,7 +1549,8 @@ export default function App() {
       {suratModalData.open && suratModalData.summary && (
         <SuratModal
           summary={suratModalData.summary}
-          violations={violations.filter(v => v.studentId === suratModalData.summary?.student.id)}
+          violations={violations}
+          compensations={compensations}
           teachers={teachers}
           violationRules={violationRules}
           settings={settings}

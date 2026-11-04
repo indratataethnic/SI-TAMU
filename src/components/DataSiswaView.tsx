@@ -23,6 +23,7 @@ import {
 import { exportStudentsToExcel, downloadStudentTemplate, importStudentsFromExcel } from '../utils/excel';
 import { PRIMARY_SCHOOL_CLASSES, PRIMARY_SCHOOL_PARALLEL_CLASSES, getAvailableClasses, matchClassFilter } from '../data/classOptions';
 import { KenaikanKelasModal } from './KenaikanKelasModal';
+import { sortViolationsByDateDesc } from '../utils/storage';
 
 interface DataSiswaViewProps {
   students: Student[];
@@ -812,8 +813,7 @@ export const DataSiswaView: React.FC<DataSiswaViewProps> = ({
                   <p className="text-slate-400 italic">Belum ada riwayat pelanggaran.</p>
                 ) : (
                   <div className="space-y-1.5">
-                    {violations
-                      .filter(v => v.studentId === detailStudent.id)
+                    {sortViolationsByDateDesc(violations.filter(v => v.studentId === detailStudent.id))
                       .map((v, idx) => (
                         <div key={`${v.id || 'v'}-${idx}`} className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-start justify-between">
                           <div>
