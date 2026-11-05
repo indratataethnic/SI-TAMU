@@ -16,6 +16,17 @@
     .no-print {
       display: none !important;
     }
+    /* Strictly hide entire dashboard, navbar, sidebar when printing letter or modal */
+    #app-shell,
+    .hidden-on-modal-print,
+    body.printing-modal #app-shell,
+    body:has(.print-letter) #app-shell,
+    body:has(.print-certificate) #app-shell {
+      display: none !important;
+      visibility: hidden !important;
+      height: 0 !important;
+      overflow: hidden !important;
+    }
     .no-print-bg {
       position: static !important;
       background: transparent !important;
@@ -24,6 +35,8 @@
       overflow: visible !important;
       inset: auto !important;
       display: block !important;
+      width: 100% !important;
+      height: auto !important;
     }
     .print-only {
       display: block !important;
@@ -45,6 +58,7 @@
       padding: 0 !important;
       margin: 0 !important;
       overflow: visible !important;
+      page-break-inside: avoid;
     }
     .print-expand {
       max-height: none !important;

@@ -1331,20 +1331,28 @@ export default function App() {
     });
   };
 
+  const isAnyPrintModalOpen = Boolean(
+    (suratModalData.open && suratModalData.summary) ||
+    (sertifikatModalData.open && sertifikatModalData.reward) ||
+    (jurnalPiketModalOpen && jurnalPiketData)
+  );
+
   return (
-    <div className="min-h-screen bg-slate-100/80 text-slate-800 flex flex-col font-sans selection:bg-emerald-900 selection:text-white">
-      {/* Navigation Header */}
-      <Navbar
-        role={role}
-        settings={settings}
-        onToggleRole={handleToggleRole}
-        onOpenSettingsModal={() => setSettingsModalOpen(true)}
-        onToggleMobileSidebar={() => setMobileSidebarOpen(prev => !prev)}
-        urgentAlertCount={urgentAlertCount}
-        isSyncing={isLoadingSpreadsheet}
-        onManualSync={handlePushToSpreadsheet}
-        lastSyncTime={lastSyncTime}
-      />
+    <div className={`min-h-screen bg-slate-100/80 text-slate-800 flex flex-col font-sans selection:bg-emerald-900 selection:text-white ${isAnyPrintModalOpen ? 'print:p-0 print:m-0 print:bg-white print:overflow-visible' : ''}`}>
+      {/* Background Application Shell (Hidden completely when printing official letters/modals) */}
+      <div id="app-shell" className={`flex-1 flex flex-col ${isAnyPrintModalOpen ? 'no-print print:hidden hidden-on-modal-print' : ''}`}>
+        {/* Navigation Header */}
+        <Navbar
+          role={role}
+          settings={settings}
+          onToggleRole={handleToggleRole}
+          onOpenSettingsModal={() => setSettingsModalOpen(true)}
+          onToggleMobileSidebar={() => setMobileSidebarOpen(prev => !prev)}
+          urgentAlertCount={urgentAlertCount}
+          isSyncing={isLoadingSpreadsheet}
+          onManualSync={handlePushToSpreadsheet}
+          lastSyncTime={lastSyncTime}
+        />
 
       {/* Main Body Layout */}
       <div className="flex-1 flex max-w-7xl w-full mx-auto">
@@ -1544,6 +1552,7 @@ export default function App() {
           )}
         </main>
       </div>
+      </div> {/* End of #app-shell */}
 
       {/* Official Letter Modal (Panggilan Ortu, Skorsing, Pembinaan di Rumah) */}
       {suratModalData.open && suratModalData.summary && (

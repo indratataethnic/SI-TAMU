@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import { Student, Teacher, StudentScoreSummary, SchoolSettings, ViolationRecord, ViolationRule, CompensationRecord } from '../types';
 import { Printer, X, MessageSquare, FileText, AlertTriangle, ShieldCheck, CheckCircle2, MapPin, User, Calendar } from 'lucide-react';
 import { openWhatsApp, generateThresholdWAMessage } from '../utils/whatsapp';
@@ -130,7 +130,15 @@ export const SuratModal: React.FC<SuratModalProps> = ({
     return assigned === studentCls || assigned.replace(/\s+/g, '') === studentCls.replace(/\s+/g, '');
   });
 
+  useEffect(() => {
+    document.body.classList.add('printing-modal');
+    return () => {
+      document.body.classList.remove('printing-modal');
+    };
+  }, []);
+
   const handlePrint = () => {
+    document.body.classList.add('printing-modal');
     window.print();
   };
 
@@ -172,8 +180,8 @@ export const SuratModal: React.FC<SuratModalProps> = ({
   const kotaAsal = settings.schoolAddress?.split(',')?.[1]?.trim() || settings.schoolAddress?.split(',')?.[0]?.trim() || 'Kota Pasuruan';
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex justify-center items-start p-2 sm:p-6 no-print-bg">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden my-2 sm:my-4 border border-slate-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-sm flex justify-center items-start p-2 sm:p-6 no-print-bg print:p-0 print:m-0 print:static print:bg-white print:overflow-visible print:w-full print:block print:inset-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden my-2 sm:my-4 border border-slate-200 print:border-none print:shadow-none print:my-0 print:p-0 print:max-w-none print:w-full print:rounded-none print:overflow-visible">
         {/* Header Action Bar (Hidden on Print) */}
         <div className="no-print bg-emerald-950 text-white px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3 border-b border-emerald-800">
           <div className="flex items-center gap-2">

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { Teacher, ViolationRecord, RewardRecord, SchoolSettings, DayOfWeek } from '../types';
 import {
   Printer,
@@ -31,6 +31,15 @@ export const JurnalPiketModal: React.FC<JurnalPiketModalProps> = ({
   rewards,
   settings
 }) => {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('printing-modal');
+      return () => {
+        document.body.classList.remove('printing-modal');
+      };
+    }
+  }, [isOpen]);
+
   // Filter records for the selected date
   const dayViolations = violations.filter(v => v.date === selectedDate);
   const dayRewards = rewards.filter(r => r.date === selectedDate);
@@ -39,6 +48,7 @@ export const JurnalPiketModal: React.FC<JurnalPiketModalProps> = ({
   const totalRewardPoints = dayRewards.reduce((acc, r) => acc + (Number(r.points) || 0), 0);
 
   const handlePrint = () => {
+    document.body.classList.add('printing-modal');
     window.print();
   };
 
@@ -61,8 +71,8 @@ export const JurnalPiketModal: React.FC<JurnalPiketModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-8">
+    <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto no-print-bg print:p-0 print:m-0 print:static print:bg-white print:overflow-visible print:w-full print:block print:inset-auto">
+      <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-8 print:border-none print:shadow-none print:my-0 print:p-0 print:max-w-none print:w-full print:rounded-none print:overflow-visible">
         {/* Modal Header */}
         <div className="bg-emerald-950 px-6 py-4 text-white flex items-center justify-between print:hidden">
           <div className="flex items-center gap-2">

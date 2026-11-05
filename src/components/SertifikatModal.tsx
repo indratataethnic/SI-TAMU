@@ -20,6 +20,7 @@ export const SertifikatModal: React.FC<SertifikatModalProps> = ({
   onClose
 }) => {
   useEffect(() => {
+    document.body.classList.add('printing-modal');
     // Launch celebratory confetti
     try {
       confetti({
@@ -31,9 +32,13 @@ export const SertifikatModal: React.FC<SertifikatModalProps> = ({
     } catch (e) {
       // ignore
     }
+    return () => {
+      document.body.classList.remove('printing-modal');
+    };
   }, []);
 
   const handlePrint = () => {
+    document.body.classList.add('printing-modal');
     window.print();
   };
 
@@ -53,8 +58,8 @@ export const SertifikatModal: React.FC<SertifikatModalProps> = ({
   const certNumber = reward.certificateNumber || `PIAGAM/SITAMU/${new Date().getFullYear()}/${reward.id.slice(-4)}`;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex justify-center items-start p-3 sm:p-6 no-print-bg">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden my-4 border border-emerald-900/30">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex justify-center items-start p-3 sm:p-6 no-print-bg print:p-0 print:m-0 print:static print:bg-white print:overflow-visible print:w-full print:block print:inset-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden my-4 border border-emerald-900/30 print:border-none print:shadow-none print:my-0 print:p-0 print:max-w-none print:w-full print:rounded-none print:overflow-visible">
         {/* Header Action Bar (Hidden on Print) */}
         <div className="no-print bg-emerald-950 text-white px-6 py-4 flex flex-wrap items-center justify-between gap-3 border-b border-emerald-800">
           <div className="flex items-center gap-2">
